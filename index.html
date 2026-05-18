@@ -3055,14 +3055,22 @@ function renderCalendarLists(acks, yr, mo){
     // Google Cal pending events (booking requests not yet turned into receipts)
     calPending.forEach(function(ev){
       var name = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+      // Try to extract client name from title format: "Service — Client (₱300 DP)"
+      var nameMatch = name.match(/—\s*(.+?)\s*\(/);
+      var clientName = nameMatch ? nameMatch[1].trim() : name;
+      var svcMatch   = name.match(/^(.+?)\s*—/);
+      var service    = svcMatch ? svcMatch[1].trim() : '';
       var date = String(ev.start||'').slice(0,10);
-      pendHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);background:rgba(255,243,205,0.3);">'+
+      var evId = encodeURIComponent(ev.id||'');
+      pendHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);background:rgba(255,243,205,0.2);">'+
         '<div style="width:8px;height:8px;border-radius:50%;background:#ffc107;flex-shrink:0;"></div>'+
         '<div style="flex:1;">'+
-          '<div style="font-weight:600;font-size:13px;">'+escHtml(name)+'</div>'+
-          '<div style="font-size:11px;color:var(--muted);">📅 '+date+' · Booking request (not yet receipted)</div>'+
+          '<div style="font-weight:600;font-size:13px;">'+escHtml(clientName)+'</div>'+
+          '<div style="font-size:11px;color:var(--muted);">📅 '+date+' · '+escHtml(service||'Booking request')+' · From booking form</div>'+
         '</div>'+
-        '<div><span style="font-size:10px;background:rgba(255,193,7,0.15);color:#856404;border-radius:8px;padding:3px 8px;">Pending</span></div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
+          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" onclick="openNewAckFromCalEvent(this)">+ Create Receipt</button>'+
+        '</div>'+
       '</div>';
     });
     pendEl.innerHTML = pendHtml || '<div class="tm">No pending payments this month.</div>';
@@ -3126,6 +3134,22 @@ function calDayClick(dateStr){
 function calConfirmAck(btn){ var id=btn.dataset.aid; confirmAck(id); closeModal(); }
 function calPrintAck(btn)  { var id=btn.dataset.aid; printAck(id); }
 function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal(); }
+
+function openNewAckFromCalEvent(btn){
+  // Pre-fill new receipt modal from a Google Calendar booking event
+  var name = decodeURIComponent(btn.dataset.name||'');
+  var date = btn.dataset.date||'';
+  var svc  = decodeURIComponent(btn.dataset.svc||'');
+  openNewAck();
+  setTimeout(function(){
+    var fbEl  = document.getElementById('ma-fb');
+    var dateEl= document.getElementById('ma-date');
+    var svcEl = document.getElementById('ma-svc');
+    if(fbEl)   fbEl.value   = name;
+    if(dateEl) dateEl.value = date;
+    if(svcEl)  svcEl.value  = svc;
+  }, 150);
+}
 
 async function confirmAck(id){
   const a = (DB.acknowledgements||[]).find(x=>x.id===id);
@@ -4999,11 +5023,11 @@ function renderAcks(){
           </div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
-          ${status==='pending'?`<button class="btn btn-sm btn-teal" onclick="confirmAck('${a.id}')">✓ Confirm</button>`:''}
-          <button class="btn btn-sm btn-outline" onclick="viewAckDetail('${a.id}')">👁</button>
-          <button class="btn btn-sm btn-outline" onclick="printAck('${a.id}')">🖨</button>
-          <button class="btn btn-sm btn-outline" onclick="toggleHideAck('${a.id}')" title="${isHidden?'Show':'Hide'}">${isHidden?'👁':'🙈'}</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteAck('${a.id}')">🗑</button>
+          ${status==='pending'?'<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="confirmAck(this.dataset.aid)">✓ Confirm</button>':''}
+          <button class="btn btn-sm btn-outline" data-aid="${a.id}" onclick="viewAckDetail(this.dataset.aid)">👁</button>
+          <button class="btn btn-sm btn-outline" data-aid="${a.id}" onclick="printAck(this.dataset.aid)">🖨</button>
+          <button class="btn btn-sm btn-outline" data-aid="${a.id}" onclick="toggleHideAck(this.dataset.aid)" title="${isHidden?'Show':'Hide'}">${isHidden?'👁':'🙈'}</button>
+          <button class="btn btn-sm btn-danger" data-aid="${a.id}" onclick="deleteAck(this.dataset.aid)">🗑</button>
         </div>
       </div>`;
     }).join('');
