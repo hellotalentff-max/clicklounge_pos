@@ -1244,6 +1244,7 @@ tr:hover td { background:var(--light); }
     <button onclick="showPage('transactions')" data-page="transactions"><span class="ni">≡</span>Transactions</button>
     <button onclick="showPage('tasks')" data-page="tasks"><span class="ni">✓</span>Tasks</button>
     <button onclick="showPage('expenses')" data-page="expenses"><span class="ni">💸</span>Expenses</button>
+    <button onclick="showPage('fund')" data-page="fund"><span class="ni">🔄</span>Fund Transfers</button>
     <button onclick="showPage('gifts')" data-page="gifts"><span class="ni">🎁</span>Gifts</button>
     <button onclick="showPage('eod')" data-page="eod"><span class="ni">◑</span>End of Shift</button>
     <button onclick="showPage('reports')" data-page="reports" class="admin-only"><span class="ni">📊</span>Monthly Reports</button>
@@ -1813,6 +1814,71 @@ tr:hover td { background:var(--light); }
       <div class="card">
         <div class="ct">This Month</div>
         <div id="exp-page-month"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FUND TRANSFERS -->
+<div id="page-fund" class="page">
+  <div class="ph">
+    <div><h2>Fund Transfers</h2><p>Internal transfers and client refunds</p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
+    <div>
+      <div class="card">
+        <div class="ct">Log Transfer or Refund</div>
+        <div class="field mb12">
+          <label>Type</label>
+          <select id="ft-page-type" class="sinput" style="width:100%;" onchange="renderFTTypeHint()">
+            <optgroup label="Internal Transfers">
+              <option value="Cash to Bank">Cash to Bank Deposit</option>
+              <option value="GCash to Bank">GCash to Bank Transfer</option>
+              <option value="Bank to Cash">Bank to Cash Withdrawal</option>
+              <option value="Bank to GCash">Bank to GCash Load</option>
+            </optgroup>
+            <optgroup label="Client Refunds">
+              <option value="Refund Cash">Refund via Cash (to client)</option>
+              <option value="Refund GCash">Refund via GCash (to client)</option>
+              <option value="Refund Bank">Refund via Bank (to client)</option>
+            </optgroup>
+          </select>
+        </div>
+        <div id="ft-page-hint" style="font-size:11px;color:var(--muted);margin-bottom:12px;padding:8px 10px;background:var(--light);border-radius:6px;"></div>
+        <div class="frow c2">
+          <div class="field mb12">
+            <label>Amount (Ph) *</label>
+            <input type="number" id="ft-page-amt" class="sinput" placeholder="0" min="0">
+          </div>
+          <div class="field mb12">
+            <label>Date</label>
+            <input type="date" id="ft-page-date" class="sinput">
+          </div>
+        </div>
+        <div class="field mb12">
+          <label>Reference / Client Name</label>
+          <input type="text" id="ft-page-ref" class="sinput" placeholder="Bank ref #, or client name for refunds">
+        </div>
+        <div class="field mb16">
+          <label>Notes</label>
+          <input type="text" id="ft-page-notes" class="sinput" placeholder="Optional details">
+        </div>
+        <div class="fe">
+          <button class="btn btn-gold" style="min-width:140px;padding:10px;" onclick="saveFundTransfer()">Save</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div class="ct" style="margin:0;">Transfer Log</div>
+          <select id="ft-filter" class="sinput" style="font-size:11px;padding:4px 8px;" onchange="renderFundTransfersPage()">
+            <option value="all">All</option>
+            <option value="internal">Internal only</option>
+            <option value="refund">Refunds only</option>
+          </select>
+        </div>
+        <div id="ft-page-list"></div>
       </div>
     </div>
   </div>
@@ -3383,7 +3449,7 @@ function showPage(pg){
     transactions: ()=>{ if(hasUrl()&&(!DB.transactions||!DB.transactions.length)){ syncAll().then(()=>{ renderTxns(); showTxTab('inv'); }); } else { renderTxns(); showTxTab('inv'); } },
     expenses:     renderExpensesPage,
     gifts:        ()=>{ syncAll().then(renderGiftsPage); },
-    eod:          renderEOD,
+    fund:         renderFundTransfersPage,
     settings:     renderSettings,
     calendar:     renderCalendar,
     reports:      renderReports,
@@ -6156,24 +6222,234 @@ function showTxTab(tab){
 // ================================================================
 //  RENDER EXPENSES PAGE
 // ================================================================
-function renderExpensesPage(){
-  const el = document.getElementById('exp-page-list');
+// ================================================================
+//  FUND TRANSFERS
+// ================================================================
+var FT_TYPE_HINTS = {
+  'Cash to Bank':  'Internal: Moving cash from your drawer into the bank account. Does NOT reduce revenue.',
+  'GCash to Bank': 'Internal: Moving GCash balance into the bank account. Does NOT reduce revenue.',
+  'Bank to Cash':  'Internal: Withdrawing cash from bank for petty cash/change fund.',
+  'Bank to GCash': 'Internal: Loading GCash from bank account.',
+  'Refund Cash':   'Refund: Cash given back to a client. This IS deducted from revenue in reports.',
+  'Refund GCash':  'Refund: GCash sent back to a client. This IS deducted from revenue in reports.',
+  'Refund Bank':   'Refund: Bank transfer sent back to a client. This IS deducted from revenue in reports.'
+};
+
+function renderFTTypeHint(){
+  var type = document.getElementById('ft-page-type')?.value||'';
+  var hint = document.getElementById('ft-page-hint');
+  if(hint){ hint.textContent = FT_TYPE_HINTS[type]||''; }
+}
+
+function saveFundTransfer(){
+  var type  = document.getElementById('ft-page-type')?.value||'';
+  var amt   = parseFloat(document.getElementById('ft-page-amt')?.value)||0;
+  var date  = document.getElementById('ft-page-date')?.value||todayStr();
+  var ref   = (document.getElementById('ft-page-ref')?.value||'').trim();
+  var notes = (document.getElementById('ft-page-notes')?.value||'').trim();
+
+  if(!type){ notify('Select a transfer type','error'); return; }
+  if(!amt)  { notify('Enter an amount','error'); return; }
+
+  var isRefund   = type.toLowerCase().includes('refund');
+  var category   = isRefund ? 'Refund' : 'Internal';
+
+  var ft = {id:uid(), date:date, type:type, category:category, amt:amt, ref:ref, notes:notes};
+  if(!DB.fundTransfers) DB.fundTransfers=[];
+  DB.fundTransfers.push(ft);
+  saveLocal();
+  push('saveFundTransfer', ft);
+  logActivity('Fund Transfer', type+' — Ph'+fmt(amt)+(ref?' ('+ref+')':''), isRefund?'error':'info');
+  notify(type+' logged: Ph'+fmt(amt),'success');
+
+  var clear = function(id){ var e=document.getElementById(id); if(e) e.value=''; };
+  clear('ft-page-amt'); clear('ft-page-ref'); clear('ft-page-notes');
+  renderFundTransfersPage();
+}
+
+function renderFundTransfersPage(){
+  var today   = todayStr();
+  var dateEl  = document.getElementById('ft-page-date');
+  if(dateEl && !dateEl.value) dateEl.value = today;
+
+  // Show type hint
+  renderFTTypeHint();
+
+  var filter  = document.getElementById('ft-filter')?.value||'all';
+  var allFTs  = (DB.fundTransfers||[]).slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+
+  if(filter==='internal') allFTs = allFTs.filter(function(f){ return f.category!=='Refund' && !String(f.type||'').toLowerCase().includes('refund'); });
+  if(filter==='refund')   allFTs = allFTs.filter(function(f){ return f.category==='Refund' || String(f.type||'').toLowerCase().includes('refund'); });
+
+  var el = document.getElementById('ft-page-list');
   if(!el) return;
-  const exps = (DB.expenses||[]).slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-  if(!exps.length){ el.innerHTML='<div class="tm">No expenses recorded.</div>'; return; }
-  el.innerHTML='<div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th>Mode</th></tr></thead><tbody>'+
-    exps.map((e,i)=>`<tr style="background:${i%2===0?'var(--white)':'var(--light)'};">
-      <td style="font-size:11px;white-space:nowrap;">${e.date}</td>
-      <td style="font-weight:500;">${escHtml(e.desc||'')}</td>
-      <td style="text-align:right;color:var(--danger);font-weight:600;">₱${fmt(+e.amt)}</td>
-      <td style="font-size:11px;color:var(--muted);">${e.mop||'—'}</td>
-    </tr>`).join('')+
-    `<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--border);">
-      <td colspan="2">Total</td>
-      <td style="text-align:right;color:var(--danger);">₱${fmt(exps.reduce((s,e)=>s+(+e.amt||0),0))}</td>
-      <td></td>
-    </tr>`+
-  '</tbody></table></div>';
+
+  if(!allFTs.length){
+    el.innerHTML='<div class="tm">No transfers recorded yet.</div>';
+    return;
+  }
+
+  // Summary stats
+  var internal = allFTs.filter(function(f){ return !String(f.type||'').toLowerCase().includes('refund'); });
+  var refunds  = allFTs.filter(function(f){ return  String(f.type||'').toLowerCase().includes('refund'); });
+  var intTotal = internal.reduce(function(s,f){ return s+(+f.amt||0); },0);
+  var refTotal = refunds.reduce(function(s,f){ return s+(+f.amt||0); },0);
+
+  var html = '';
+  if(filter==='all'){
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">'+
+      '<div class="rep-card-stat"><div class="rs-label">Internal Transfers</div><div class="rs-val rs-teal">Ph'+fmt(intTotal)+'</div></div>'+
+      '<div class="rep-card-stat"><div class="rs-label">Client Refunds</div><div class="rs-val rs-danger">Ph'+fmt(refTotal)+'</div></div>'+
+    '</div>';
+  }
+
+  html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  html += '<thead><tr style="background:var(--slate);color:var(--cream);">'+
+    '<th style="padding:5px 7px;text-align:left;">Date</th>'+
+    '<th style="padding:5px 7px;text-align:left;">Type</th>'+
+    '<th style="padding:5px 7px;text-align:right;">Amount</th>'+
+    '<th style="padding:5px 7px;">Ref / Notes</th>'+
+    '<th style="padding:5px 7px;"></th>'+
+    '</tr></thead><tbody>';
+
+  allFTs.forEach(function(f,i){
+    var bg      = i%2===0?'var(--white)':'var(--light)';
+    var isRef   = String(f.type||'').toLowerCase().includes('refund');
+    var typeColor = isRef ? 'var(--danger)' : 'var(--teal)';
+    var badge   = isRef
+      ? '<span style="font-size:9px;background:rgba(192,84,74,0.1);color:var(--danger);border-radius:6px;padding:1px 6px;">Refund</span>'
+      : '<span style="font-size:9px;background:rgba(81,137,125,0.1);color:var(--teal);border-radius:6px;padding:1px 6px;">Internal</span>';
+
+    html += '<tr style="background:'+bg+';">'+
+      '<td style="padding:5px 7px;font-size:11px;white-space:nowrap;">'+escHtml(String(f.date||'').slice(0,10))+'</td>'+
+      '<td style="padding:5px 7px;">'+badge+' <span style="font-size:11px;color:'+typeColor+';">'+escHtml(f.type||'—')+'</span></td>'+
+      '<td style="padding:5px 7px;text-align:right;font-weight:600;color:'+typeColor+';">Ph'+fmt(+f.amt||0)+'</td>'+
+      '<td style="padding:5px 7px;font-size:11px;color:var(--muted);">'+escHtml((f.ref||'')+(f.notes?' — '+f.notes:''))+'</td>'+
+      '<td style="padding:5px 7px;text-align:center;"><button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" data-fid="'+f.id+'" onclick="deleteFT(this.dataset.fid)">x</button></td>'+
+    '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+function deleteFT(id){
+  if(!confirm('Delete this transfer record?')) return;
+  DB.fundTransfers = (DB.fundTransfers||[]).filter(function(f){ return f.id!==id; });
+  saveLocal();
+  renderFundTransfersPage();
+  notify('Transfer deleted','info');
+}
+
+function saveExpensePage(){
+  var desc     = (document.getElementById('exp-desc')?.value||'').trim();
+  var amt      = parseFloat(document.getElementById('exp-amt')?.value)||0;
+  var mop      = document.getElementById('exp-mop')?.value||'Cash';
+  var category = document.getElementById('exp-category')?.value||'Operations';
+  var notes    = (document.getElementById('exp-notes-page')?.value||'').trim();
+  if(!desc){ notify('Enter a description','error'); return; }
+  if(!amt)  { notify('Enter an amount','error'); return; }
+  var exp = {id:uid(), date:todayStr(), desc:desc, amt:amt, mop:mop, category:category, notes:notes};
+  if(!DB.expenses) DB.expenses=[];
+  DB.expenses.push(exp);
+  saveLocal();
+  push('saveExpense', exp);
+  logActivity('Expense Logged', desc+' \u2014 \u20b1'+fmt(amt)+' ('+mop+')', 'info');
+  notify('Expense saved','success');
+  var clr = function(id){ var e=document.getElementById(id); if(e) e.value=''; };
+  clr('exp-desc'); clr('exp-amt'); clr('exp-notes-page');
+  renderExpensesPage();
+}
+
+function renderExpensesPage(){
+  var today  = todayStr();
+  var month  = today.slice(0,7);
+  var allExp = (DB.expenses||[]).slice();
+
+  // ── Today's expenses ──
+  var todayExp = allExp.filter(function(e){ return String(e.date||'').slice(0,10)===today; })
+                       .sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+
+  var listEl  = document.getElementById('exp-page-list');
+  var totalEl = document.getElementById('exp-page-total');
+
+  if(listEl){
+    if(!todayExp.length){
+      listEl.innerHTML='<div class="tm">No expenses recorded today.</div>';
+    } else {
+      var todayTotal = todayExp.reduce(function(s,e){ return s+(+e.amt||0); },0);
+      if(totalEl) totalEl.textContent='Total: ₱'+fmt(todayTotal);
+
+      var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      html += '<thead><tr style="background:var(--slate);color:var(--cream);">'+
+        '<th style="padding:6px 8px;text-align:left;">Description</th>'+
+        '<th style="padding:6px 8px;text-align:left;">Category</th>'+
+        '<th style="padding:6px 8px;text-align:right;">Amount</th>'+
+        '<th style="padding:6px 8px;">MOP</th>'+
+        '<th style="padding:6px 8px;"></th>'+
+        '</tr></thead><tbody>';
+
+      todayExp.forEach(function(e,i){
+        var bg = i%2===0?'var(--white)':'var(--light)';
+        html += '<tr style="background:'+bg+';">'+
+          '<td style="padding:6px 8px;font-weight:500;">'+escHtml(e.desc||'')+'</td>'+
+          '<td style="padding:6px 8px;"><span style="font-size:10px;background:var(--light2);border-radius:8px;padding:2px 7px;">'+escHtml(e.category||'Operations')+'</span></td>'+
+          '<td style="padding:6px 8px;text-align:right;color:var(--danger);font-weight:600;">₱'+fmt(+e.amt)+'</td>'+
+          '<td style="padding:6px 8px;font-size:11px;color:var(--muted);">'+escHtml(e.mop||'—')+'</td>'+
+          '<td style="padding:6px 8px;text-align:center;"><button class="btn btn-sm btn-danger" style="padding:2px 7px;font-size:10px;" data-eid="'+e.id+'" onclick="deleteExpense(this.dataset.eid)">✕</button></td>'+
+        '</tr>';
+      });
+
+      html += '<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--border);">'+
+        '<td colspan="2" style="padding:6px 8px;">Today Total</td>'+
+        '<td style="padding:6px 8px;text-align:right;color:var(--danger);">₱'+fmt(todayTotal)+'</td>'+
+        '<td colspan="2"></td></tr>';
+      html += '</tbody></table></div>';
+      listEl.innerHTML = html;
+    }
+  }
+
+  // ── This month breakdown by category ──
+  var monthExp = allExp.filter(function(e){ return String(e.date||'').startsWith(month); });
+  var monthEl  = document.getElementById('exp-page-month');
+  if(monthEl){
+    if(!monthExp.length){
+      monthEl.innerHTML='<div class="tm">No expenses this month yet.</div>';
+    } else {
+      var monthTotal = monthExp.reduce(function(s,e){ return s+(+e.amt||0); },0);
+
+      // Group by category
+      var byCat = {};
+      monthExp.forEach(function(e){
+        var cat = e.category||'Operations';
+        if(!byCat[cat]) byCat[cat]=0;
+        byCat[cat]+=(+e.amt||0);
+      });
+      var cats = Object.entries(byCat).sort(function(a,b){ return b[1]-a[1]; });
+      var maxAmt = cats[0]?cats[0][1]:1;
+
+      var html = '<div style="margin-bottom:12px;">';
+      cats.forEach(function(pair){
+        var cat=pair[0], amt=pair[1];
+        var pct = Math.round(amt/maxAmt*100);
+        html += '<div class="chart-bar-row">'+
+          '<div class="chart-bar-label" style="min-width:110px;font-size:12px;">'+escHtml(cat)+'</div>'+
+          '<div class="chart-bar-track"><div class="chart-bar-fill" style="width:'+pct+'%;background:var(--danger);"></div></div>'+
+          '<div class="chart-bar-val" style="color:var(--danger);">₱'+fmt(amt)+'</div>'+
+        '</div>';
+      });
+      html += '</div>';
+      html += '<div style="font-size:12px;font-weight:700;color:var(--danger);border-top:2px solid var(--border);padding-top:8px;">Month Total: ₱'+fmt(monthTotal)+'</div>';
+      monthEl.innerHTML = html;
+    }
+  }
+}
+
+function deleteExpense(id){
+  if(!confirm('Delete this expense?')) return;
+  DB.expenses = (DB.expenses||[]).filter(function(e){ return e.id!==id; });
+  saveLocal();
+  renderExpensesPage();
+  notify('Expense deleted','info');
 }
 
 // ================================================================
