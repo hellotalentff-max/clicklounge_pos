@@ -1604,7 +1604,6 @@ tr:hover td { background:var(--light); }
     <div><h2>Client Records</h2><p>CRM — history, activity and direct messaging</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-sm btn-outline" onclick="openImportClients()">📥 Import CSV</button>
-      <button class="btn btn-sm btn-danger" onclick="clearAllClients()" style="font-size:11px;">🗑 Clear Client Data</button>
       <button class="btn btn-gold" onclick="openCRMCompose()">✉ Send Campaign</button>
     </div>
   </div>
@@ -6559,8 +6558,13 @@ function renderClients(){
       return '<div class="cl-card" onclick="openClientProfile('+JSON.stringify(JSON.stringify(name))+')">'+
         '<div class="cl-card-header">'+
           '<div class="cl-avatar">'+ini+'</div>'+
-          '<div><div class="cl-name">'+escHtml(name)+'</div>'+
-          '<div class="cl-email">'+(c.email||'No email on file')+'</div></div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div class="cl-name">'+escHtml(name)+'</div>'+
+            '<div class="cl-email">'+(c.email||'No email on file')+'</div>'+
+          '</div>'+
+          '<button class="btn btn-sm btn-outline" style="flex-shrink:0;padding:4px 10px;font-size:11px;" '+
+            'data-cname="'+encodeURIComponent(name)+'" '+
+            'onclick="event.stopPropagation();openEditClient(this.dataset.cname)">✏ Edit</button>'+
         '</div>'+
         '<div class="cl-stats">'+
           '<div class="cl-stat"><div class="cl-stat-val">'+sessions+'</div><div class="cl-stat-lbl">Visits</div></div>'+
@@ -6581,6 +6585,111 @@ function renderClients(){
         '</div>'+
       '</div>';
     }).join('')+'</div>';
+}
+
+// ================================================================
+//  EDIT CLIENT (from card)
+// ================================================================
+function openEditClient(encodedName){
+  var name = decodeURIComponent(encodedName);
+  var c    = (DB.clients||[]).find(function(x){ return x.fbName===name; });
+  if(!c){ notify('Client not found','error'); return; }
+
+  var html =
+    '<h3 style="margin-bottom:16px;">&#9998; Edit Client</h3>'+
+    '<div class="field mb12">'+
+      '<label>FB Name *</label>'+
+      '<input type="text" id="ec-name" class="sinput" value="'+escHtml(c.fbName||'')+'" style="width:100%;">'+
+    '</div>'+
+    '<div class="field mb12">'+
+      '<label>Email</label>'+
+      '<input type="email" id="ec-email" class="sinput" value="'+escHtml(c.email||'')+'" placeholder="client@email.com" style="width:100%;">'+
+    '</div>'+
+    '<div class="frow c2" style="gap:10px;margin-bottom:12px;">'+
+      '<div class="field" style="margin:0;">'+
+        '<label>Phone</label>'+
+        '<input type="tel" id="ec-phone" class="sinput" value="'+escHtml(c.phone||'')+'" placeholder="09xx xxx xxxx" style="width:100%;">'+
+      '</div>'+
+      '<div class="field" style="margin:0;">'+
+        '<label>Birthday</label>'+
+        '<input type="date" id="ec-bday" class="sinput" value="'+escHtml(c.birthday||'')+'" style="width:100%;">'+
+      '</div>'+
+    '</div>'+
+    '<div class="frow c2" style="gap:10px;margin-bottom:12px;">'+
+      '<div class="field" style="margin:0;">'+
+        '<label>Client Type</label>'+
+        '<select id="ec-type" class="sinput" style="width:100%;">'+
+          '<option value="walkin"'+(c.type==='walkin'?' selected':'')+'>Walk-in</option>'+
+          '<option value="booked"'+(c.type==='booked'?' selected':'')+'>Booked</option>'+
+        '</select>'+
+      '</div>'+
+      '<div class="field" style="margin:0;">'+
+        '<label>SM Consent</label>'+
+        '<select id="ec-smc" class="sinput" style="width:100%;">'+
+          '<option value=""'+((!c.socialConsent)?' selected':'')+'>Not set</option>'+
+          '<option value="yes"'+(c.socialConsent==='yes'?' selected':'')+'>&#9989; Yes - allowed</option>'+
+          '<option value="no"'+(c.socialConsent==='no'?' selected':'')+'>&#128683; No - private</option>'+
+        '</select>'+
+      '</div>'+
+    '</div>'+
+    '<div class="field mb12">'+
+      '<label>Referred By</label>'+
+      '<input type="text" id="ec-ref" class="sinput" value="'+escHtml(c.referredBy||'')+'" placeholder="Who referred this client?" style="width:100%;" list="client-names-list">'+
+    '</div>'+
+    '<div class="field mb16">'+
+      '<label>Notes</label>'+
+      '<input type="text" id="ec-notes" class="sinput" value="'+escHtml(c.notes||'')+'" placeholder="Preferences, allergies, special notes…" style="width:100%;">'+
+    '</div>'+
+    '<div class="fe" style="justify-content:space-between;">'+
+      '<button class="btn btn-danger btn-sm" data-cname="'+encodeURIComponent(name)+'" onclick="deleteClientRecord(this.dataset.cname)">&#128465; Delete</button>'+
+      '<div style="display:flex;gap:8px;">'+
+        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>'+
+        '<button class="btn btn-teal" id="ec-save-btn">&#128190; Save Changes</button>'+
+      '</div>'+
+    '</div>';
+
+  window._editClientOrigName = name;
+  openModal(html);
+
+  setTimeout(function(){
+    var btn = document.getElementById('ec-save-btn');
+    if(btn) btn.addEventListener('click', saveEditClient);
+  }, 50);
+}
+
+function saveEditClient(){
+  var origName = window._editClientOrigName||'';
+  var c = (DB.clients||[]).find(function(x){ return x.fbName===origName; });
+  if(!c){ notify('Client not found','error'); return; }
+
+  var newName = (document.getElementById('ec-name')?.value||'').trim();
+  if(!newName){ notify('FB Name is required','error'); return; }
+
+  c.fbName       = newName;
+  c.email        = (document.getElementById('ec-email')?.value||'').trim();
+  c.phone        = (document.getElementById('ec-phone')?.value||'').trim();
+  c.birthday     = (document.getElementById('ec-bday')?.value||'').trim();
+  c.type         = document.getElementById('ec-type')?.value||'walkin';
+  c.socialConsent= document.getElementById('ec-smc')?.value||'';
+  c.referredBy   = (document.getElementById('ec-ref')?.value||'').trim();
+  c.notes        = (document.getElementById('ec-notes')?.value||'').trim();
+
+  saveLocal();
+  push('saveClient', c);
+  notify('Client updated: '+newName,'success');
+  logActivity('Client Updated', newName, 'success');
+  closeModal();
+  renderClients();
+}
+
+function deleteClientRecord(encodedName){
+  var name = decodeURIComponent(encodedName);
+  if(!confirm('Delete '+name+' from client records? This cannot be undone.')) return;
+  DB.clients = (DB.clients||[]).filter(function(c){ return c.fbName!==name; });
+  saveLocal();
+  notify(name+' deleted','info');
+  closeModal();
+  renderClients();
 }
 
 // ================================================================
