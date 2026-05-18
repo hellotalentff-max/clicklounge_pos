@@ -2971,11 +2971,12 @@ function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal()
 
 async function confirmAck(id){
   const a = (DB.acknowledgements||[]).find(x=>x.id===id);
-  if(!a) return;
+  if(!a){ notify('Receipt not found','error'); return; }
   a.status = 'Confirmed';
   saveLocal();
-  push('saveAck', a);
+  await push('saveAcknowledgement', a);
   notify('Booking confirmed ✓','success');
+  logActivity('Booking Confirmed', a.fbName+' — '+a.bookDate, 'success');
   renderCalendar();
   renderAcks();
 }
