@@ -2116,6 +2116,11 @@ tr:hover td { background:var(--light); }
         <div class="field mb16"><label for="set-name">Studio Name</label><input type="text" id="set-name"></div>
         <div class="field mb16"><label for="set-addr">Address</label><input type="text" id="set-addr" placeholder="Studio address"></div>
         <div class="field mb16"><label for="set-contact">Contact / FB Page</label><input type="text" id="set-contact" placeholder="FB page or phone"></div>
+        <div class="field mb16">
+          <label for="set-eod-email">EOD Report Email</label>
+          <input type="email" id="set-eod-email" placeholder="owner@gmail.com">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">End of Shift reports will be emailed here after each submission.</div>
+        </div>
         <div style="background:rgba(192,84,74,0.06);border:1px solid rgba(192,84,74,0.2);border-radius:8px;padding:12px;margin-bottom:12px;">
           <div style="font-size:12px;font-weight:600;color:var(--danger);margin-bottom:6px;">Offline Queue</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Items queued while offline: <span id="queue-count">0</span></div>
@@ -2628,11 +2633,12 @@ function saveAdminPw(){
 }
 
 function saveStudio(){
-  const name    = (document.getElementById('set-name')?.value||'').trim();
-  const contact = (document.getElementById('set-contact')?.value||'').trim();
-  const address = (document.getElementById('set-address')?.value||'').trim();
-  const fbUrl   = (document.getElementById('set-feedback-url')?.value||'').trim();
-  DB.studioInfo = Object.assign(DB.studioInfo||{}, {name, contact, address, feedbackUrl: fbUrl});
+  const name     = (document.getElementById('set-name')?.value||'').trim();
+  const contact  = (document.getElementById('set-contact')?.value||'').trim();
+  const address  = (document.getElementById('set-address')?.value||document.getElementById('set-addr')?.value||'').trim();
+  const fbUrl    = (document.getElementById('set-feedback-url')?.value||'').trim();
+  const eodEmail = (document.getElementById('set-eod-email')?.value||'').trim();
+  DB.studioInfo  = Object.assign(DB.studioInfo||{}, {name, contact, address, feedbackUrl:fbUrl, eodEmail});
   saveLocal();
   if(hasUrl()) push('saveSettings', DB.studioInfo);
   notify('Studio info saved ✓','success');
@@ -2889,6 +2895,40 @@ async function genEOD(){
   notify('End of Shift Report submitted ✓','success');
   logActivity('EOD Report', staff+' — ₱'+fmt(totalRev)+' total, ₱'+fmt(cashHand)+' cash on hand','success');
   renderFTList();
+  genEODlive();
+
+  // Send email report if configured
+  const toEmail = DB.studioInfo?.eodEmail || '';
+  if(toEmail && hasUrl()){
+    const totalSales  = txns.reduce(function(s,t){ return s+(+t.balance||0); },0);
+    const cashToBank2 = fts.filter(function(f){ return f.type==='Cash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+    const gcashBank2  = fts.filter(function(f){ return f.type==='GCash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+    const refunds2    = fts.filter(function(f){ return f.type&&f.type.includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+    const expectedCash= opening + cashRev - cashToBank2 - refunds2;
+    const variance    = cashHand - expectedCash;
+
+    const emailPayload = {
+      toEmail: toEmail,
+      studioInfo: DB.studioInfo||{},
+      report: Object.assign({}, report, {
+        totalSales:   totalSales,
+        totalExp:     refunds2,
+        expectedCash: expectedCash,
+        cashOnHand:   cashHand,
+        variance:     variance,
+        fundTransfers:fts,
+        expenses:     []
+      })
+    };
+    gasCall('sendEODEmail', emailPayload)
+      .then(function(r){
+        if(r.ok) notify('EOD email sent to '+toEmail,'success');
+        else notify('EOD saved but email failed: '+(r.error||'unknown'),'error');
+      })
+      .catch(function(e){ notify('EOD saved but email error: '+e.message,'error'); });
+  } else if(!toEmail) {
+    notify('Tip: Add your email in Settings → EOD Report Email to receive email reports','info');
+  }
 }
 
 // ================================================================
@@ -2904,7 +2944,7 @@ function renderCalendar(){
   const lbl = document.getElementById('cal-month-label');
   if(lbl) lbl.textContent = MONTH_NAMES[mo] + ' ' + yr;
 
-  // Monday-first offset (JS getDay: 0=Sun,1=Mon...)
+  // Monday-first offset
   const firstJsDay  = new Date(yr, mo, 1).getDay();
   const firstOffset = (firstJsDay === 0) ? 6 : firstJsDay - 1;
   const daysInMo    = new Date(yr, mo+1, 0).getDate();
@@ -2914,18 +2954,19 @@ function renderCalendar(){
   const closedDates = getClosedDates().map(function(c){ return c.date||c; });
   const acks        = (DB.acknowledgements||[]);
   const blocked     = (DB.blockedDates||[]);
+  // Merge calendar events (from Google Calendar poll) + acknowledgements
+  const calEvents   = (DB._calEvents||[]);
 
   var html = '';
 
-  // Empty leading cells
   for(var i = 0; i < firstOffset; i++){
     html += '<div style="min-height:80px;background:var(--light);border:1px solid var(--light2);"></div>';
   }
 
-  function bookingChip(a, color, border){
+  function bookingChip(name, color, border){
     return '<div style="font-size:9px;background:'+color+';border:1px solid '+border+
            ';border-radius:3px;padding:1px 4px;margin-top:2px;overflow:hidden;'+
-           'text-overflow:ellipsis;white-space:nowrap;">'+escHtml(a.fbName||'')+'</div>';
+           'text-overflow:ellipsis;white-space:nowrap;">'+escHtml(name)+'</div>';
   }
 
   for(var d = 1; d <= daysInMo; d++){
@@ -2935,52 +2976,101 @@ function renderCalendar(){
     var isRest   = restDays.includes(jsDay) || closedDates.includes(dateStr);
     var isBlocked= blocked.some(function(b){ return b.date===dateStr; });
 
-    var dayAcks  = acks.filter(function(a){ return a.bookDate === dateStr; });
-    var pend     = dayAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s.includes('pending'); });
+    // Acknowledgements for this day
+    var dayAcks  = acks.filter(function(a){ return String(a.bookDate||'').slice(0,10) === dateStr; });
+    var pend     = dayAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s==='pending'||s.includes('pending'); });
     var conf     = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); });
     var canc     = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('cancel'); });
+
+    // Google Calendar events for this day
+    var dayEvents = calEvents.filter(function(ev){
+      var evDate = String(ev.start||'').slice(0,10);
+      return evDate === dateStr;
+    });
+    var evPend = dayEvents.filter(function(ev){ return ev.status==='pending'; });
+    var evConf = dayEvents.filter(function(ev){ return ev.status==='confirmed'; });
 
     var bg = 'var(--white)';
     if(isRest)    bg = 'rgba(192,84,74,0.04)';
     if(isBlocked) bg = '#e8e8e8';
     if(isToday)   bg = 'rgba(81,137,125,0.1)';
 
-    var dayNum_color = isToday ? 'var(--teal)' : isRest ? 'var(--danger)' : 'var(--text)';
-    var dayNum_weight = isToday ? '700' : '500';
-
+    var allCount = dayAcks.length + dayEvents.length;
     var chips = '';
-    if(isBlocked) chips += '<div style="font-size:9px;color:#666;background:#ddd;border-radius:2px;padding:1px 3px;">🚫 Blocked</div>';
-    pend.slice(0,2).forEach(function(a){ chips += bookingChip(a,'#fff3cd','#ffc107'); });
-    conf.slice(0,2).forEach(function(a){ chips += bookingChip(a,'#d4edda','#51897d'); });
-    canc.slice(0,1).forEach(function(a){ chips += bookingChip(a,'#f8d7da','#c0544a'); });
-    if(dayAcks.length > 3) chips += '<div style="font-size:9px;color:var(--muted);margin-top:2px;">+'+(dayAcks.length-3)+' more</div>';
+    if(isBlocked) chips += '<div style="font-size:9px;color:#666;background:#ddd;border-radius:2px;padding:1px 3px;">🚫</div>';
+    // Show ack receipts
+    pend.slice(0,2).forEach(function(a){ chips += bookingChip(a.fbName,'#fff3cd','#ffc107'); });
+    conf.slice(0,2).forEach(function(a){ chips += bookingChip(a.fbName,'#d4edda','#51897d'); });
+    canc.slice(0,1).forEach(function(a){ chips += bookingChip(a.fbName,'#f8d7da','#c0544a'); });
+    // Show Google Cal events not already in acks
+    evPend.slice(0,2).forEach(function(ev){
+      var name = ev.title.replace(/\[PENDING\]/g,'').replace(/\[CONFIRMED\]/g,'').trim();
+      chips += bookingChip(name,'#fff3cd','#ffc107');
+    });
+    evConf.slice(0,1).forEach(function(ev){
+      var name = ev.title.replace(/\[PENDING\]/g,'').replace(/\[CONFIRMED\]/g,'').trim();
+      chips += bookingChip(name,'#d4edda','#51897d');
+    });
+    if(allCount > 4) chips += '<div style="font-size:9px;color:var(--muted);margin-top:2px;">+'+(allCount-4)+' more</div>';
 
     html += '<div style="min-height:80px;background:'+bg+';border:1px solid var(--light2);'+
             'padding:5px;cursor:pointer;" onclick="calDayClick(\''+dateStr+'\')">'+
-            '<div style="font-size:11px;font-weight:'+dayNum_weight+';color:'+dayNum_color+';margin-bottom:3px;">'+d+'</div>'+
+            '<div style="font-size:11px;font-weight:'+(isToday?'700':'500')+';color:'+
+            (isToday?'var(--teal)':isRest?'var(--danger)':'var(--text)')+';margin-bottom:3px;">'+d+'</div>'+
             chips+'</div>';
   }
 
   el.innerHTML = html;
   renderCalendarLists(acks, yr, mo);
+
+  // Fetch fresh Google Calendar events
+  if(hasUrl()){
+    gasCall('getCalendarEvents',{year:yr, month:mo}).then(function(res){
+      if(res.ok && Array.isArray(res.events)){
+        DB._calEvents = res.events;
+        // Re-render if still on same month
+        if(CAL_YEAR===yr && CAL_MONTH===mo) renderCalendar();
+      }
+    }).catch(function(){});
+  }
 }
 
 function renderCalendarLists(acks, yr, mo){
-  const prefix = yr+'-'+String(mo+1).padStart(2,'0');
-  const monthAcks = acks.filter(a => String(a.bookDate||'').startsWith(prefix));
-  const pending   = monthAcks.filter(a => !a.status || (a.status||'').toLowerCase().includes('pending'));
-  const confirmed = monthAcks.filter(a => (a.status||'').toLowerCase().includes('confirm'));
+  const prefix    = yr+'-'+String(mo+1).padStart(2,'0');
+  const monthAcks = acks.filter(function(a){ return String(a.bookDate||'').startsWith(prefix); });
+  const pending   = monthAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s==='pending'||s.includes('pending'); });
+  const confirmed = monthAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); });
+
+  // Also include Google Calendar events not yet in acknowledgements
+  const calEvents = (DB._calEvents||[]).filter(function(ev){ return String(ev.start||'').startsWith(prefix); });
+  const calPending = calEvents.filter(function(ev){ return ev.status==='pending'; });
 
   const pendEl = document.getElementById('pending-list');
   const confEl = document.getElementById('confirmed-list');
 
   if(pendEl){
-    if(!pending.length){ pendEl.innerHTML='<div class="tm">No pending payments this month.</div>'; }
-    else pendEl.innerHTML = pending.map(a=>ackListRow(a,'pending')).join('');
+    var pendHtml = '';
+    // Ack receipts pending
+    pending.forEach(function(a){ pendHtml += ackListRow(a,'pending'); });
+    // Google Cal pending events (booking requests not yet turned into receipts)
+    calPending.forEach(function(ev){
+      var name = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+      var date = String(ev.start||'').slice(0,10);
+      pendHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);background:rgba(255,243,205,0.3);">'+
+        '<div style="width:8px;height:8px;border-radius:50%;background:#ffc107;flex-shrink:0;"></div>'+
+        '<div style="flex:1;">'+
+          '<div style="font-weight:600;font-size:13px;">'+escHtml(name)+'</div>'+
+          '<div style="font-size:11px;color:var(--muted);">📅 '+date+' · Booking request (not yet receipted)</div>'+
+        '</div>'+
+        '<div><span style="font-size:10px;background:rgba(255,193,7,0.15);color:#856404;border-radius:8px;padding:3px 8px;">Pending</span></div>'+
+      '</div>';
+    });
+    pendEl.innerHTML = pendHtml || '<div class="tm">No pending payments this month.</div>';
   }
+
   if(confEl){
-    if(!confirmed.length){ confEl.innerHTML='<div class="tm">No confirmed bookings this month.</div>'; }
-    else confEl.innerHTML = confirmed.map(a=>ackListRow(a,'confirmed')).join('');
+    const confHtml = confirmed.map(function(a){ return ackListRow(a,'confirmed'); }).join('');
+    confEl.innerHTML = confHtml || '<div class="tm">No confirmed bookings this month.</div>';
   }
 }
 
@@ -5885,18 +5975,18 @@ function renderExpensesPage(){
 //  RENDER SETTINGS
 // ================================================================
 function renderSettings(){
-  // Studio info
   const si = DB.studioInfo||{};
   const setVal = (id,v)=>{ const el=document.getElementById(id); if(el) el.value=v||''; };
-  setVal('set-name',    si.name);
-  setVal('set-contact', si.contact);
-  setVal('set-address', si.address);
-  setVal('set-url',     getUrl());
-  setVal('set-admin-pw', '');
-  // Service manager
+  setVal('set-name',         si.name);
+  setVal('set-contact',      si.contact);
+  setVal('set-addr',         si.address);
+  setVal('set-address',      si.address);
+  setVal('set-url',          getUrl());
+  setVal('set-admin-pw',     '');
+  setVal('set-feedback-url', si.feedbackUrl||'');
+  setVal('set-eod-email',    si.eodEmail||'');
   SVC = loadSVC();
   renderSvcMgr();
-  // Queue
   updateQueueCount();
   renderRestDaySettings();
 }
