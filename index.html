@@ -2264,7 +2264,7 @@ tr:hover td { background:var(--light); }
       <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Sat</div>
       <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:rgba(232,239,238,0.3);text-transform:uppercase;letter-spacing:1px;">Sun</div>
     </div>
-    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--light2);"></div>
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--light2);grid-auto-rows:90px;"></div>
   </div>
 
   <!-- Pending bookings list -->
@@ -2960,7 +2960,7 @@ function renderCalendar(){
   var html = '';
 
   for(var i = 0; i < firstOffset; i++){
-    html += '<div style="min-height:80px;background:var(--light);border:1px solid var(--light2);"></div>';
+    html += '<div style="height:100%;background:var(--light);border:1px solid var(--light2);"></div>';
   }
 
   function bookingChip(name, color, border){
@@ -3013,8 +3013,8 @@ function renderCalendar(){
     });
     if(allCount > 4) chips += '<div style="font-size:9px;color:var(--muted);margin-top:2px;">+'+(allCount-4)+' more</div>';
 
-    html += '<div style="min-height:80px;background:'+bg+';border:1px solid var(--light2);'+
-            'padding:5px;cursor:pointer;" onclick="calDayClick(\''+dateStr+'\')">'+
+    html += '<div style="height:100%;box-sizing:border-box;background:'+bg+';border:1px solid var(--light2);'+
+            'padding:5px;cursor:pointer;overflow:hidden;" onclick="calDayClick(\''+dateStr+'\')">'+
             '<div style="font-size:11px;font-weight:'+(isToday?'700':'500')+';color:'+
             (isToday?'var(--teal)':isRest?'var(--danger)':'var(--text)')+';margin-bottom:3px;">'+d+'</div>'+
             chips+'</div>';
@@ -4899,13 +4899,47 @@ function renderReg(){
 //  ACKNOWLEDGEMENT
 // ================================================================
 function openNewAck(){
-  openModal(`<h3>New Acknowledgement Receipt</h3>
-    <div class="field" style="margin-bottom:12px;"><label for="ma-fb">FB Name *</label>
-      <input type="text" id="ma-fb" placeholder="Client Facebook name" autocomplete="off" list="client-names-list">
-    </div>
-    <div class="frow c2"><div class="field"><label for="ma-svc">Service</label><input type="text" id="ma-svc" placeholder="e.g. Styleshots S"></div><div class="field"><label for="ma-date">Booking Date</label><input type="date" id="ma-date" value="${todayStr()}"></div></div>
-    <div class="frow c2"><div class="field"><label for="ma-mop">MOP</label><select id="ma-mop"><option>BPI</option><option>GCash</option><option>Cash</option><option>Maya</option></select></div><div class="field"><label for="dp-amt">Downpayment (₱)</label><input type="number" id="ma-dp" placeholder="500"></div></div>
-    <div class="fe mt8"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-gold" onclick="saveAck()">Save</button></div>`);
+  var today = todayStr();
+  var html =
+    '<h3 style="margin-bottom:16px;">New Acknowledgement Receipt</h3>'+
+    '<div class="field mb12">'+
+      '<label>FB Name *</label>'+
+      '<input type="text" id="ma-fb" class="sinput" placeholder="Client Facebook name" autocomplete="off" list="client-names-list" style="width:100%;">'+
+    '</div>'+
+    '<div class="field mb12">'+
+      '<label>Email <span style="font-size:10px;color:var(--muted);">(optional)</span></label>'+
+      '<input type="email" id="ma-email" class="sinput" placeholder="client@email.com" style="width:100%;">'+
+    '</div>'+
+    '<div class="frow c2" style="gap:10px;margin-bottom:12px;">'+
+      '<div class="field" style="margin:0;"><label>Service</label>'+
+      '<input type="text" id="ma-svc" class="sinput" placeholder="e.g. Styleshots S" style="width:100%;"></div>'+
+      '<div class="field" style="margin:0;"><label>Booking Date</label>'+
+      '<input type="date" id="ma-date" class="sinput" value="'+today+'" style="width:100%;"></div>'+
+    '</div>'+
+    '<div class="frow c2" style="gap:10px;margin-bottom:12px;">'+
+      '<div class="field" style="margin:0;"><label>Total Price (₱)</label>'+
+      '<input type="number" id="ma-total" class="sinput" placeholder="0" style="width:100%;"></div>'+
+      '<div class="field" style="margin:0;"><label>Downpayment (₱)</label>'+
+      '<input type="number" id="ma-dp" class="sinput" placeholder="500" style="width:100%;"></div>'+
+    '</div>'+
+    '<div class="field mb16">'+
+      '<label>Mode of Payment</label>'+
+      '<select id="ma-mop" class="sinput" style="width:100%;">'+
+        '<option>GCash</option><option>BPI</option><option>Cash</option><option>Maya</option>'+
+      '</select>'+
+    '</div>'+
+    '<div class="fe">'+
+      '<button class="btn btn-outline" id="ack-cancel-btn">Cancel</button>'+
+      '<button class="btn btn-gold" id="ack-save-btn">💾 Save Receipt</button>'+
+    '</div>';
+  openModal(html);
+  // Wire buttons via addEventListener — avoids Safari onclick issues
+  setTimeout(function(){
+    var cancelBtn = document.getElementById('ack-cancel-btn');
+    var saveBtn   = document.getElementById('ack-save-btn');
+    if(cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    if(saveBtn)   saveBtn.addEventListener('click', saveAck);
+  }, 50);
 }
 function genARNum(service){
   // Format: AR + DDMMYY + service-type-code + sequence
@@ -4931,18 +4965,39 @@ function genARNum(service){
 }
 
 async function saveAck(){
-  const fbName=document.getElementById('ma-fb').value.trim();
-  const ackEmail='';
-  if(!fbName){ notify('FB Name required','error'); return; }
-  const ack={id:uid(),date:todayStr(),fbName,email:ackEmail,service:document.getElementById('ma-svc').value.trim(),bookDate:document.getElementById('ma-date').value,mop:document.getElementById('ma-mop').value,downpayment:parseFloat(document.getElementById('ma-dp').value)||0,ackNum:genARNum(document.getElementById('ma-svc').value.trim())};
+  var fbName  = (document.getElementById('ma-fb')?.value||'').trim();
+  var email   = (document.getElementById('ma-email')?.value||'').trim();
+  var service = (document.getElementById('ma-svc')?.value||'').trim();
+  var bookDate= document.getElementById('ma-date')?.value||todayStr();
+  var mop     = document.getElementById('ma-mop')?.value||'GCash';
+  var dp      = parseFloat(document.getElementById('ma-dp')?.value)||0;
+  var total   = parseFloat(document.getElementById('ma-total')?.value)||0;
+
+  if(!fbName){ notify('FB Name is required','error'); return; }
+
+  var ackNum = genARNum(service);
+  var ack = {
+    id: uid(), date: todayStr(), fbName: fbName, email: email,
+    service: service, bookDate: bookDate, mop: mop,
+    downpayment: dp, totalPrice: total, ackNum: ackNum, status: ''
+  };
+
+  if(!DB.acknowledgements) DB.acknowledgements = [];
   DB.acknowledgements.push(ack);
-  if(!DB.clients.find(c=>c.fbName===fbName)){
-    const cl={id:uid(),fbName,email:ack.email,type:'booked',added:todayStr()};
-    DB.clients.push(cl); await push('saveClient',cl);
+
+  if(!DB.clients) DB.clients = [];
+  if(!DB.clients.find(function(c){ return c.fbName===fbName; })){
+    var cl = {id:uid(), fbName:fbName, email:email, type:'booked', added:todayStr()};
+    DB.clients.push(cl);
+    push('saveClient', cl);
   }
-  saveLocal(); notify('Saved: '+fbName); closeModal(); renderAcks();
-  logActivity('Acknowledgement Receipt Created', ack.ackNum+' — '+fbName+' ('+ack.service+')', 'success');
-  await push('saveAcknowledgement',ack);
+
+  saveLocal();
+  notify('Receipt saved: '+ackNum,'success');
+  closeModal();
+  renderAcks();
+  logActivity('Acknowledgement Receipt Created', ackNum+' — '+fbName+(service?' ('+service+')':''), 'success');
+  push('saveAcknowledgement', ack);
 }
 let ACK_SORT = 'none'; // 'none' | 'az' | 'za'
 function toggleAckSort(){
