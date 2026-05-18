@@ -1488,6 +1488,8 @@ tr:hover td { background:var(--light); }
       <input type="text" id="ack-search" class="sinput" style="flex:1;min-width:140px;" placeholder="Search by name or receipt #…" oninput="renderAcks()">
       <select id="ack-filter" class="sinput" onchange="renderAcks()">
         <option value="all">All</option>
+        <option value="pending">Pending Payment</option>
+        <option value="confirmed">Confirmed</option>
         <option value="today">Today</option>
         <option value="upcoming">Upcoming</option>
       </select>
@@ -4740,127 +4742,139 @@ function setHiddenAcks(arr){ localStorage.setItem('cl_hidden_acks', JSON.stringi
 function toggleHideAck(id){ const hidden=getHiddenAcks(); const idx=hidden.indexOf(id); if(idx>=0) hidden.splice(idx,1); else hidden.push(id); setHiddenAcks(hidden); renderAcks(); }
 function deleteAck(id){ if(!confirm('Permanently delete this acknowledgement receipt?')) return; DB.acknowledgements=DB.acknowledgements.filter(a=>a.id!==id); saveLocal(); push('deleteRow',{sheet:'Acknowledgements',id}); renderAcks(); notify('Receipt deleted','success'); }
 function renderAcks(){
-  const el  = document.getElementById('ack-list');
-  const q   = (document.getElementById('ack-search')?.value||'').toLowerCase();
-  const df  = document.getElementById('ack-filter')?.value||'all';
-  const today = todayStr();
+  const el     = document.getElementById('ack-list');
+  if(!el) return;
+  const q      = (document.getElementById('ack-search')?.value||'').toLowerCase();
+  const df     = document.getElementById('ack-filter')?.value||'all';
+  const today  = todayStr();
+  const hidden = getHiddenAcks();
+  const showHidden = document.getElementById('ack-show-hidden')?.checked;
 
-  let acks = DB.acknowledgements.slice().reverse();
+  let acks = (DB.acknowledgements||[]).slice().reverse();
 
-  // Filter
-  if(df==='today')    acks = acks.filter(a=>dateOnly(a.date)===today);
-  if(df==='upcoming') acks = acks.filter(a=>a.bookDate && a.bookDate >= today);
+  // Status helper
+  const getStatus = a => {
+    const s = String(a.status||'').toLowerCase();
+    if(s.includes('confirm')) return 'confirmed';
+    if(s.includes('cancel'))  return 'cancelled';
+    return 'pending'; // default — no status means pending
+  };
+
+  // Filters
+  if(df==='today')     acks = acks.filter(a=>dateOnly(a.date)===today);
+  if(df==='upcoming')  acks = acks.filter(a=>a.bookDate && a.bookDate>=today);
+  if(df==='pending')   acks = acks.filter(a=>getStatus(a)==='pending');
+  if(df==='confirmed') acks = acks.filter(a=>getStatus(a)==='confirmed');
   if(q) acks = acks.filter(a=>
-    (a.fbName||'').toLowerCase().includes(q) ||
-    (a.ackNum||'').toLowerCase().includes(q) ||
+    (a.fbName||'').toLowerCase().includes(q)||
+    (a.ackNum||'').toLowerCase().includes(q)||
     (a.service||'').toLowerCase().includes(q)
   );
+  if(!showHidden) acks = acks.filter(a=>!hidden.includes(a.id));
 
-  // Apply name sort if active
+  // Sort
   if(ACK_SORT==='az') acks.sort((a,b)=>(a.fbName||'').localeCompare(b.fbName||''));
   if(ACK_SORT==='za') acks.sort((a,b)=>(b.fbName||'').localeCompare(a.fbName||''));
 
   if(!acks.length){ el.innerHTML='<div class="tm">No receipts found.</div>'; return; }
 
-  // Group by month
+  // Group by month (booking date preferred, fallback to receipt date)
   const groups = {};
   acks.forEach(a=>{
-    const d   = dateOnly(a.date)||'Unknown';
-    const key = d.slice(0,7); // YYYY-MM
+    const key = (a.bookDate||dateOnly(a.date)||'').slice(0,7)||'Unknown';
     if(!groups[key]) groups[key]=[];
     groups[key].push(a);
   });
 
-  const hidden = getHiddenAcks();
-  const showHidden = document.getElementById('ack-show-hidden')?.checked;
-  if(!showHidden) acks = acks.filter(a=>!hidden.includes(a.id));
-  // Apply name sort if active
-  if(ACK_SORT==='az') acks.sort((a,b)=>(a.fbName||'').localeCompare(b.fbName||''));
-  if(ACK_SORT==='za') acks.sort((a,b)=>(b.fbName||'').localeCompare(a.fbName||''));
-
-  if(!acks.length){ el.innerHTML='<div class="tm">No receipts found.</div>'; return; }
-
   const curMonth = today.slice(0,7);
-  const groups2 = {};
-  acks.forEach(a=>{
-    const key = (dateOnly(a.date)||'').slice(0,7)||'Unknown';
-    if(!groups2[key]) groups2[key]=[];
-    groups2[key].push(a);
-  });
+  const months = Object.keys(groups).sort().reverse();
 
-  const months = Object.keys(groups2).sort().reverse();
-  el.innerHTML = months.map(function(month, mi){
+  el.innerHTML = months.map((month, mi)=>{
     const isPast = month < curMonth;
     const isCollapsed = isPast && mi > 0;
     const label = month !== 'Unknown'
       ? new Date(month+'-02T00:00:00').toLocaleDateString('en-PH',{month:'long',year:'numeric',timeZone:'Asia/Manila'})
       : 'Unknown Date';
-    const items = groups2[month];
+    const items = groups[month];
     const colId = 'ackg'+month.replace('-','');
 
-    const rows = items.map(function(a){
+    const rows = items.map(a=>{
+      const status   = getStatus(a);
       const isHidden = hidden.includes(a.id);
-      const isToday  = dateOnly(a.date)===today;
-      const aid = a.id;
-      return '<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--light2);gap:10px;opacity:'+(isHidden?'0.4':'1')+'">' +
-        '<div style="flex:1;min-width:0;">' +
-          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">' +
-            '<span style="font-size:10px;font-weight:700;color:var(--gold);">'+a.ackNum+'</span>' +
-            (isToday?'<span class="badge b-teal" style="font-size:8px;">Today</span>':'') +
-          '</div>' +
-          '<div style="font-size:12px;font-weight:600;color:var(--slate);">'+a.fbName+'</div>' +
-          '<div style="font-size:11px;color:var(--muted);">'+(a.service||'—')+' &middot; ₱'+fmt(+a.downpayment)+' '+a.mop+' &middot; '+a.bookDate+'</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:5px;flex-shrink:0;" id="ackbtn-'+aid+'">' +
-        '</div>' +
-      '</div>';
+      const isBday   = dateOnly(a.bookDate)===today;
+
+      // Status badge style
+      const badgeStyle = status==='confirmed'
+        ? 'background:rgba(61,140,110,0.12);color:var(--success);border:1px solid rgba(61,140,110,0.25);'
+        : status==='cancelled'
+        ? 'background:rgba(192,84,74,0.08);color:var(--danger);border:1px solid rgba(192,84,74,0.2);'
+        : 'background:rgba(215,144,104,0.12);color:var(--gold);border:1px solid rgba(215,144,104,0.3);';
+      const badgeLabel = status==='confirmed' ? '✓ Confirmed' : status==='cancelled' ? '✕ Cancelled' : '⏳ Pending';
+
+      // Balance due
+      const total    = +a.totalPrice||+a.total||0;
+      const dp       = +a.downpayment||0;
+      const balance  = total>0 ? total-dp : 0;
+
+      return `<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--light2);gap:10px;opacity:${isHidden?'0.4':'1'}">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
+            <span style="font-size:10px;font-weight:700;color:var(--gold);">${a.ackNum||'—'}</span>
+            <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;${badgeStyle}">${badgeLabel}</span>
+            ${isBday?'<span class="badge b-teal" style="font-size:8px;">Today</span>':''}
+          </div>
+          <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:1px;">${escHtml(a.fbName||'')}</div>
+          <div style="font-size:11px;color:var(--muted);">
+            ${escHtml(a.service||'—')} &middot;
+            📅 ${a.bookDate||'—'} &middot;
+            ₱${fmt(dp)} ${escHtml(a.mop||'')} downpayment
+            ${balance>0?`<span style="color:var(--danger);font-weight:600;"> &middot; ₱${fmt(balance)} balance due</span>`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
+          ${status==='pending'?`<button class="btn btn-sm btn-teal" onclick="confirmAck('${a.id}')">✓ Confirm</button>`:''}
+          <button class="btn btn-sm btn-outline" onclick="viewAckDetail('${a.id}')">👁</button>
+          <button class="btn btn-sm btn-outline" onclick="printAck('${a.id}')">🖨</button>
+          <button class="btn btn-sm btn-outline" onclick="toggleHideAck('${a.id}')" title="${isHidden?'Show':'Hide'}">${isHidden?'👁':'🙈'}</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteAck('${a.id}')">🗑</button>
+        </div>
+      </div>`;
     }).join('');
 
-    return '<div style="margin-bottom:14px;">' +
-      '<div id="ackhdr-'+colId+'" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:5px 0;border-bottom:2px solid var(--light2);margin-bottom:4px;">' +
-        '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:'+(isPast?'var(--muted)':'var(--teal)')+';">'+label+'</span>' +
-        '<span style="font-size:10px;color:var(--muted);">'+items.length+' receipt'+(items.length!==1?'s':'')+' '+(isCollapsed?'▸':'▾')+'</span>' +
-      '</div>' +
-      '<div id="'+colId+'" style="display:'+(isCollapsed?'none':'')+'">' + rows + '</div>' +
-    '</div>';
+    const pendCount = items.filter(a=>getStatus(a)==='pending').length;
+    const confCount = items.filter(a=>getStatus(a)==='confirmed').length;
+    const summary   = [
+      pendCount ? `<span style="color:var(--gold);font-weight:600;">${pendCount} pending</span>` : '',
+      confCount ? `<span style="color:var(--success);">${confCount} confirmed</span>` : '',
+    ].filter(Boolean).join(' · ');
+
+    return `<div style="margin-bottom:14px;">
+      <div id="ackhdr-${colId}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:6px 0;border-bottom:2px solid var(--light2);margin-bottom:4px;">
+        <div>
+          <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:${isPast?'var(--muted)':'var(--teal)'};">${label}</span>
+          ${summary?`<span style="margin-left:10px;font-size:10px;">${summary}</span>`:''}
+        </div>
+        <span style="font-size:10px;color:var(--muted);">${items.length} receipt${items.length!==1?'s':''} ${isCollapsed?'▸':'▾'}</span>
+      </div>
+      <div id="${colId}" style="display:${isCollapsed?'none':''}">${rows}</div>
+    </div>`;
   }).join('');
 
-  // Wire up collapse toggles and action buttons after render
-  months.forEach(function(month){
+  // Wire collapse toggles
+  months.forEach(month=>{
     const colId = 'ackg'+month.replace('-','');
     const hdr = document.getElementById('ackhdr-'+colId);
     const body = document.getElementById(colId);
-    if(hdr && body) hdr.addEventListener('click', function(){
+    if(hdr && body) hdr.addEventListener('click', ()=>{
       body.style.display = body.style.display==='none' ? '' : 'none';
+      hdr.querySelector('span:last-child').textContent =
+        body.style.display===''
+          ? `${groups[month].length} receipt${groups[month].length!==1?'s':''} ▾`
+          : `${groups[month].length} receipt${groups[month].length!==1?'s':''} ▸`;
     });
   });
-  acks.forEach(function(a){
-    const btnEl = document.getElementById('ackbtn-'+a.id);
-    if(!btnEl) return;
-    const isHidden = hidden.includes(a.id);
-
-    const viewBtn = document.createElement('button');
-    viewBtn.className = 'btn btn-sm btn-outline';
-    viewBtn.title = 'View';
-    viewBtn.textContent = '👁';
-    viewBtn.addEventListener('click', function(){ viewAckDetail(a.id); });
-    btnEl.appendChild(viewBtn);
-
-    const hideBtn = document.createElement('button');
-    hideBtn.className = 'btn btn-sm btn-outline';
-    hideBtn.title = isHidden ? 'Show' : 'Hide';
-    hideBtn.textContent = isHidden ? '👁‍🗨' : '🙈';
-    hideBtn.addEventListener('click', function(){ toggleHideAck(a.id); });
-    btnEl.appendChild(hideBtn);
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'btn btn-sm btn-danger';
-    delBtn.title = 'Delete';
-    delBtn.textContent = '🗑';
-    delBtn.addEventListener('click', function(){ deleteAck(a.id); });
-    btnEl.appendChild(delBtn);
-  });
 }
+
 
 function viewAckDetail(id){
   const a = DB.acknowledgements.find(x=>x.id===id);
