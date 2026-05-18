@@ -2838,162 +2838,107 @@ function removeFT(idx){
 }
 
 function genEODlive(){
-  const today    = todayStr();
-  const txns     = (DB.transactions||[]).filter(function(t){ return dateOnly(t.date)===today && !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var today    = todayStr();
+  var txns     = (DB.transactions||[]).filter(function(t){ return dateOnly(t.date)===today && !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var todayAcks= (DB.acknowledgements||[]).filter(function(a){ return dateOnly(a.date)===today; });
+  var todayExp = (DB.expenses||[]).filter(function(e){ return dateOnly(e.date)===today; });
+  var fts      = DB._eodFT||[];
 
-  // Acknowledgement receipts issued today (downpayments collected)
-  const todayAcks     = (DB.acknowledgements||[]).filter(function(a){ return dateOnly(a.date)===today; });
-  const ackCashDP     = todayAcks.filter(function(a){ return a.mop==='Cash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
-  const ackGcashDP    = todayAcks.filter(function(a){ return a.mop==='GCash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
-  const ackOtherDP    = todayAcks.filter(function(a){ return a.mop!=='Cash'&&a.mop!=='GCash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
-  const totalAckDP    = todayAcks.reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  var opening  = parseFloat(document.getElementById('eod-opening')?.value)||0;
+  var cashHand = parseFloat(document.getElementById('eod-cash')?.value)||0;
 
-  const opening  = parseFloat(document.getElementById('eod-opening')?.value)||0;
-  const cashHand = parseFloat(document.getElementById('eod-cash')?.value)||0;
-
-  const totalRev   = txns.reduce(function(s,t){ return s+(+t.total||0); },0);
-  const cashRev    = txns.filter(function(t){ return t.balanceMOP==='Cash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
-  const gcashRev   = txns.filter(function(t){ return t.balanceMOP==='GCash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
-  const totalInvDP = txns.reduce(function(s,t){ return s+(+t.downpayment||0); },0);
-
-  // Total cash in = cash from sales + cash downpayments from ack receipts
-  const totalCashIn = cashRev + ackCashDP;
-
-  const fts       = DB._eodFT||[];
-  const cashToBank= fts.filter(function(f){ return f.type==='Cash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
-  const gcashBank = fts.filter(function(f){ return f.type==='GCash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
-  const refunds   = fts.filter(function(f){ return f.type.includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
-
-  const expectedCash = opening + totalCashIn - cashToBank - refunds;
-  const cashDiff     = cashHand - expectedCash;
-
-  var html = '';
-
-  // Stats row
-  html += '<div class="rep-section-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">';
-  html += '<div class="rep-card-stat"><div class="rs-label">Invoices</div><div class="rs-val rs-teal">'+txns.length+'</div></div>';
-  html += '<div class="rep-card-stat"><div class="rs-label">Total Revenue</div><div class="rs-val rs-gold">₱'+fmt(totalRev)+'</div></div>';
-  html += '<div class="rep-card-stat"><div class="rs-label">Cash Collected</div><div class="rs-val">₱'+fmt(totalCashIn)+'</div></div>';
-  html += '<div class="rep-card-stat"><div class="rs-label">Receipts Issued</div><div class="rs-val">'+todayAcks.length+'</div></div>';
-  html += '</div>';
-
-  // Cash breakdown table
-  html += '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:12px;">';
-  html += '<tr style="background:var(--slate);color:var(--cream);"><th colspan="2" style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Cash Flow Summary</th></tr>';
-  html += '<tr style="background:var(--light);"><td style="padding:6px 8px;font-weight:500;">Opening Cash</td><td style="padding:6px 8px;text-align:right;">₱'+fmt(opening)+'</td></tr>';
-
-  if(cashRev>0)
-    html += '<tr><td style="padding:6px 8px;color:var(--success);">+ Cash from Sales (invoices)</td><td style="padding:6px 8px;text-align:right;color:var(--success);">₱'+fmt(cashRev)+'</td></tr>';
-
-  if(ackCashDP>0)
-    html += '<tr style="background:rgba(81,137,125,0.04);"><td style="padding:6px 8px;color:var(--teal);">+ Cash Downpayments ('+todayAcks.filter(function(a){return a.mop==='Cash';}).length+' receipts)</td><td style="padding:6px 8px;text-align:right;color:var(--teal);font-weight:600;">₱'+fmt(ackCashDP)+'</td></tr>';
-
-  if(gcashRev+ackGcashDP>0)
-    html += '<tr style="background:var(--light);"><td style="padding:6px 8px;color:var(--muted);">GCash (sales + DP)</td><td style="padding:6px 8px;text-align:right;color:var(--muted);">₱'+fmt(gcashRev+ackGcashDP)+'</td></tr>';
-
-  if(cashToBank)
-    html += '<tr><td style="padding:6px 8px;color:var(--danger);">− Cash to Bank</td><td style="padding:6px 8px;text-align:right;color:var(--danger);">₱'+fmt(cashToBank)+'</td></tr>';
-
-  if(refunds)
-    html += '<tr style="background:var(--light);"><td style="padding:6px 8px;color:var(--danger);">− Refunds</td><td style="padding:6px 8px;text-align:right;color:var(--danger);">₱'+fmt(refunds)+'</td></tr>';
-
-  html += '<tr style="border-top:2px solid var(--border);font-weight:700;"><td style="padding:8px 8px;">Expected Cash on Hand</td><td style="padding:8px 8px;text-align:right;">₱'+fmt(expectedCash)+'</td></tr>';
-
-  if(cashHand>0){
-    var diffColor = Math.abs(cashDiff)<1 ? 'var(--success)' : cashDiff>0 ? 'var(--gold)' : 'var(--danger)';
-    var diffLabel = Math.abs(cashDiff)<1 ? '✓ Balanced' : cashDiff>0 ? '▲ Over by ₱'+fmt(Math.abs(cashDiff)) : '▼ Short by ₱'+fmt(Math.abs(cashDiff));
-    html += '<tr><td style="padding:6px 8px;">Actual Cash on Hand</td><td style="padding:6px 8px;text-align:right;">₱'+fmt(cashHand)+'</td></tr>';
-    html += '<tr style="background:var(--light);"><td style="padding:6px 8px;font-weight:700;color:'+diffColor+';">Cash Variance</td><td style="padding:6px 8px;text-align:right;font-weight:700;color:'+diffColor+';">'+diffLabel+'</td></tr>';
-  }
-  html += '</table>';
-
-  // Today's acknowledgement receipts (downpayments)
-  if(todayAcks.length){
-    html += '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:12px 0 6px;">Today\'s Downpayments (Acknowledgement Receipts)</div>';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px;">';
-    html += '<thead><tr style="background:var(--slate);color:var(--cream);">'+
-      '<th style="padding:5px 6px;text-align:left;">Receipt #</th>'+
-      '<th style="padding:5px 6px;text-align:left;">Client</th>'+
-      '<th style="padding:5px 6px;text-align:left;">Service</th>'+
-      '<th style="padding:5px 6px;text-align:right;">Downpayment</th>'+
-      '<th style="padding:5px 6px;">MOP</th>'+
-      '</tr></thead><tbody>';
-    todayAcks.forEach(function(a,i){
-      var bg = i%2===0?'var(--white)':'var(--light)';
-      var isCash = a.mop==='Cash';
-      html += '<tr style="background:'+bg+';">'+
-        '<td style="padding:5px 6px;"><span class="badge b-gold" style="font-size:9px;">'+escHtml(a.ackNum||'—')+'</span></td>'+
-        '<td style="padding:5px 6px;font-weight:500;">'+escHtml(a.fbName||'')+'</td>'+
-        '<td style="padding:5px 6px;color:var(--muted);font-size:10px;">'+escHtml(a.service||'—')+'</td>'+
-        '<td style="padding:5px 6px;text-align:right;font-weight:600;color:'+(isCash?'var(--success)':'var(--teal)')+';">₱'+fmt(+a.downpayment||0)+'</td>'+
-        '<td style="padding:5px 6px;font-size:10px;color:'+(isCash?'var(--success)':'var(--muted)')+';">'+escHtml(a.mop||'—')+(isCash?' 💵':'')+'</td>'+
-      '</tr>';
-    });
-    html += '<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--border);">'+
-      '<td colspan="3" style="padding:6px 8px;">Total Downpayments</td>'+
-      '<td style="padding:6px 8px;text-align:right;color:var(--teal);">₱'+fmt(totalAckDP)+'</td>'+
-      '<td style="padding:6px 8px;font-size:10px;color:var(--success);">'+fmt(ackCashDP)+' Cash</td>'+
-    '</tr>';
-    html += '</tbody></table>';
-  }
-
-  // Today's invoices
-  if(txns.length){
-    html += '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:12px 0 6px;">Today\'s Invoices</div>';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
-    html += '<thead><tr style="background:var(--slate);color:var(--cream);">'+
-      '<th style="padding:5px 6px;text-align:left;">Invoice</th>'+
-      '<th style="padding:5px 6px;text-align:left;">Client</th>'+
-      '<th style="padding:5px 6px;text-align:right;">Total</th>'+
-      '<th style="padding:5px 6px;">MOP</th>'+
-      '</tr></thead><tbody>';
-    txns.forEach(function(t,i){
-      var bg = i%2===0?'var(--white)':'var(--light)';
-      html += '<tr style="background:'+bg+';">'+
-        '<td style="padding:5px 6px;"><span class="badge b-gold" style="font-size:9px;">'+escHtml(t.invoiceNum)+'</span></td>'+
-        '<td style="padding:5px 6px;font-weight:500;">'+escHtml(t.clientName)+'</td>'+
-        '<td style="padding:5px 6px;text-align:right;font-weight:600;">₱'+fmt(+t.total)+'</td>'+
-        '<td style="padding:5px 6px;color:var(--muted);">'+escHtml(t.balanceMOP||'—')+'</td>'+
-      '</tr>';
-    });
-    html += '</tbody></table>';
-  } else {
-    html += '<div class="tm" style="margin-top:12px;">No invoices recorded today yet.</div>';
-  }
+  var totalSales  = txns.reduce(function(s,t){ return s+(+t.total||0); },0);
+  var totalDisc   = txns.reduce(function(s,t){ return s+(+t.discount||0); },0);
+  var cashRev     = txns.filter(function(t){ return t.balanceMOP==='Cash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  var gcashRev    = txns.filter(function(t){ return t.balanceMOP==='GCash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  var ackCashDP   = todayAcks.filter(function(a){ return a.mop==='Cash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  var ackGcashDP  = todayAcks.filter(function(a){ return a.mop==='GCash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  var totalDPs    = todayAcks.reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  var totalExp    = todayExp.reduce(function(s,e){ return s+(+e.amt||0); },0);
+  var cashToBank  = fts.filter(function(f){ return f.type==='Cash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  var gcashToBank = fts.filter(function(f){ return f.type==='GCash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  var refunds     = fts.filter(function(f){ return f.type.includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  var totalCashIn = cashRev + ackCashDP;
+  var expectedCash= opening + totalCashIn - cashToBank - refunds;
+  var cashDiff    = cashHand - expectedCash;
 
   // Update stat cards
-  var setS = function(id, val){ var el=document.getElementById(id); if(el) el.textContent='₱'+fmt(val); };
-  setS('eod-stat-sales',    totalRev);
-  setS('eod-stat-dp',       totalAckDP);
-  setS('eod-stat-disc',     txns.reduce(function(s,t){ return s+(+t.discount||0); },0));
-  setS('eod-stat-exp',      fts.filter(function(f){ return f.type.includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0));
-  setS('eod-stat-cash',     totalCashIn);
-  setS('eod-stat-expected', expectedCash);
+  function sc(id,v){ var el=document.getElementById(id); if(el) el.textContent='\u20b1'+fmt(v); }
+  sc('eod-stat-sales',    totalSales);
+  sc('eod-stat-dp',       totalDPs);
+  sc('eod-stat-disc',     totalDisc);
+  sc('eod-stat-exp',      totalExp);
+  sc('eod-stat-cash',     totalCashIn);
+  sc('eod-stat-expected', expectedCash);
 
   // Variance bar
   var varBar = document.getElementById('eod-variance-bar');
   if(varBar){
-    if(cashHand > 0){
-      if(Math.abs(cashDiff) < 1){
-        varBar.style.background='rgba(61,140,110,0.1)'; varBar.style.color='var(--success)';
-        varBar.textContent='✓ Balanced — Cash count matches expected';
-      } else if(cashDiff > 0){
-        varBar.style.background='rgba(200,130,74,0.1)'; varBar.style.color='var(--gold)';
-        varBar.textContent='▲ Over by ₱'+fmt(Math.abs(cashDiff))+' — more cash than expected';
+    if(cashHand>0 || opening>0){
+      var ab = Math.abs(cashDiff);
+      if(ab<1){
+        varBar.style.cssText='border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:600;text-align:center;background:rgba(61,140,110,0.1);color:var(--success);';
+        varBar.textContent='\u2713 Cash balanced \u2014 Expected \u20b1'+fmt(expectedCash)+', Count \u20b1'+fmt(cashHand);
+      } else if(cashDiff>0){
+        varBar.style.cssText='border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:600;text-align:center;background:rgba(200,130,74,0.1);color:var(--gold);';
+        varBar.textContent='\u25b2 Over by \u20b1'+fmt(ab)+' \u2014 Expected \u20b1'+fmt(expectedCash)+', Count \u20b1'+fmt(cashHand);
       } else {
-        varBar.style.background='rgba(192,84,74,0.08)'; varBar.style.color='var(--danger)';
-        varBar.textContent='▼ Short by ₱'+fmt(Math.abs(cashDiff))+' — less cash than expected';
+        varBar.style.cssText='border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:600;text-align:center;background:rgba(192,84,74,0.08);color:var(--danger);';
+        varBar.textContent='\u25bc Short by \u20b1'+fmt(ab)+' \u2014 Expected \u20b1'+fmt(expectedCash)+', Count \u20b1'+fmt(cashHand);
       }
     } else {
-      varBar.style.background='var(--light)'; varBar.style.color='var(--muted)';
-      varBar.textContent='Enter Actual Cash on Hand to see variance';
+      varBar.style.cssText='border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:600;text-align:center;background:var(--light);color:var(--muted);';
+      varBar.textContent='Enter Opening Cash and Actual Cash to see variance';
     }
+  }
+
+  // Detailed breakdown
+  var html = '';
+  html += '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:10px;">';
+  html += '<tr style="background:var(--slate);color:var(--cream);"><th colspan="2" style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Cash Flow</th></tr>';
+  html += '<tr style="background:var(--light);"><td style="padding:6px 8px;">Opening Cash</td><td style="padding:6px 8px;text-align:right;">\u20b1'+fmt(opening)+'</td></tr>';
+  if(cashRev>0)   html += '<tr><td style="padding:6px 8px;color:var(--success);">+ Cash Sales</td><td style="padding:6px 8px;text-align:right;color:var(--success);">\u20b1'+fmt(cashRev)+'</td></tr>';
+  if(ackCashDP>0) html += '<tr style="background:rgba(81,137,125,0.04);"><td style="padding:6px 8px;color:var(--teal);">+ Cash DPs ('+todayAcks.filter(function(a){return a.mop==='Cash';}).length+' receipts) \ud83d\udcb5</td><td style="padding:6px 8px;text-align:right;color:var(--teal);font-weight:600;">\u20b1'+fmt(ackCashDP)+'</td></tr>';
+  if(cashToBank)  html += '<tr><td style="padding:6px 8px;color:var(--danger);">\u2212 Cash to Bank</td><td style="padding:6px 8px;text-align:right;color:var(--danger);">\u20b1'+fmt(cashToBank)+'</td></tr>';
+  if(refunds)     html += '<tr style="background:var(--light);"><td style="padding:6px 8px;color:var(--danger);">\u2212 Refunds</td><td style="padding:6px 8px;text-align:right;color:var(--danger);">\u20b1'+fmt(refunds)+'</td></tr>';
+  if(totalExp)    html += '<tr><td style="padding:6px 8px;color:var(--danger);">\u2212 Expenses</td><td style="padding:6px 8px;text-align:right;color:var(--danger);">\u20b1'+fmt(totalExp)+'</td></tr>';
+  html += '<tr style="border-top:2px solid var(--border);font-weight:700;"><td style="padding:8px;">Expected Cash</td><td style="padding:8px;text-align:right;">\u20b1'+fmt(expectedCash)+'</td></tr>';
+  if(gcashRev+ackGcashDP>0) html += '<tr style="background:var(--light);"><td style="padding:6px 8px;color:var(--muted);">GCash (not in drawer)</td><td style="padding:6px 8px;text-align:right;color:var(--muted);">\u20b1'+fmt(gcashRev+ackGcashDP)+'</td></tr>';
+  html += '</table>';
+
+  if(todayAcks.length){
+    html += '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:8px 0 4px;">Downpayments Today</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:8px;">';
+    html += '<thead><tr style="background:var(--slate);color:var(--cream);"><th style="padding:4px 6px;text-align:left;">Receipt</th><th style="padding:4px 6px;text-align:left;">Client</th><th style="padding:4px 6px;text-align:right;">DP</th><th style="padding:4px 6px;">MOP</th></tr></thead><tbody>';
+    todayAcks.forEach(function(a,i){
+      var bg=i%2===0?'var(--white)':'var(--light)';
+      html += '<tr style="background:'+bg+';"><td style="padding:4px 6px;"><span class="badge b-gold" style="font-size:9px;">'+escHtml(a.ackNum||'\u2014')+'</span></td>'+
+        '<td style="padding:4px 6px;font-weight:500;">'+escHtml(a.fbName||'')+'</td>'+
+        '<td style="padding:4px 6px;text-align:right;font-weight:600;color:'+(a.mop==='Cash'?'var(--success)':'var(--teal)')+';">\u20b1'+fmt(+a.downpayment||0)+'</td>'+
+        '<td style="padding:4px 6px;font-size:10px;">'+(a.mop==='Cash'?'\ud83d\udcb5 Cash':'\ud83d\udcf1 '+escHtml(a.mop||''))+'</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  if(txns.length){
+    html += '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:8px 0 4px;">Invoices Today ('+txns.length+')</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+    html += '<thead><tr style="background:var(--slate);color:var(--cream);"><th style="padding:4px 6px;text-align:left;">Invoice</th><th style="padding:4px 6px;text-align:left;">Client</th><th style="padding:4px 6px;text-align:right;">Total</th><th style="padding:4px 6px;">MOP</th></tr></thead><tbody>';
+    txns.forEach(function(t,i){
+      var bg=i%2===0?'var(--white)':'var(--light)';
+      html += '<tr style="background:'+bg+';"><td style="padding:4px 6px;"><span class="badge b-gold" style="font-size:9px;">'+escHtml(t.invoiceNum)+'</span></td>'+
+        '<td style="padding:4px 6px;font-weight:500;">'+escHtml(t.clientName)+'</td>'+
+        '<td style="padding:4px 6px;text-align:right;font-weight:600;">\u20b1'+fmt(+t.total)+'</td>'+
+        '<td style="padding:4px 6px;color:var(--muted);">'+escHtml(t.balanceMOP||'\u2014')+'</td></tr>';
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<div class="tm" style="margin-top:8px;">No invoices today yet.</div>';
   }
 
   var repEl = document.getElementById('eod-report');
   if(repEl) repEl.innerHTML = html;
 }
-
 async function genEOD(){
   const today    = todayStr();
   const txns     = (DB.transactions||[]).filter(function(t){ return dateOnly(t.date)===today&&!String(t.invoiceNum||'').startsWith('[VOID]'); });
