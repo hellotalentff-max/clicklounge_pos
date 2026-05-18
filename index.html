@@ -2962,14 +2962,29 @@ async function genEOD(){
   const totalCashIn = cashRev + ackCashDP;
   const expectedCashVal = opening + totalCashIn - cashToBank - refunds;
 
+  const totalDisc   = txns.reduce(function(s,t){ return s+(+t.discount||0); },0);
+  const totalAckDP  = todayAcks.reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  const todayExp    = (DB.expenses||[]).filter(function(e){ return dateOnly(e.date)===today; });
+  const totalExp    = todayExp.reduce(function(s,e){ return s+(+e.amt||0); },0);
+  const variance    = cashHand - expectedCashVal;
+
   const report = {
     id: uid(), date: today, staff: staff,
-    openingCash: opening, cashOnHand: cashHand,
-    totalRevenue: totalRev, cashCollected: totalCashIn,
+    totalSales:   totalRev,
+    totalDP:      totalAckDP,
+    totalDisc:    totalDisc,
+    totalExp:     totalExp,
+    expectedCash: expectedCashVal,
+    cashOnHand:   cashHand,
+    variance:     variance,
+    expenses:     JSON.stringify(todayExp),
+    notes:        notes,
+    // Extra detail fields (not in Sheets headers but saved locally)
+    openingCash:  opening,
     cashFromSales: cashRev, ackCashDP: ackCashDP, ackGcashDP: ackGcashDP,
     gcashCollected: gcashRev, cashToBank: cashToBank, gcashToBank: gcashBank,
     refunds: refunds, closingCash: expectedCashVal,
-    ackCount: todayAcks.length, fundTransfers: fts, notes: notes, txnCount: txns.length
+    ackCount: todayAcks.length, fundTransfers: fts, txnCount: txns.length
   };
 
   var submitBtn = document.getElementById('eod-submit-btn');
@@ -2992,7 +3007,6 @@ async function genEOD(){
   const toEmail = (DB.studioInfo?.eodEmail||'').trim();
   if(toEmail && hasUrl()){
     notify('Sending EOD report to '+toEmail+'…','info');
-    const totalDisc   = txns.reduce(function(s,t){ return s+(+t.discount||0); },0);
     const emailPayload = {
       toEmail: toEmail,
       studioInfo: DB.studioInfo||{},
@@ -3001,12 +3015,12 @@ async function genEOD(){
         totalDP:      totalAckDP,
         ackCashDP:    ackCashDP,
         totalDisc:    totalDisc,
-        totalExp:     refunds,
+        totalExp:     totalExp,
         expectedCash: expectedCashVal,
         cashOnHand:   cashHand,
-        variance:     cashHand - expectedCashVal,
+        variance:     variance,
         fundTransfers:fts,
-        expenses:     []
+        expenses:     todayExp
       })
     };
     gasCall('sendEODEmail', emailPayload)
