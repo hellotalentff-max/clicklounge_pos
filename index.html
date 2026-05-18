@@ -2726,101 +2726,169 @@ async function redeemGift(id){
 //  EOD (End of Day Report)
 // ================================================================
 function renderEOD(){
-  const el = document.getElementById('eod-content');
+  const today  = todayStr();
+  const dateEl = document.getElementById('eod-date');
+  if(dateEl) dateEl.textContent = new Date().toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'Asia/Manila'});
+
+  // Populate staff dropdown
+  const staffSel = document.getElementById('eod-staff');
+  if(staffSel){
+    staffSel.innerHTML = (DB.staff||[]).map(function(s){
+      return '<option value="'+escHtml(s)+'"'+(s===CURR_USER?' selected':'')+'>'+escHtml(s)+'</option>';
+    }).join('');
+  }
+
+  // Pre-fill opening cash from last EOD or DB
+  const prevEOD = (DB.eodReports||[]).find(function(r){ return dateOnly(r.date)===today; });
+  const openingEl = document.getElementById('eod-opening');
+  if(openingEl && !openingEl.value) openingEl.value = prevEOD?.openingCash || DB._openingCash || 0;
+
+  // Render fund transfers list
+  renderFTList();
+
+  // Auto-compute summary
+  genEODlive();
+}
+
+function renderFTList(){
+  const el = document.getElementById('eod-ft-list');
   if(!el) return;
+  const fts = DB._eodFT || [];
+  if(!fts.length){ el.innerHTML='<div class="tm" style="font-size:11px;margin-bottom:6px;">No transfers added yet.</div>'; return; }
+  el.innerHTML = fts.map(function(f,i){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--light2);font-size:12px;">'+
+      '<div style="flex:1;"><strong>'+escHtml(f.type)+'</strong>'+
+      (f.ref?' — '+escHtml(f.ref):'')+
+      (f.notes?' ('+escHtml(f.notes)+')':'')+'</div>'+
+      '<div style="font-weight:600;color:var(--danger);">₱'+fmt(+f.amt)+'</div>'+
+      '<button class="btn btn-sm btn-danger" onclick="removeFT('+i+')" style="padding:2px 7px;font-size:10px;">✕</button>'+
+    '</div>';
+  }).join('');
+}
 
-  const today   = todayStr();
-  const txns    = (DB.transactions||[]).filter(t=>dateOnly(t.date)===today && !String(t.invoiceNum||'').startsWith('[VOID]'));
-  const prevEOD = (DB.eodReports||[]).find(r=>dateOnly(r.date)===today);
-  const opening = prevEOD?.openingCash || DB._openingCash || 0;
+function addFT(){
+  const type  = document.getElementById('ft-type')?.value||'';
+  const amt   = parseFloat(document.getElementById('ft-amt')?.value)||0;
+  const ref   = (document.getElementById('ft-ref')?.value||'').trim();
+  const notes = (document.getElementById('ft-notes')?.value||'').trim();
+  if(!amt){ notify('Enter an amount','error'); return; }
+  if(!DB._eodFT) DB._eodFT=[];
+  DB._eodFT.push({type,amt,ref,notes,date:todayStr()});
+  document.getElementById('ft-amt').value='';
+  document.getElementById('ft-ref').value='';
+  document.getElementById('ft-notes').value='';
+  renderFTList();
+  genEODlive();
+}
 
-  const cashRev   = txns.filter(t=>t.balanceMOP==='Cash').reduce((s,t)=>s+(+t.balance||0),0);
-  const gcashRev  = txns.filter(t=>t.balanceMOP==='GCash').reduce((s,t)=>s+(+t.balance||0),0);
-  const otherRev  = txns.filter(t=>!['Cash','GCash'].includes(t.balanceMOP)).reduce((s,t)=>s+(+t.balance||0),0);
-  const totalRev  = txns.reduce((s,t)=>s+(+t.total||0),0);
-  const totalBal  = txns.reduce((s,t)=>s+(+t.balance||0),0);
-  const totalDP   = txns.reduce((s,t)=>s+(+t.downpayment||0),0);
+function removeFT(idx){
+  if(!DB._eodFT) return;
+  DB._eodFT.splice(idx,1);
+  renderFTList();
+  genEODlive();
+}
 
-  el.innerHTML = `
-  <div class="rep-section-grid">
-    <div class="rep-card-stat"><div class="rs-label">Today's Transactions</div><div class="rs-val rs-teal">${txns.length}</div></div>
-    <div class="rep-card-stat"><div class="rs-label">Total Revenue</div><div class="rs-val rs-gold">₱${fmt(totalRev)}</div></div>
-    <div class="rep-card-stat"><div class="rs-label">Cash Collected</div><div class="rs-val">₱${fmt(cashRev)}</div></div>
-    <div class="rep-card-stat"><div class="rs-label">GCash Collected</div><div class="rs-val">₱${fmt(gcashRev)}</div></div>
-  </div>
-  <div class="card">
-    <div class="ct">Today's Transactions</div>
-    ${txns.length ? `<div style="overflow-x:auto;"><table><thead><tr>
-      <th>Invoice</th><th>Client</th><th>Services</th>
-      <th style="text-align:right;">Total</th><th>Balance</th><th>MOP</th>
-    </tr></thead><tbody>
-    ${txns.map(t=>{
-      let items=[]; try{items=Array.isArray(t.items)?t.items:JSON.parse(t.items||'[]');}catch(e){}
-      const svcs=items.map(i=>i.name+(i.qty>1?' x'+i.qty:'')).join(', ')||'—';
-      return `<tr>
-        <td><span class="badge b-gold">${t.invoiceNum}</span></td>
-        <td style="font-weight:500;">${escHtml(t.clientName)}</td>
-        <td style="font-size:11px;color:var(--muted);">${escHtml(svcs)}</td>
-        <td style="text-align:right;font-weight:600;">₱${fmt(+t.total)}</td>
-        <td style="text-align:right;">₱${fmt(+t.balance)}</td>
-        <td style="font-size:11px;">${t.balanceMOP||'—'}</td>
-      </tr>`;
-    }).join('')}
-    </tbody></table></div>` : '<div class="tm">No transactions today.</div>'}
-  </div>
-  <div class="card">
-    <div class="ct">Submit End of Day Report</div>
-    <div class="frow c2">
-      <div class="field"><label>Opening Cash (₱)</label>
-        <input type="number" id="eod-opening" value="${opening}" placeholder="0" class="sinput"></div>
-      <div class="field"><label>Cash to Bank (₱)</label>
-        <input type="number" id="eod-cash-bank" value="0" placeholder="0" class="sinput"></div>
-    </div>
-    <div class="frow c2">
-      <div class="field"><label>GCash to Bank (₱)</label>
-        <input type="number" id="eod-gcash-bank" value="0" placeholder="0" class="sinput"></div>
-      <div class="field"><label>Refunds Given (₱)</label>
-        <input type="number" id="eod-refunds" value="0" placeholder="0" class="sinput"></div>
-    </div>
-    <div class="field"><label>Notes / Summary</label>
-      <textarea id="eod-notes" class="sinput" rows="3" placeholder="Any notes about today's operations…" style="width:100%;resize:vertical;"></textarea>
-    </div>
-    <div class="fe">
-      <button class="btn btn-gold" onclick="genEOD()">📊 Submit EOD Report</button>
-    </div>
-  </div>`;
+function genEODlive(){
+  const today    = todayStr();
+  const txns     = (DB.transactions||[]).filter(function(t){ return dateOnly(t.date)===today && !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  const opening  = parseFloat(document.getElementById('eod-opening')?.value)||0;
+  const cashHand = parseFloat(document.getElementById('eod-cash')?.value)||0;
+
+  const totalRev   = txns.reduce(function(s,t){ return s+(+t.total||0); },0);
+  const cashRev    = txns.filter(function(t){ return t.balanceMOP==='Cash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  const gcashRev   = txns.filter(function(t){ return t.balanceMOP==='GCash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  const otherRev   = txns.filter(function(t){ return t.balanceMOP==='Maya'||t.balanceMOP==='BPI'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  const totalDP    = txns.reduce(function(s,t){ return s+(+t.downpayment||0); },0);
+
+  const fts       = DB._eodFT||[];
+  const cashToBank= fts.filter(function(f){ return f.type==='Cash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  const gcashBank = fts.filter(function(f){ return f.type==='GCash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  const refunds   = fts.filter(function(f){ return f.type.includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+
+  const expectedCash = opening + cashRev - cashToBank - refunds;
+  const cashDiff     = cashHand - expectedCash;
+
+  var html = '';
+
+  // Transaction summary stats
+  html += '<div class="rep-section-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:16px;">';
+  html += '<div class="rep-card-stat"><div class="rs-label">Transactions</div><div class="rs-val rs-teal">'+txns.length+'</div></div>';
+  html += '<div class="rep-card-stat"><div class="rs-label">Total Revenue</div><div class="rs-val rs-gold">₱'+fmt(totalRev)+'</div></div>';
+  html += '<div class="rep-card-stat"><div class="rs-label">Cash Collected</div><div class="rs-val">₱'+fmt(cashRev)+'</div></div>';
+  html += '<div class="rep-card-stat"><div class="rs-label">GCash Collected</div><div class="rs-val">₱'+fmt(gcashRev)+'</div></div>';
+  html += '</div>';
+
+  // Breakdown table
+  html += '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:12px;">';
+  html += '<tr style="background:var(--light);"><td style="padding:6px 8px;font-weight:500;">Opening Cash</td><td style="padding:6px 8px;text-align:right;">₱'+fmt(opening)+'</td></tr>';
+  html += '<tr><td style="padding:6px 8px;color:var(--success);">+ Cash from Sales</td><td style="padding:6px 8px;text-align:right;color:var(--success);">₱'+fmt(cashRev)+'</td></tr>';
+  html += '<tr style="background:var(--light);"><td style="padding:6px 8px;color:var(--teal);">+ Downpayments</td><td style="padding:6px 8px;text-align:right;color:var(--teal);">₱'+fmt(totalDP)+'</td></tr>';
+  if(cashToBank) html += '<tr><td style="padding:6px 8px;color:var(--danger);">− Cash to Bank</td><td style="padding:6px 8px;text-align:right;color:var(--danger);">₱'+fmt(cashToBank)+'</td></tr>';
+  if(refunds)    html += '<tr style="background:var(--light);"><td style="padding:6px 8px;color:var(--danger);">− Refunds</td><td style="padding:6px 8px;text-align:right;color:var(--danger);">₱'+fmt(refunds)+'</td></tr>';
+  html += '<tr style="border-top:2px solid var(--border);font-weight:700;"><td style="padding:8px 8px;">Expected Cash on Hand</td><td style="padding:8px 8px;text-align:right;">₱'+fmt(expectedCash)+'</td></tr>';
+  if(cashHand>0){
+    var diffColor = Math.abs(cashDiff)<1 ? 'var(--success)' : cashDiff>0 ? 'var(--gold)' : 'var(--danger)';
+    var diffLabel = Math.abs(cashDiff)<1 ? '✓ Balanced' : cashDiff>0 ? '▲ Over by ₱'+fmt(Math.abs(cashDiff)) : '▼ Short by ₱'+fmt(Math.abs(cashDiff));
+    html += '<tr><td style="padding:6px 8px;font-weight:500;">Actual Cash on Hand</td><td style="padding:6px 8px;text-align:right;">₱'+fmt(cashHand)+'</td></tr>';
+    html += '<tr style="background:var(--light);"><td style="padding:6px 8px;font-weight:700;color:'+diffColor+';">Cash Variance</td><td style="padding:6px 8px;text-align:right;font-weight:700;color:'+diffColor+';">'+diffLabel+'</td></tr>';
+  }
+  html += '</table>';
+
+  // Today's transaction list
+  if(txns.length){
+    html += '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;">Today\'s Transactions</div>';
+    html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">';
+    html += '<thead><tr style="background:var(--slate);color:var(--cream);"><th style="padding:5px 6px;text-align:left;">Invoice</th><th style="padding:5px 6px;text-align:left;">Client</th><th style="padding:5px 6px;text-align:right;">Total</th><th style="padding:5px 6px;">MOP</th></tr></thead><tbody>';
+    txns.forEach(function(t,i){
+      var bg = i%2===0?'var(--white)':'var(--light)';
+      html += '<tr style="background:'+bg+';"><td style="padding:5px 6px;"><span class="badge b-gold" style="font-size:9px;">'+t.invoiceNum+'</span></td>'+
+        '<td style="padding:5px 6px;font-weight:500;">'+escHtml(t.clientName)+'</td>'+
+        '<td style="padding:5px 6px;text-align:right;font-weight:600;">₱'+fmt(+t.total)+'</td>'+
+        '<td style="padding:5px 6px;color:var(--muted);">'+escHtml(t.balanceMOP||'—')+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  } else {
+    html += '<div class="tm">No transactions recorded today yet.</div>';
+  }
+
+  var repEl = document.getElementById('eod-report');
+  if(repEl) repEl.innerHTML = html;
 }
 
 async function genEOD(){
-  const opening   = parseFloat(document.getElementById('eod-opening')?.value)||0;
-  const cashBank  = parseFloat(document.getElementById('eod-cash-bank')?.value)||0;
-  const gcashBank = parseFloat(document.getElementById('eod-gcash-bank')?.value)||0;
-  const refunds   = parseFloat(document.getElementById('eod-refunds')?.value)||0;
-  const notes     = (document.getElementById('eod-notes')?.value||'').trim();
+  const today    = todayStr();
+  const txns     = (DB.transactions||[]).filter(function(t){ return dateOnly(t.date)===today&&!String(t.invoiceNum||'').startsWith('[VOID]'); });
+  const staff    = document.getElementById('eod-staff')?.value || CURR_USER;
+  const opening  = parseFloat(document.getElementById('eod-opening')?.value)||0;
+  const cashHand = parseFloat(document.getElementById('eod-cash')?.value)||0;
+  const notes    = (document.getElementById('eod-notes')?.value||'').trim();
+  const fts      = DB._eodFT||[];
 
-  const today  = todayStr();
-  const txns   = (DB.transactions||[]).filter(t=>dateOnly(t.date)===today&&!String(t.invoiceNum||'').startsWith('[VOID]'));
-  const totalRev = txns.reduce((s,t)=>s+(+t.total||0),0);
-  const cashRev  = txns.filter(t=>t.balanceMOP==='Cash').reduce((s,t)=>s+(+t.balance||0),0);
-  const gcashRev = txns.filter(t=>t.balanceMOP==='GCash').reduce((s,t)=>s+(+t.balance||0),0);
+  const totalRev  = txns.reduce(function(s,t){ return s+(+t.total||0); },0);
+  const cashRev   = txns.filter(function(t){ return t.balanceMOP==='Cash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  const gcashRev  = txns.filter(function(t){ return t.balanceMOP==='GCash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  const cashToBank= fts.filter(function(f){ return f.type==='Cash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  const gcashBank = fts.filter(function(f){ return f.type==='GCash to Bank'; }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  const refunds   = fts.filter(function(f){ return f.type.includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
 
   const report = {
-    id: uid(), date: today, staff: CURR_USER,
-    openingCash: opening, totalRevenue: totalRev,
-    cashCollected: cashRev, gcashCollected: gcashRev,
-    cashToBank: cashBank, gcashToBank: gcashBank,
-    refunds, notes,
-    closingCash: opening + cashRev - cashBank - refunds,
-    txnCount: txns.length
+    id: uid(), date: today, staff: staff,
+    openingCash: opening, cashOnHand: cashHand,
+    totalRevenue: totalRev, cashCollected: cashRev, gcashCollected: gcashRev,
+    cashToBank: cashToBank, gcashToBank: gcashBank, refunds: refunds,
+    closingCash: opening + cashRev - cashToBank - refunds,
+    fundTransfers: fts, notes: notes, txnCount: txns.length
   };
 
   if(!DB.eodReports) DB.eodReports=[];
-  const existing = DB.eodReports.findIndex(r=>dateOnly(r.date)===today);
-  if(existing>=0) DB.eodReports[existing]=report; else DB.eodReports.push(report);
+  const idx = DB.eodReports.findIndex(function(r){ return dateOnly(r.date)===today&&r.staff===staff; });
+  if(idx>=0) DB.eodReports[idx]=report; else DB.eodReports.push(report);
+  DB._eodFT = []; // clear temp FT list
   saveLocal();
   push('saveEOD', report);
-  notify('EOD Report submitted ✓','success');
-  logActivity('EOD Report', today+' — ₱'+fmt(totalRev)+' total revenue','success');
+  notify('End of Shift Report submitted ✓','success');
+  logActivity('EOD Report', staff+' — ₱'+fmt(totalRev)+' total, ₱'+fmt(cashHand)+' cash on hand','success');
+  renderFTList();
 }
 
 // ================================================================
