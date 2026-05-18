@@ -1604,6 +1604,7 @@ tr:hover td { background:var(--light); }
     <div><h2>Client Records</h2><p>CRM — history, activity and direct messaging</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-sm btn-outline" onclick="openImportClients()">📥 Import CSV</button>
+      <button class="btn btn-sm btn-danger" onclick="clearAllClients()" style="font-size:11px;">🗑 Clear Client Data</button>
       <button class="btn btn-gold" onclick="openCRMCompose()">✉ Send Campaign</button>
     </div>
   </div>
@@ -2550,7 +2551,32 @@ const SVC_LABELS = { ss:'Self Shoot', ph:'Photographer', ot:'Others', as:'Add-on
 // ================================================================
 //  LOCAL STORAGE
 // ================================================================
-function loadLocal(){ try{ const s=localStorage.getItem('cl_db'); if(s) DB=Object.assign({},DB,JSON.parse(s)); }catch(e){} }
+function loadLocal(){
+  try{
+    const s=localStorage.getItem('cl_db');
+    if(s) DB=Object.assign({},DB,JSON.parse(s));
+    // Silently deduplicate clients on every load
+    if(DB.clients && DB.clients.length){
+      var seen={}, deduped=[];
+      DB.clients.forEach(function(c){
+        var key=(c.fbName||'').trim().toLowerCase();
+        if(!key) return;
+        if(!seen[key]){ seen[key]=c; deduped.push(c); }
+        else{
+          var ex=seen[key];
+          if(c.email && !ex.email) ex.email=c.email;
+          if(c.phone && !ex.phone) ex.phone=c.phone;
+          if(c.birthday && !ex.birthday) ex.birthday=c.birthday;
+          if(c.notes && !ex.notes) ex.notes=c.notes;
+          if(c.socialConsent && !ex.socialConsent) ex.socialConsent=c.socialConsent;
+          if(c.referredBy && !ex.referredBy) ex.referredBy=c.referredBy;
+          if(c.type==='booked' && ex.type!=='booked') ex.type='booked';
+        }
+      });
+      DB.clients=deduped;
+    }
+  }catch(e){}
+}
 function saveLocal(){ try{ localStorage.setItem('cl_db',JSON.stringify(DB)); }catch(e){} }
 
 // ================================================================
@@ -7089,31 +7115,99 @@ function processClientImport(input){
   reader.readAsText(file);
 }
 
+function clearAllClients(){
+  if(!confirm('Delete ALL client records from this device? This only clears local data — Sheets data is unchanged. You can re-import after clearing.')) return;
+  DB.clients = [];
+  saveLocal();
+  renderClients();
+  notify('Client data cleared. Ready for fresh import.','success');
+  logActivity('Client Data Cleared','All local client records removed','info');
+}
+
+function deduplicateClients(){
+  // Remove duplicate fbName entries — keep the one with the most data filled in
+  var seen = {};
+  var deduped = [];
+  (DB.clients||[]).forEach(function(c){
+    var key = (c.fbName||'').trim().toLowerCase();
+    if(!key) return;
+    if(!seen[key]){
+      seen[key] = c;
+      deduped.push(c);
+    } else {
+      // Merge: fill in missing fields from duplicate into existing
+      var ex = seen[key];
+      if(c.email    && !ex.email)        ex.email        = c.email;
+      if(c.phone    && !ex.phone)        ex.phone        = c.phone;
+      if(c.birthday && !ex.birthday)     ex.birthday     = c.birthday;
+      if(c.notes    && !ex.notes)        ex.notes        = c.notes;
+      if(c.referredBy && !ex.referredBy) ex.referredBy   = c.referredBy;
+      if(c.socialConsent && !ex.socialConsent) ex.socialConsent = c.socialConsent;
+      // Keep the more complete type
+      if(c.type==='booked' && ex.type!=='booked') ex.type = 'booked';
+    }
+  });
+  var removed = (DB.clients||[]).length - deduped.length;
+  DB.clients = deduped;
+  return removed;
+}
+
 async function confirmClientImport(){
   if(!_importRows.length){ notify('No rows to import','error'); return; }
-  let added=0, updated=0;
-  for(let i=0;i<_importRows.length;i++){
-    const row      = _importRows[i];
-    const existing = (DB.clients||[]).find(c=>c.fbName===row.fbName);
+
+  var added=0, updated=0, skipped=0;
+
+  for(var i=0;i<_importRows.length;i++){
+    var row  = _importRows[i];
+    var name = (row.fbName||'').trim();
+    if(!name){ skipped++; continue; }
+
+    // Case-insensitive, trimmed match
+    var existing = (DB.clients||[]).find(function(c){
+      return (c.fbName||'').trim().toLowerCase() === name.toLowerCase();
+    });
+
     if(existing){
-      if(row.email    && !existing.email)        existing.email        = row.email;
-      if(row.phone    && !existing.phone)        existing.phone        = row.phone;
-      if(row.birthday && !existing.birthday)     existing.birthday     = row.birthday;
-      if(row.notes    && !existing.notes)        existing.notes        = row.notes;
-      if(row.referredBy && !existing.referredBy) existing.referredBy   = row.referredBy;
-      if(row.socialConsent && !existing.socialConsent) existing.socialConsent = row.socialConsent;
-      await push('saveClient', existing);
+      // Update only empty fields — never overwrite existing data
+      var changed = false;
+      if(row.email        && !existing.email)        { existing.email        = row.email;        changed=true; }
+      if(row.phone        && !existing.phone)        { existing.phone        = row.phone;        changed=true; }
+      if(row.birthday     && !existing.birthday)     { existing.birthday     = row.birthday;     changed=true; }
+      if(row.notes        && !existing.notes)        { existing.notes        = row.notes;        changed=true; }
+      if(row.referredBy   && !existing.referredBy)   { existing.referredBy   = row.referredBy;   changed=true; }
+      if(row.socialConsent && !existing.socialConsent){ existing.socialConsent= row.socialConsent; changed=true; }
+      if(row.type === 'booked' && existing.type !== 'booked'){ existing.type = 'booked'; changed=true; }
+      if(changed){ await push('saveClient', existing); }
       updated++;
     } else {
-      const cl = Object.assign({id:uid()}, row);
+      if(!DB.clients) DB.clients=[];
+      var cl = {
+        id: uid(), fbName: name,
+        email:        row.email||'',
+        phone:        row.phone||'',
+        birthday:     row.birthday||'',
+        notes:        row.notes||'',
+        referredBy:   row.referredBy||'',
+        socialConsent:row.socialConsent||'',
+        type:         row.type||'walkin',
+        added:        row.added||todayStr()
+      };
       DB.clients.push(cl);
       await push('saveClient', cl);
       added++;
     }
   }
+
+  // Deduplicate after import
+  var dupsRemoved = deduplicateClients();
   saveLocal();
-  notify('Import done: '+added+' added, '+updated+' updated','success');
-  logActivity('Client Import', added+' new, '+updated+' updated','success');
+
+  var msg = added+' added, '+updated+' updated';
+  if(dupsRemoved) msg += ', '+dupsRemoved+' duplicates removed';
+  if(skipped)     msg += ', '+skipped+' skipped (no name)';
+
+  notify('Import done: '+msg,'success');
+  logActivity('Client Import', msg,'success');
   closeModal();
   renderClients();
   _importRows=[];
