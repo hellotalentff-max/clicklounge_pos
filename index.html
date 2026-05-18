@@ -1822,22 +1822,35 @@ tr:hover td { background:var(--light); }
 <div id="page-eod" class="page">
   <div class="ph">
     <div><h2>End of Shift Report</h2><p id="eod-date"></p></div>
-    <button class="btn btn-teal" onclick="genEOD()">Generate Report</button>
   </div>
+
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
+
+    <!-- LEFT: Input panel -->
     <div>
       <div class="card">
-        <div class="ct">Staff Submission</div>
-        <div class="field mb16"><label for="eod-staff">Submitting Staff</label><select id="eod-staff"></select></div>
-        <div class="field mb16"><label for="eod-opening">Opening Cash Fund (₱)</label><input type="number" id="eod-opening" placeholder="0" min="0" onchange="genEODlive()">
-          <div class="tm mt8">Starting cash in the register at beginning of shift</div>
+        <div class="ct">Shift Details</div>
+        <div class="field mb12">
+          <label>Submitting Staff</label>
+          <select id="eod-staff" class="sinput" style="width:100%;"></select>
         </div>
-        <div class="field mb16"><label for="eod-cash">Cash on Hand (₱)</label><input type="number" id="eod-cash" placeholder="0" min="0" onchange="genEODlive()"></div>
-        <div class="field" style="margin-top:12px;"><label for="eod-notes">Notes</label><textarea id="eod-notes" rows="3" placeholder="Shift notes…"></textarea></div>
+        <div class="field mb12">
+          <label>Opening Cash Fund (₱) <span style="font-size:10px;color:var(--muted);font-weight:400;">— cash in register at start of shift</span></label>
+          <input type="number" id="eod-opening" class="sinput" placeholder="0" min="0" style="width:100%;" oninput="genEODlive()">
+        </div>
+        <div class="field mb12">
+          <label>Actual Cash on Hand (₱) <span style="font-size:10px;color:var(--muted);font-weight:400;">— count cash in drawer now</span></label>
+          <input type="number" id="eod-cash" class="sinput" placeholder="0" min="0" style="width:100%;" oninput="genEODlive()">
+        </div>
+        <div class="field">
+          <label>Notes / Incidents</label>
+          <textarea id="eod-notes" class="sinput" rows="3" placeholder="Any notes about today's shift…" style="width:100%;resize:vertical;"></textarea>
+        </div>
       </div>
+
       <div class="card">
         <div class="ct">Fund Transfers & Refunds</div>
-        <p class="tm" style="margin-bottom:10px;line-height:1.6;">Record GCash→Bank transfers, Cash→Bank deposits, and client refunds for accurate cash reconciliation.</p>
+        <p class="tm" style="margin-bottom:10px;line-height:1.6;">Record GCash→Bank transfers, Cash→Bank deposits, and client refunds.</p>
         <div id="eod-ft-list"></div>
         <div style="display:grid;grid-template-columns:2fr 1fr;gap:6px;margin-top:8px;">
           <select id="ft-type" class="sinput">
@@ -1847,16 +1860,46 @@ tr:hover td { background:var(--light); }
             <option value="Refund to Bank">Refund → Bank (Client)</option>
             <option value="Refund Cash">Refund → Cash (Client)</option>
           </select>
-          <input type="number" id="ft-amt" placeholder="₱" class="sinput">
+          <input type="number" id="ft-amt" placeholder="₱ Amount" class="sinput">
         </div>
         <div style="display:flex;gap:6px;margin-top:6px;">
-          <input type="text" id="ft-ref" placeholder="Reference # or client name (optional)" class="sinput" style="flex:1;">
+          <input type="text" id="ft-ref" placeholder="Reference # or client name" class="sinput" style="flex:1;">
           <input type="text" id="ft-notes" placeholder="Notes" class="sinput" style="flex:1;">
           <button class="btn btn-outline btn-sm" onclick="addFT()">Add</button>
         </div>
       </div>
     </div>
-    <div><div class="card"><div class="ct">Shift Summary</div><div id="eod-report"><div class="tm">Click Generate to compute.</div></div></div></div>
+
+    <!-- RIGHT: Live summary -->
+    <div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="ct" style="margin:0;">Shift Summary</div>
+          <button class="btn btn-gold" id="eod-submit-btn" onclick="genEOD()" style="padding:10px 20px;font-size:13px;font-weight:600;">
+            📤 Submit & Email Report
+          </button>
+        </div>
+
+        <!-- Key stats -->
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
+          <div class="rep-card-stat"><div class="rs-label">Total Sales</div><div class="rs-val rs-teal" id="eod-stat-sales">₱0</div></div>
+          <div class="rep-card-stat"><div class="rs-label">Total Downpayments</div><div class="rs-val rs-gold" id="eod-stat-dp">₱0</div></div>
+          <div class="rep-card-stat"><div class="rs-label">Total Discounts</div><div class="rs-val rs-muted" id="eod-stat-disc">₱0</div></div>
+          <div class="rep-card-stat"><div class="rs-label">Total Expenses</div><div class="rs-val rs-danger" id="eod-stat-exp">₱0</div></div>
+          <div class="rep-card-stat"><div class="rs-label">Cash Collected</div><div class="rs-val" id="eod-stat-cash">₱0</div></div>
+          <div class="rep-card-stat"><div class="rs-label">Expected Cash</div><div class="rs-val" id="eod-stat-expected">₱0</div></div>
+        </div>
+
+        <!-- Variance indicator -->
+        <div id="eod-variance-bar" style="border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;font-weight:600;text-align:center;background:var(--light);color:var(--muted);">
+          Enter Opening Cash and Actual Cash to see variance
+        </div>
+
+        <!-- Detailed breakdown -->
+        <div id="eod-report"><div class="tm">Fill in opening cash above to generate live summary.</div></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -2918,6 +2961,35 @@ function genEODlive(){
     html += '<div class="tm" style="margin-top:12px;">No invoices recorded today yet.</div>';
   }
 
+  // Update stat cards
+  var setS = function(id, val){ var el=document.getElementById(id); if(el) el.textContent='₱'+fmt(val); };
+  setS('eod-stat-sales',    totalRev);
+  setS('eod-stat-dp',       totalAckDP);
+  setS('eod-stat-disc',     txns.reduce(function(s,t){ return s+(+t.discount||0); },0));
+  setS('eod-stat-exp',      fts.filter(function(f){ return f.type.includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0));
+  setS('eod-stat-cash',     totalCashIn);
+  setS('eod-stat-expected', expectedCash);
+
+  // Variance bar
+  var varBar = document.getElementById('eod-variance-bar');
+  if(varBar){
+    if(cashHand > 0){
+      if(Math.abs(cashDiff) < 1){
+        varBar.style.background='rgba(61,140,110,0.1)'; varBar.style.color='var(--success)';
+        varBar.textContent='✓ Balanced — Cash count matches expected';
+      } else if(cashDiff > 0){
+        varBar.style.background='rgba(200,130,74,0.1)'; varBar.style.color='var(--gold)';
+        varBar.textContent='▲ Over by ₱'+fmt(Math.abs(cashDiff))+' — more cash than expected';
+      } else {
+        varBar.style.background='rgba(192,84,74,0.08)'; varBar.style.color='var(--danger)';
+        varBar.textContent='▼ Short by ₱'+fmt(Math.abs(cashDiff))+' — less cash than expected';
+      }
+    } else {
+      varBar.style.background='var(--light)'; varBar.style.color='var(--muted)';
+      varBar.textContent='Enter Actual Cash on Hand to see variance';
+    }
+  }
+
   var repEl = document.getElementById('eod-report');
   if(repEl) repEl.innerHTML = html;
 }
@@ -2955,45 +3027,51 @@ async function genEOD(){
     ackCount: todayAcks.length, fundTransfers: fts, notes: notes, txnCount: txns.length
   };
 
+  var submitBtn = document.getElementById('eod-submit-btn');
+  if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='Saving…'; }
+
   if(!DB.eodReports) DB.eodReports=[];
   const idx = DB.eodReports.findIndex(function(r){ return dateOnly(r.date)===today&&r.staff===staff; });
   if(idx>=0) DB.eodReports[idx]=report; else DB.eodReports.push(report);
-  DB._eodFT = []; // clear temp FT list
+  DB._eodFT = [];
   saveLocal();
   push('saveEOD', report);
-  notify('End of Shift Report submitted ✓','success');
+  notify('EOD Report submitted ✓','success');
   logActivity('EOD Report', staff+' — ₱'+fmt(totalRev)+' total, ₱'+fmt(cashHand)+' cash on hand','success');
   renderFTList();
   genEODlive();
 
-  // Send email report if configured
-  const toEmail = DB.studioInfo?.eodEmail || '';
-  if(toEmail && hasUrl()){
-    const totalSales  = txns.reduce(function(s,t){ return s+(+t.balance||0); },0);
-    const expectedCash= expectedCashVal;
-    const variance    = cashHand - expectedCash;
+  if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='📤 Submit & Email Report'; }
 
+  // Send email report
+  const toEmail = (DB.studioInfo?.eodEmail||'').trim();
+  if(toEmail && hasUrl()){
+    notify('Sending EOD report to '+toEmail+'…','info');
+    const totalDisc   = txns.reduce(function(s,t){ return s+(+t.discount||0); },0);
     const emailPayload = {
       toEmail: toEmail,
       studioInfo: DB.studioInfo||{},
       report: Object.assign({}, report, {
-        totalSales:   totalSales,
-        totalExp:     refunds2,
-        expectedCash: expectedCash,
+        totalSales:   totalRev,
+        totalDP:      totalAckDP,
+        ackCashDP:    ackCashDP,
+        totalDisc:    totalDisc,
+        totalExp:     refunds,
+        expectedCash: expectedCashVal,
         cashOnHand:   cashHand,
-        variance:     variance,
+        variance:     cashHand - expectedCashVal,
         fundTransfers:fts,
         expenses:     []
       })
     };
     gasCall('sendEODEmail', emailPayload)
       .then(function(r){
-        if(r.ok) notify('EOD email sent to '+toEmail,'success');
-        else notify('EOD saved but email failed: '+(r.error||'unknown'),'error');
+        if(r.ok) notify('✓ EOD email sent to '+toEmail,'success');
+        else notify('EOD saved — email failed: '+(r.error||'check Apps Script'),'error');
       })
-      .catch(function(e){ notify('EOD saved but email error: '+e.message,'error'); });
-  } else if(!toEmail) {
-    notify('Tip: Add your email in Settings → EOD Report Email to receive email reports','info');
+      .catch(function(e){ notify('EOD saved — email error: '+e.message,'error'); });
+  } else if(!toEmail){
+    notify('EOD saved. Set EOD Report Email in Settings to receive email reports.','info');
   }
 }
 
