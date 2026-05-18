@@ -2833,62 +2833,67 @@ function renderCalendar(){
   const yr = CAL_YEAR, mo = CAL_MONTH;
   const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-  // Update month label in page header
   const lbl = document.getElementById('cal-month-label');
   if(lbl) lbl.textContent = MONTH_NAMES[mo] + ' ' + yr;
 
-  // Calendar starts Monday (1), HTML headers are Mon-Sun
-  // JS getDay(): 0=Sun,1=Mon...6=Sat → offset so Mon=0
-  const firstJsDay = new Date(yr, mo, 1).getDay(); // 0=Sun
-  const firstOffset = (firstJsDay === 0) ? 6 : firstJsDay - 1; // Mon-based offset
-  const daysInMo   = new Date(yr, mo+1, 0).getDate();
+  // Monday-first offset (JS getDay: 0=Sun,1=Mon...)
+  const firstJsDay  = new Date(yr, mo, 1).getDay();
+  const firstOffset = (firstJsDay === 0) ? 6 : firstJsDay - 1;
+  const daysInMo    = new Date(yr, mo+1, 0).getDate();
 
   const today       = todayStr();
-  const restDays    = getRestDays();   // array of day numbers 0-6 (0=Sun)
-  const closedDates = getClosedDates().map(c => c.date||c);
+  const restDays    = getRestDays();
+  const closedDates = getClosedDates().map(function(c){ return c.date||c; });
   const acks        = (DB.acknowledgements||[]);
   const blocked     = (DB.blockedDates||[]);
 
-  let html = '';
+  var html = '';
 
-  // Empty cells before first day (Monday-based)
-  for(let i = 0; i < firstOffset; i++){
+  // Empty leading cells
+  for(var i = 0; i < firstOffset; i++){
     html += '<div style="min-height:80px;background:var(--light);border:1px solid var(--light2);"></div>';
   }
 
-  for(let d = 1; d <= daysInMo; d++){
-    const dateStr  = yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    const isToday  = dateStr === today;
-    const jsDay    = new Date(dateStr+'T00:00:00').getDay();
-    const isSun    = jsDay === 0;
-    const isRest   = restDays.includes(jsDay) || closedDates.includes(dateStr);
-    const isBlocked= blocked.some(b => b.date===dateStr);
+  function bookingChip(a, color, border){
+    return '<div style="font-size:9px;background:'+color+';border:1px solid '+border+
+           ';border-radius:3px;padding:1px 4px;margin-top:2px;overflow:hidden;'+
+           'text-overflow:ellipsis;white-space:nowrap;">'+escHtml(a.fbName||'')+'</div>';
+  }
 
-    const dayAcks  = acks.filter(a => a.bookDate === dateStr);
-    const pending  = dayAcks.filter(a => (a.status||'').toLowerCase().includes('pending') || (!a.status));
-    const confirmed= dayAcks.filter(a => (a.status||'').toLowerCase().includes('confirm'));
-    const cancelled= dayAcks.filter(a => (a.status||'').toLowerCase().includes('cancel'));
+  for(var d = 1; d <= daysInMo; d++){
+    var dateStr  = yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var isToday  = dateStr === today;
+    var jsDay    = new Date(dateStr+'T00:00:00').getDay();
+    var isRest   = restDays.includes(jsDay) || closedDates.includes(dateStr);
+    var isBlocked= blocked.some(function(b){ return b.date===dateStr; });
 
-    let bg = 'var(--white)';
-    if(isToday)   bg = 'rgba(81,137,125,0.08)';
+    var dayAcks  = acks.filter(function(a){ return a.bookDate === dateStr; });
+    var pend     = dayAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s.includes('pending'); });
+    var conf     = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); });
+    var canc     = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('cancel'); });
+
+    var bg = 'var(--white)';
     if(isRest)    bg = 'rgba(192,84,74,0.04)';
     if(isBlocked) bg = '#e8e8e8';
-    if(isSun)     bg = isBlocked ? '#e8e8e8' : 'rgba(47,79,79,0.02)';
+    if(isToday)   bg = 'rgba(81,137,125,0.1)';
 
-    html += `<div style="min-height:80px;background:${bg};border:1px solid var(--light2);padding:5px;position:relative;cursor:pointer;"
-       onclick="calDayClick('${dateStr}')">
-      <div style="font-size:11px;font-weight:${isToday?'700':'500'};color:${isToday?'var(--teal)':isRest?'var(--danger)':'var(--text)'};margin-bottom:3px;">${d}</div>
-      ${isBlocked?'<div style="font-size:9px;color:#666;background:#ddd;border-radius:2px;padding:1px 3px;">🚫 Blocked</div>':''}
-      ${pending.slice(0,2).map(a=>`<div style="font-size:9px;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;padding:1px 4px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.fbName||'')}</div>`).join('')}
-      ${confirmed.slice(0,2).map(a=>`<div style="font-size:9px;background:#d4edda;border:1px solid #51897d;border-radius:3px;padding:1px 4px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(a.fbName||'')}</div>`).join('')}
-      ${cancelled.slice(0,1).map(a=>`<div style="font-size:9px;background:#f8d7da;border:1px solid #c0544a;border-radius:3px;padding:1px 4px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:0.7;">${escHtml(a.fbName||'')}</div>`).join('')}
-      ${dayAcks.length > 3 ? `<div style="font-size:9px;color:var(--muted);margin-top:2px;">+${dayAcks.length-3} more</div>` : ''}
-    </div>`;
+    var dayNum_color = isToday ? 'var(--teal)' : isRest ? 'var(--danger)' : 'var(--text)';
+    var dayNum_weight = isToday ? '700' : '500';
+
+    var chips = '';
+    if(isBlocked) chips += '<div style="font-size:9px;color:#666;background:#ddd;border-radius:2px;padding:1px 3px;">🚫 Blocked</div>';
+    pend.slice(0,2).forEach(function(a){ chips += bookingChip(a,'#fff3cd','#ffc107'); });
+    conf.slice(0,2).forEach(function(a){ chips += bookingChip(a,'#d4edda','#51897d'); });
+    canc.slice(0,1).forEach(function(a){ chips += bookingChip(a,'#f8d7da','#c0544a'); });
+    if(dayAcks.length > 3) chips += '<div style="font-size:9px;color:var(--muted);margin-top:2px;">+'+(dayAcks.length-3)+' more</div>';
+
+    html += '<div style="min-height:80px;background:'+bg+';border:1px solid var(--light2);'+
+            'padding:5px;cursor:pointer;" onclick="calDayClick(\''+dateStr+'\')">'+
+            '<div style="font-size:11px;font-weight:'+dayNum_weight+';color:'+dayNum_color+';margin-bottom:3px;">'+d+'</div>'+
+            chips+'</div>';
   }
 
   el.innerHTML = html;
-
-  // Render pending and confirmed lists
   renderCalendarLists(acks, yr, mo);
 }
 
@@ -2912,18 +2917,18 @@ function renderCalendarLists(acks, yr, mo){
 }
 
 function ackListRow(a, type){
-  const isP = type==='pending';
-  return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);">
-    <div style="width:8px;height:8px;border-radius:50%;background:${isP?'var(--gold)':'var(--success)'};flex-shrink:0;"></div>
-    <div style="flex:1;">
-      <div style="font-weight:600;font-size:13px;">${escHtml(a.fbName||'')}</div>
-      <div style="font-size:11px;color:var(--muted);">${a.bookDate} · ${escHtml(a.service||'—')} · ₱${fmt(+a.downpayment||0)} ${a.mop||''}</div>
-    </div>
-    <div style="display:flex;gap:6px;">
-      ${isP?`<button class="btn btn-sm btn-teal" onclick="confirmAck('${a.id}')">✓ Confirm</button>`:''}
-      <button class="btn btn-sm btn-outline" onclick="viewAckDetail('${a.id}')">View</button>
-    </div>
-  </div>`;
+  var isP = type==='pending';
+  return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);">'+
+    '<div style="width:8px;height:8px;border-radius:50%;background:'+(isP?'var(--gold)':'var(--success)')+';flex-shrink:0;"></div>'+
+    '<div style="flex:1;">'+
+      '<div style="font-weight:600;font-size:13px;">'+escHtml(a.fbName||'')+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);">'+a.bookDate+' · '+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:6px;">'+
+      (isP ? '<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)">✓ Confirm</button>' : '')+
+      '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="viewAckDetail(this.dataset.aid)">View</button>'+
+    '</div>'+
+  '</div>';
 }
 
 function calNav(dir){
@@ -2940,26 +2945,29 @@ function calNavToday(){
 }
 
 function calDayClick(dateStr){
-  const acks = (DB.acknowledgements||[]).filter(a=>a.bookDate===dateStr);
-  if(!acks.length){ return; }
-  const html =
-    '<h3 style="margin-bottom:12px;">📅 '+dateStr+'</h3>'+
-    acks.map(a=>
-      '<div style="background:var(--light);border-radius:8px;padding:12px 14px;margin-bottom:8px;">'+
-        '<div style="font-weight:600;">'+escHtml(a.fbName||'')+'</div>'+
-        '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
-        '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Status: '+(a.status||'Pending')+'</div>'+
-        '<div style="display:flex;gap:6px;margin-top:8px;">'+
-          ((!a.status||(a.status||'').toLowerCase().includes('pending'))?
-            '<button class="btn btn-sm btn-teal" onclick="confirmAck(\''+a.id+'\');closeModal()">✓ Confirm</button>':'')+
-          '<button class="btn btn-sm btn-outline" onclick="printAck(\''+a.id+'\')">🖨 Print</button>'+
-          '<button class="btn btn-sm btn-danger" onclick="deleteAck(\''+a.id+'\');closeModal()">✕ Delete</button>'+
-        '</div>'+
-      '</div>'
-    ).join('')+
-    '<div class="fe"><button class="btn btn-outline" onclick="closeModal()">Close</button></div>';
+  var acks = (DB.acknowledgements||[]).filter(function(a){ return a.bookDate===dateStr; });
+  if(!acks.length) return;
+  var html = '<h3 style="margin-bottom:12px;">📅 '+dateStr+'</h3>';
+  acks.forEach(function(a){
+    var isPending = !a.status || String(a.status||'').toLowerCase().includes('pending');
+    html += '<div style="background:var(--light);border-radius:8px;padding:12px 14px;margin-bottom:8px;">'+
+      '<div style="font-weight:600;">'+escHtml(a.fbName||'')+'</div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Status: '+(a.status||'Pending')+'</div>'+
+      '<div style="display:flex;gap:6px;margin-top:8px;">'+
+        (isPending ? '<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)">✓ Confirm</button>' : '')+
+        '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)">🖨 Print</button>'+
+        '<button class="btn btn-sm btn-danger" data-aid="'+a.id+'" onclick="calDeleteAck(this)">✕ Delete</button>'+
+      '</div>'+
+    '</div>';
+  });
+  html += '<div class="fe"><button class="btn btn-outline" onclick="closeModal()">Close</button></div>';
   openModal(html);
 }
+
+function calConfirmAck(btn){ var id=btn.dataset.aid; confirmAck(id); closeModal(); }
+function calPrintAck(btn)  { var id=btn.dataset.aid; printAck(id); }
+function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal(); }
 
 async function confirmAck(id){
   const a = (DB.acknowledgements||[]).find(x=>x.id===id);
