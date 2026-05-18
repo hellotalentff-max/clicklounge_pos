@@ -4907,6 +4907,29 @@ function openNewAck(){
     <div class="frow c2"><div class="field"><label for="ma-mop">MOP</label><select id="ma-mop"><option>BPI</option><option>GCash</option><option>Cash</option><option>Maya</option></select></div><div class="field"><label for="dp-amt">Downpayment (₱)</label><input type="number" id="ma-dp" placeholder="500"></div></div>
     <div class="fe mt8"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-gold" onclick="saveAck()">Save</button></div>`);
 }
+function genARNum(service){
+  // Format: AR + DDMMYY + service-type-code + sequence
+  const now  = new Date();
+  const dd   = String(now.getDate()).padStart(2,'0');
+  const mm   = String(now.getMonth()+1).padStart(2,'0');
+  const yy   = String(now.getFullYear()).slice(-2);
+  // Type code from service name
+  const svc  = (service||'').toUpperCase();
+  let code = 'X';
+  if(svc.includes('SS'))  code = 'SS';
+  else if(svc.includes('S'))   code = 'S';
+  else if(svc.includes('M'))   code = 'M';
+  else if(svc.includes('L'))   code = 'L';
+  else if(svc.includes('XL'))  code = 'XL';
+  // Sequence: count existing acks today
+  const todayPrefix = yy+mm+dd;
+  const todayCount  = (DB.acknowledgements||[]).filter(function(a){
+    return String(a.ackNum||'').includes(todayPrefix);
+  }).length + 1;
+  const seq = String(todayCount).padStart(2,'0');
+  return 'AR'+dd+mm+yy+code+seq;
+}
+
 async function saveAck(){
   const fbName=document.getElementById('ma-fb').value.trim();
   const ackEmail='';
