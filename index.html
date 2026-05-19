@@ -6048,57 +6048,143 @@ async function pollFeedback(){
 //  RENDER TRANSACTIONS
 // ================================================================
 function renderTxns(){
-  const invEl  = document.getElementById('inv-list');
-  const expEl  = document.getElementById('exp-list');
-  const ftEl   = document.getElementById('ft-list');
-  if(invEl){
-    const txns = (DB.transactions||[]).slice().sort((a,b)=>String(b.date+b.invoiceNum).localeCompare(String(a.date+a.invoiceNum)));
-    if(!txns.length){ invEl.innerHTML='<div class="tm">No transactions yet.</div>'; }
-    else{
-      invEl.innerHTML='<div style="overflow-x:auto;"><table><thead><tr><th>Invoice</th><th>Date</th><th>Client</th><th>Services</th><th style="text-align:right;">Total</th><th>MOP</th><th></th></tr></thead><tbody>'+
-        txns.map(t=>{
-          const isVoid = String(t.invoiceNum||'').startsWith('[VOID]');
-          const items  = Array.isArray(t.items)?t.items:(typeof t.items==='string'?JSON.parse(t.items||'[]'):[]);
-          const svcs   = items.map(i=>i.name+(i.qty>1?' x'+i.qty:'')).join(', ')||t.itemsSummary||'—';
-          return `<tr style="opacity:${isVoid?'0.45':'1'};">
-            <td><span class="badge b-gold">${t.invoiceNum}</span></td>
-            <td style="font-size:11px;white-space:nowrap;">${t.date}</td>
-            <td style="font-weight:500;">${t.clientName}</td>
-            <td style="font-size:11px;color:var(--muted);max-width:200px;">${escHtml(svcs)}</td>
-            <td style="text-align:right;font-weight:600;">₱${fmt(+t.total)}</td>
-            <td style="font-size:11px;">${t.balanceMOP||t.mop||'—'}</td>
-            <td><button class="btn btn-sm btn-outline" onclick="printInvoice('${t.id}')">🖨</button></td>
-          </tr>`;
-        }).join('')+
-      '</tbody></table></div>';
-    }
-  }
+  var filter = (document.getElementById('tx-filter')?.value)||'all';
+  var q      = (document.getElementById('tx-search')?.value||'').toLowerCase();
+  var today  = todayStr();
+  var month  = today.slice(0,7);
+
+  var txns = (DB.transactions||[]).slice().sort(function(a,b){
+    return String(b.date+(b.invoiceNum||'')).localeCompare(String(a.date+(a.invoiceNum||'')));
+  });
+
+  if(filter==='today') txns = txns.filter(function(t){ return String(t.date||'').slice(0,10)===today; });
+  if(filter==='month') txns = txns.filter(function(t){ return String(t.date||'').startsWith(month); });
+  if(q) txns = txns.filter(function(t){
+    return String(t.clientName||'').toLowerCase().includes(q) || String(t.invoiceNum||'').toLowerCase().includes(q);
+  });
+
+  var el = document.getElementById('tx-table');
+  if(!el) return;
+
+  if(!txns.length){ el.innerHTML='<div class="tm">No transactions found.</div>'; return; }
+
+  var totalRev  = txns.filter(function(t){ return !String(t.invoiceNum||'').startsWith('[VOID]'); }).reduce(function(s,t){ return s+(+t.total||0); },0);
+  var rows = '';
+  txns.forEach(function(t){
+    var isVoid = String(t.invoiceNum||'').startsWith('[VOID]');
+    var items  = [];
+    try{ items = Array.isArray(t.items) ? t.items : JSON.parse(t.items||'[]'); }catch(e){}
+    var svcs = items.map(function(i){ return i.name+(i.qty>1?' x'+i.qty:''); }).join(', ') || t.itemsSummary || '—';
+    rows += '<tr style="opacity:'+(isVoid?'0.4':'1')+';background:'+(isVoid?'var(--light)':'')+';">'+
+      '<td><span class="badge b-gold" style="font-size:9px;">'+escHtml(t.invoiceNum||'')+'</span></td>'+
+      '<td style="font-size:11px;white-space:nowrap;">'+escHtml(String(t.date||'').slice(0,10))+'</td>'+
+      '<td style="font-weight:500;">'+escHtml(t.clientName||'')+'</td>'+
+      '<td style="font-size:11px;color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(svcs)+'</td>'+
+      '<td style="text-align:right;font-weight:600;color:'+(isVoid?'var(--danger)':'')+';">&#8369;'+fmt(+t.total||0)+'</td>'+
+      '<td style="font-size:11px;color:var(--muted);">'+escHtml(t.balanceMOP||t.mop||'—')+'</td>'+
+      '<td style="white-space:nowrap;">'+
+        '<button class="btn btn-sm btn-outline" style="padding:2px 7px;" data-tid="'+t.id+'" onclick="printInvoice(this.dataset.tid)">&#128424;</button>'+
+        (!isVoid?'<button class="btn btn-sm btn-danger" style="padding:2px 6px;margin-left:3px;font-size:10px;" data-tid="'+t.id+'" onclick="voidInvoice(this.dataset.tid)">Void</button>':'')+
+      '</td>'+
+    '</tr>';
+  });
+
+  el.innerHTML =
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">'+txns.length+' records &nbsp;|&nbsp; Total: <strong>&#8369;'+fmt(totalRev)+'</strong></div>'+
+    '<div style="overflow-x:auto;"><table>'+
+    '<thead><tr>'+
+      '<th>Invoice</th><th>Date</th><th>Client</th><th>Services</th>'+
+      '<th style="text-align:right;">Total</th><th>MOP</th><th></th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+function renderExpTx(){
+  var filter = (document.getElementById('exp-filter')?.value)||'all';
+  var q      = (document.getElementById('exp-search')?.value||'').toLowerCase();
+  var today  = todayStr();
+  var month  = today.slice(0,7);
+
+  var exps = (DB.expenses||[]).slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  if(filter==='today') exps = exps.filter(function(e){ return String(e.date||'').slice(0,10)===today; });
+  if(filter==='month') exps = exps.filter(function(e){ return String(e.date||'').startsWith(month); });
+  if(q) exps = exps.filter(function(e){ return String(e.desc||'').toLowerCase().includes(q) || String(e.category||'').toLowerCase().includes(q); });
+
+  var el = document.getElementById('exp-tx-table');
+  if(!el) return;
+
+  if(!exps.length){ el.innerHTML='<div class="tm">No expenses found.</div>'; return; }
+
+  var total = exps.reduce(function(s,e){ return s+(+e.amt||0); },0);
+  var rows  = '';
+  exps.forEach(function(e,i){
+    var bg = i%2===0?'var(--white)':'var(--light)';
+    rows += '<tr style="background:'+bg+';">'+
+      '<td style="font-size:11px;white-space:nowrap;">'+escHtml(String(e.date||'').slice(0,10))+'</td>'+
+      '<td style="font-weight:500;">'+escHtml(e.desc||'')+'</td>'+
+      '<td><span style="font-size:10px;background:var(--light2);border-radius:6px;padding:2px 7px;">'+escHtml(e.category||'Operations')+'</span></td>'+
+      '<td style="text-align:right;color:var(--danger);font-weight:600;">&#8369;'+fmt(+e.amt||0)+'</td>'+
+      '<td style="font-size:11px;color:var(--muted);">'+escHtml(e.mop||'—')+'</td>'+
+      '<td><button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" data-eid="'+e.id+'" onclick="deleteExpense(this.dataset.eid)">&#10005;</button></td>'+
+    '</tr>';
+  });
+
+  el.innerHTML =
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">'+exps.length+' records &nbsp;|&nbsp; Total: <strong style="color:var(--danger);">&#8369;'+fmt(total)+'</strong></div>'+
+    '<div style="overflow-x:auto;"><table>'+
+    '<thead><tr><th>Date</th><th>Description</th><th>Category</th><th style="text-align:right;">Amount</th><th>MOP</th><th></th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div>';
+}
+
+function renderFtTx(){
+  var filter = (document.getElementById('ft-filter')?.value)||'all';
+  var q      = (document.getElementById('ft-search')?.value||'').toLowerCase();
+  var today  = todayStr();
+  var month  = today.slice(0,7);
+
+  var fts = (DB.fundTransfers||[]).slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  if(filter==='today') fts = fts.filter(function(f){ return String(f.date||'').slice(0,10)===today; });
+  if(filter==='month') fts = fts.filter(function(f){ return String(f.date||'').startsWith(month); });
+  if(q) fts = fts.filter(function(f){ return String(f.type||'').toLowerCase().includes(q) || String(f.ref||'').toLowerCase().includes(q); });
+
+  var el = document.getElementById('ft-tx-table');
+  if(!el) return;
+
+  if(!fts.length){ el.innerHTML='<div class="tm">No fund transfers found.</div>'; return; }
+
+  var intTotal = fts.filter(function(f){ return !String(f.type||'').toLowerCase().includes('refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  var refTotal = fts.filter(function(f){ return String(f.type||'').toLowerCase().includes('refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  var rows = '';
+  fts.forEach(function(f,i){
+    var bg    = i%2===0?'var(--white)':'var(--light)';
+    var isRef = String(f.type||'').toLowerCase().includes('refund');
+    rows += '<tr style="background:'+bg+';">'+
+      '<td style="font-size:11px;white-space:nowrap;">'+escHtml(String(f.date||'').slice(0,10))+'</td>'+
+      '<td><span style="font-size:10px;border-radius:6px;padding:2px 7px;'+(isRef?'background:rgba(192,84,74,0.1);color:var(--danger);':'background:rgba(81,137,125,0.1);color:var(--teal);')+'">'+(isRef?'Refund':'Internal')+'</span></td>'+
+      '<td style="font-size:12px;">'+escHtml(f.type||'—')+'</td>'+
+      '<td style="text-align:right;font-weight:600;color:'+(isRef?'var(--danger)':'var(--teal)')+';">&#8369;'+fmt(+f.amt||0)+'</td>'+
+      '<td style="font-size:11px;color:var(--muted);">'+escHtml((f.ref||'')+(f.notes?' — '+f.notes:''))+'</td>'+
+    '</tr>';
+  });
+
+  el.innerHTML =
+    '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Internal: <strong style="color:var(--teal);">&#8369;'+fmt(intTotal)+'</strong> &nbsp;|&nbsp; Refunds: <strong style="color:var(--danger);">&#8369;'+fmt(refTotal)+'</strong></div>'+
+    '<div style="overflow-x:auto;"><table>'+
+    '<thead><tr><th>Date</th><th>Category</th><th>Type</th><th style="text-align:right;">Amount</th><th>Reference</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div>';
 }
 
 function showTxTab(tab){
-  ['inv','exp','ft'].forEach(t=>{
-    const btn = document.getElementById('tx-tab-'+t);
-    const pnl = document.getElementById('tx-pnl-'+t);
+  ['inv','exp','ft','log'].forEach(function(t){
+    var btn = document.getElementById('tx-tab-'+t);
+    var pnl = document.getElementById('tx-panel-'+t);
     if(btn) btn.classList.toggle('active', t===tab);
     if(pnl) pnl.style.display = t===tab ? '' : 'none';
   });
+  if(tab==='inv') renderTxns();
+  if(tab==='exp') renderExpTx();
+  if(tab==='ft')  renderFtTx();
+  if(tab==='log') renderActivityLog();
 }
-
-// ================================================================
-//  RENDER EXPENSES PAGE
-// ================================================================
-// ================================================================
-//  FUND TRANSFERS
-// ================================================================
-var FT_TYPE_HINTS = {
-  'Cash to Bank':  'Internal: Moving cash from your drawer into the bank account. Does NOT reduce revenue.',
-  'GCash to Bank': 'Internal: Moving GCash balance into the bank account. Does NOT reduce revenue.',
-  'Bank to Cash':  'Internal: Withdrawing cash from bank for petty cash/change fund.',
-  'Bank to GCash': 'Internal: Loading GCash from bank account.',
-  'Refund Cash':   'Refund: Cash given back to a client. This IS deducted from revenue in reports.',
-  'Refund GCash':  'Refund: GCash sent back to a client. This IS deducted from revenue in reports.',
-  'Refund Bank':   'Refund: Bank transfer sent back to a client. This IS deducted from revenue in reports.'
-};
 
 function renderFTTypeHint(){
   var type = document.getElementById('ft-page-type')?.value||'';
