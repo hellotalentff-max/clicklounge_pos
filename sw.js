@@ -1,4 +1,4 @@
-const CACHE_NAME = 'clicklounge-pos-v44';
+const CACHE_NAME = 'clicklounge-pos-v45';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
