@@ -6705,128 +6705,357 @@ function openClientProfile(nameJson){
   const acks  = (DB.acknowledgements||[]).filter(a=>a.fbName===name);
   const fbks  = (DB.feedback||[]).filter(f=>f.fbName===name||f.clientName===name);
   const tasks = (DB.tasks||[]).filter(t=>t.client===name);
-  const totalSpent = txns.reduce((s,t)=>s+(+t.total||0),0);
+  const clientGifts = (DB.gifts||[]).filter(g=>g.clientName===name||g.fbName===name);
+  const referrals   = (DB.clients||[]).filter(cl=>cl.referredBy===name);
+  const totalSpent  = txns.reduce((s,t)=>s+(+t.total||0),0);
+  const avgSpent    = txns.length ? Math.round(totalSpent/txns.length) : 0;
   const ini = name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
 
-  // Visit frequency
-  let daysSince = '—';
+  // Visit analytics
+  let daysSince='—', firstVisit='—', avgDaysBetween='—', visitStreak=0;
+  let peakDay='', peakHour='', peakMonth='';
+
   if(regs.length){
     const last = regs[0].date;
     const diff = Math.floor((Date.now()-new Date(last+'T00:00:00').getTime())/86400000);
     daysSince = diff===0?'Today':diff+'d ago';
+    const sorted = regs.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    firstVisit = sorted[0].date;
+    if(regs.length>1){
+      const dates = sorted.map(r=>new Date(r.date+'T00:00:00').getTime());
+      let gaps=0;
+      for(let i=1;i<dates.length;i++) gaps+=Math.floor((dates[i]-dates[i-1])/86400000);
+      avgDaysBetween = Math.round(gaps/(dates.length-1))+'d';
+    }
+    const dayCounts={Sun:0,Mon:0,Tue:0,Wed:0,Thu:0,Fri:0,Sat:0};
+    const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    regs.forEach(r=>{ const d=new Date(r.date+'T00:00:00').getDay(); dayCounts[dayNames[d]]++; });
+    peakDay = Object.entries(dayCounts).sort((a,b)=>b[1]-a[1])[0][0];
+    const hourCounts={};
+    regs.forEach(r=>{
+      if(!r.time) return;
+      const m=String(r.time).match(/(\d{1,2}):/);
+      if(m){ let h=parseInt(m[1]); if(/pm/i.test(r.time)&&h!==12) h+=12; if(/am/i.test(r.time)&&h===12) h=0; hourCounts[h]=(hourCounts[h]||0)+1; }
+    });
+    if(Object.keys(hourCounts).length){
+      const ph=Object.entries(hourCounts).sort((a,b)=>b[1]-a[1])[0][0];
+      const h12=+ph>12?+ph-12:+ph===0?12:+ph;
+      peakHour=h12+(+ph>=12?'PM':'AM');
+    }
+    const monthCounts={};
+    regs.forEach(r=>{ const mo=String(r.date||'').slice(5,7); monthCounts[mo]=(monthCounts[mo]||0)+1; });
+    if(Object.keys(monthCounts).length){
+      const pm=Object.entries(monthCounts).sort((a,b)=>b[1]-a[1])[0][0];
+      const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      peakMonth=MONTHS[parseInt(pm)-1]||pm;
+    }
+    const monthSet=new Set(regs.map(r=>String(r.date||'').slice(0,7)));
+    const now=new Date();
+    for(let i=0;i<12;i++){
+      const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      if(monthSet.has(key)) visitStreak++; else break;
+    }
   }
-  const clientGifts = (DB.gifts||[]).filter(g=>g.clientName===name||g.fbName===name);
-  const referrals   = (DB.clients||[]).filter(cl=>cl.referredBy===name);
 
-  // Timeline
-  const timeline = [];
-  regs.forEach(r=>timeline.push({date:r.date,time:r.time||'',type:'visit',icon:'&#128694;',title:'Studio Visit ('+r.arrType+')',meta:fmtTimePHT(r.time)}));
+  // Package preferences
+  const pkgCounts={};
   txns.forEach(t=>{
     let items=[]; try{items=Array.isArray(t.items)?t.items:JSON.parse(t.items||'[]');}catch(e){}
-    timeline.push({date:t.date,type:'invoice',icon:'&#129534;',title:'Invoice '+t.invoiceNum,meta:items.map(i=>i.name).join(', ')||'—',amt:+t.total||0});
+    const main=items.find(i=>!i.isAddon)||items[0];
+    if(main&&main.name){ pkgCounts[main.name]=(pkgCounts[main.name]||0)+1; }
   });
-  fbks.forEach(f=>timeline.push({date:f.date||'',type:'feedback',icon:'&#128172;',title:'Feedback submitted',meta:f.rating?'Rating: '+f.rating:''}));
-  tasks.forEach(t=>timeline.push({date:t.createdAt||'',type:'task',icon:'&#9989;',title:'Task: '+escHtml(t.title||''),meta:t.stage||''}));
-  timeline.sort((a,b)=>String(b.date+b.time).localeCompare(String(a.date+a.time)));
+  const topPkg=Object.entries(pkgCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
 
-  const html =
-    '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">'+
-      '<div class="cl-avatar" style="width:56px;height:56px;font-size:20px;">'+ini+'</div>'+
-      '<div style="flex:1;">'+
+  // Loyalty score
+  const loyaltyScore = Math.min(100,Math.round((regs.length*10)+(visitStreak*5)+(referrals.length*10)+(txns.length*5)+(fbks.length*5)+(totalSpent/1000*2)));
+  const loyaltyLabel = loyaltyScore>=80?'&#11088; VIP':loyaltyScore>=50?'&#128142; Regular':loyaltyScore>=20?'&#128994; Growing':'&#128997; New';
+  const loyaltyColor = loyaltyScore>=80?'var(--gold)':loyaltyScore>=50?'var(--teal)':loyaltyScore>=20?'var(--success)':'var(--muted)';
+
+  // Last 12 months bar chart
+  const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now2=new Date();
+  let barHtml='';
+  let maxV=0;
+  const buckets=[];
+  for(let i=11;i>=0;i--){
+    const d=new Date(now2.getFullYear(),now2.getMonth()-i,1);
+    const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const cnt=regs.filter(r=>String(r.date||'').startsWith(key)).length;
+    buckets.push({mo:MONTHS_S[d.getMonth()],cnt});
+    if(cnt>maxV) maxV=cnt;
+  }
+  if(maxV>0){
+    barHtml=buckets.map(b=>{
+      const h=b.cnt?Math.max(10,Math.round(b.cnt/maxV*44)):3;
+      return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;">'+
+        '<div style="font-size:9px;color:'+(b.cnt?'var(--teal)':'var(--light2)')+';">'+(b.cnt||'')+'</div>'+
+        '<div style="width:100%;height:44px;display:flex;align-items:flex-end;">'+
+          '<div style="width:100%;height:'+h+'px;background:'+(b.cnt?'var(--teal)':'var(--light2)')+';border-radius:3px 3px 0 0;"></div>'+
+        '</div>'+
+        '<div style="font-size:9px;color:var(--muted);">'+b.mo+'</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  // Timeline
+  const timeline=[];
+  regs.forEach(r=>timeline.push({date:r.date,time:r.time||'',icon:'&#128694;',title:'Studio Visit ('+r.arrType+')',meta:fmtTimePHT(r.time)}));
+  txns.forEach(t=>{ let items=[]; try{items=Array.isArray(t.items)?t.items:JSON.parse(t.items||'[]');}catch(e){} timeline.push({date:t.date,icon:'&#129534;',title:'Invoice '+t.invoiceNum,meta:items.map(i=>i.name).join(', ')||'',amt:+t.total||0}); });
+  fbks.forEach(f=>timeline.push({date:f.date||'',icon:'&#128172;',title:'Feedback submitted',meta:f.rating?'Rating: '+f.rating:''}));
+  acks.forEach(a=>timeline.push({date:a.bookDate||a.date||'',icon:'&#128197;',title:'Receipt '+escHtml(a.ackNum||''),meta:escHtml(a.service||'')}));
+  tasks.forEach(t=>timeline.push({date:t.createdAt||'',icon:'&#9989;',title:'Task: '+escHtml(t.title||''),meta:t.stage||''}));
+  timeline.sort((a,b)=>String(b.date+(b.time||'')).localeCompare(String(a.date+(a.time||''))));
+
+  // ── Upcoming bookings ──
+  var today = todayStr();
+  var upcoming = acks.filter(function(a){ return a.bookDate >= today && String(a.status||'').toLowerCase()!=='cancelled'; })
+                     .sort(function(a,b){ return String(a.bookDate).localeCompare(String(b.bookDate)); });
+  var lastReg = regs.length ? regs[0] : null;
+  var lastDiff = lastReg ? Math.floor((Date.now()-new Date(String(lastReg.date)+'T00:00:00').getTime())/86400000) : null;
+
+  // ── Churn risk ──
+  var churnRisk = 'none', churnLabel = '', churnColor = 'var(--muted)';
+  if(lastDiff !== null){
+    if(lastDiff > 90){ churnRisk='high';   churnLabel='&#9888; High Risk ('+lastDiff+'d)'; churnColor='var(--danger)'; }
+    else if(lastDiff > 60){ churnRisk='med'; churnLabel='&#128993; At Risk ('+lastDiff+'d)'; churnColor='var(--gold)'; }
+    else if(lastDiff > 30){ churnRisk='low'; churnLabel='&#128994; Overdue ('+lastDiff+'d)'; churnColor='var(--teal)'; }
+  }
+
+  // ── Day-of-week heatmap ──
+  var DAY_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var DAY_JS    = [1,2,3,4,5,6,0];
+  var dayCounts2 = {1:0,2:0,3:0,4:0,5:0,6:0,0:0};
+  var maxDayCount = 1;
+  regs.forEach(function(r){ var d=new Date(String(r.date)+'T00:00:00').getDay(); dayCounts2[d]++; if(dayCounts2[d]>maxDayCount) maxDayCount=dayCounts2[d]; });
+
+  var heatHtml = DAY_ORDER.map(function(day,i){
+    var jsDay = DAY_JS[i];
+    var cnt   = dayCounts2[jsDay]||0;
+    var pct   = Math.round(cnt/maxDayCount*100);
+    var bg    = cnt===0 ? 'var(--light2)' : cnt===maxDayCount ? 'var(--teal)' : 'rgba(81,137,125,'+((pct/100)*0.7+0.1)+')';
+    return '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;">'+
+      '<div style="width:100%;aspect-ratio:1;background:'+bg+';border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:'+(cnt>0?'#fff':'var(--muted)')+';">'+
+        (cnt>0?cnt:'')+'</div>'+
+      '<div style="font-size:9px;color:var(--muted);">'+day+'</div>'+
+    '</div>';
+  }).join('');
+
+  // ── Build HTML ──
+  var html =
+    // Header
+    '<div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px;">'+
+      '<div class="cl-avatar" style="width:52px;height:52px;font-size:19px;flex-shrink:0;">'+ini+'</div>'+
+      '<div style="flex:1;min-width:0;">'+
         '<h3 style="margin:0 0 2px;">'+escHtml(name)+'</h3>'+
-        '<div style="font-size:12px;color:var(--muted);">'+(c.email||'No email on file')+'</div>'+
-        (c.phone?'<div style="font-size:12px;color:var(--muted);">&#128241; '+escHtml(c.phone)+'</div>':'')+
-        (c.birthday?'<div style="font-size:12px;color:var(--gold);">&#127874; '+fmtBirthday(c.birthday)+'</div>':'')+
-        '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">'+
+        '<div style="font-size:12px;color:var(--muted);">'+(c.email||'No email on file')+
+          (c.phone?' &nbsp;&#128241; '+escHtml(c.phone):'')+
+          (c.birthday?' &nbsp;&#127874; '+fmtBirthday(c.birthday):'')+
+        '</div>'+
+        '<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">'+
           '<span class="cl-tag '+(c.type==='booked'?'b-gold':'b-teal')+'">'+c.type+'</span>'+
-          (c.socialConsent==='yes'?'<span class="cl-tag" style="background:rgba(61,140,110,0.1);color:var(--success);">&#9989; SM Consent</span>':'')+
-          (fbks.length?'<span class="cl-tag" style="background:rgba(81,137,125,0.08);color:var(--teal);">&#128172; Feedback</span>':'')+
-          (c.referredBy?'<span class="cl-tag" style="background:var(--light);color:var(--muted);">&#129309; Ref by: '+escHtml(c.referredBy)+'</span>':'')+
+          '<span class="cl-tag" style="background:rgba(200,130,74,0.07);color:'+loyaltyColor+';">'+loyaltyLabel+'</span>'+
+          (c.socialConsent==='yes'?'<span class="cl-tag" style="background:rgba(61,140,110,0.1);color:var(--success);">&#9989; SM OK</span>':'')+
+          (c.socialConsent==='no'?'<span class="cl-tag" style="background:rgba(192,84,74,0.08);color:var(--danger);">&#128683; Private</span>':'')+
+          (churnRisk!=='none'?'<span class="cl-tag" style="background:rgba(192,84,74,0.06);color:'+churnColor+';">'+churnLabel+'</span>':'')+
         '</div>'+
       '</div>'+
+      '<button class="btn btn-sm btn-outline" style="flex-shrink:0;" data-cname="'+encodeURIComponent(name)+'" onclick="closeModal();openEditClient(this.dataset.cname)">&#9998; Edit</button>'+
     '</div>'+
-    '<div class="cl-stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">'+
-      '<div class="cl-stat"><div class="cl-stat-val">'+regs.length+'</div><div class="cl-stat-lbl">Visits</div></div>'+
-      '<div class="cl-stat"><div class="cl-stat-val">'+txns.length+'</div><div class="cl-stat-lbl">Invoices</div></div>'+
+
+    // Stats row
+    '<div class="cl-stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px;">'+
+      '<div class="cl-stat"><div class="cl-stat-val rs-teal">'+regs.length+'</div><div class="cl-stat-lbl">Visits</div></div>'+
       '<div class="cl-stat"><div class="cl-stat-val" style="font-size:12px;">&#8369;'+fmt(totalSpent)+'</div><div class="cl-stat-lbl">Total Spent</div></div>'+
-      '<div class="cl-stat"><div class="cl-stat-val" style="font-size:12px;">'+daysSince+'</div><div class="cl-stat-lbl">Last Visit</div></div>'+
-      '<div class="cl-stat"><div class="cl-stat-val">'+clientGifts.length+'</div><div class="cl-stat-lbl">Gifts Won</div></div>'+
-      '<div class="cl-stat"><div class="cl-stat-val">'+referrals.length+'</div><div class="cl-stat-lbl">Referrals</div></div>'+
-    '</div>'+
-    '<div class="crm-section-title">&#9993; CRM Actions</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'+
-      '<button class="btn btn-teal btn-sm" data-n="'+encodeURIComponent(name)+'" data-t="" onclick="crmBtnClick(this)">&#128231; Send Email</button>'+
-      '<button class="btn btn-sm btn-outline" data-n="'+encodeURIComponent(name)+'" data-t="promo" onclick="crmBtnClick(this)">&#127873; Promo</button>'+
-      '<button class="btn btn-sm btn-outline" data-n="'+encodeURIComponent(name)+'" data-t="reminder" onclick="crmBtnClick(this)">&#9200; Reminder</button>'+
-      '<button class="btn btn-sm btn-outline" data-n="'+encodeURIComponent(name)+'" data-t="followup" onclick="crmBtnClick(this)">&#128172; Follow-up</button>'+
-    '</div>'+
-    (!c.email?'<div style="font-size:11px;color:var(--gold);margin-bottom:8px;">&#9888; No email on file — add below to enable messaging.</div>':'')+
-    '<div style="background:var(--light);border-radius:10px;padding:14px 16px;margin-bottom:16px;">'+
-      '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px;">&#128221; Client Details</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+
-        '<div><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Email</label>'+
-        '<input type="email" id="crm-email-input" class="sinput" value="'+escHtml(c.email||'')+'" placeholder="client@email.com" style="width:100%;font-size:12px;margin-top:3px;"></div>'+
-        '<div><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Phone</label>'+
-        '<input type="tel" id="crm-phone-input" class="sinput" value="'+escHtml(c.phone||'')+'" placeholder="09xx xxx xxxx" style="width:100%;font-size:12px;margin-top:3px;"></div>'+
-        '<div><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Birthday</label>'+
-        '<input type="date" id="crm-bday-input" class="sinput" value="'+escHtml(c.birthday||'')+'" style="width:100%;font-size:12px;margin-top:3px;"></div>'+
-        '<div><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Notes</label>'+
-        '<input type="text" id="crm-notes-input" class="sinput" value="'+escHtml(c.notes||'')+'" placeholder="preferences, notes…" style="width:100%;font-size:12px;margin-top:3px;"></div>'+
-        '<div style="grid-column:1/-1;"><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Referred By</label>'+
-        '<input type="text" id="crm-referral-input" class="sinput" value="'+escHtml(c.referredBy||'')+'" placeholder="Who referred this client?" style="width:100%;font-size:12px;margin-top:3px;" list="client-names-list"></div>'+
-      '</div>'+
-      '<button class="btn btn-sm btn-teal" onclick="saveCRMClient('+JSON.stringify(JSON.stringify(name))+')">&#128190; Save Details</button>'+
-    '</div>'+
-    // Gift history
-    (clientGifts.length?
-      '<div class="crm-section-title">&#127873; Gift History</div>'+
-      '<table style="font-size:12px;width:100%;border-collapse:collapse;margin-bottom:12px;"><thead><tr>'+
-        '<th style="padding:6px 10px;background:var(--slate);color:var(--cream);text-align:left;">Prize</th>'+
-        '<th style="padding:6px 10px;background:var(--slate);color:var(--cream);">Date</th>'+
-        '<th style="padding:6px 10px;background:var(--slate);color:var(--cream);">Status</th>'+
-      '</tr></thead><tbody>'+
-      clientGifts.map((g,i)=>{
-        const bg=i%2===0?'var(--white)':'var(--light)';
-        const red=g.redeemed==='Yes'||g.redeemed===true;
-        return '<tr style="background:'+bg+';">'+
-          '<td style="padding:6px 10px;font-weight:500;">'+escHtml(g.prize||g.reward||'—')+'</td>'+
-          '<td style="padding:6px 10px;color:var(--muted);">'+String(g.date||'').slice(0,10)+'</td>'+
-          '<td style="padding:6px 10px;">'+(red?'<span style="color:var(--success);font-weight:600;">&#10003; Redeemed</span>':'<span style="color:var(--gold);">Pending</span>')+'</td></tr>';
-      }).join('')+'</tbody></table>'
-    :'')+
-    // Referrals
-    (referrals.length?
-      '<div class="crm-section-title">&#129309; Referred Clients ('+referrals.length+')</div>'+
-      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">'+
-      referrals.map(r=>'<span style="background:rgba(81,137,125,0.08);border:1px solid rgba(81,137,125,0.2);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--teal);">'+escHtml(r.fbName||'')+'</span>').join('')+
-      '</div>'
-    :'')+
-    // Feedback
-    (fbks.length?
-      '<div class="crm-section-title">&#128172; Feedback</div>'+
-      fbks.map(f=>'<div style="background:var(--light);border-radius:8px;padding:12px 14px;margin-bottom:8px;font-size:12px;">'+
-        (f.rating?'<div style="font-size:16px;margin-bottom:4px;">'+'&#9733;'.repeat(Math.min(5,+f.rating||0))+'</div>':'')+
-        '<div style="color:var(--text);">'+escHtml(f.message||f.feedback||'—')+'</div>'+
-        '<div style="color:var(--muted);font-size:11px;margin-top:4px;">'+f.date+'</div>'+
-      '</div>').join('')
-    :'')+
-    // Activity timeline
-    '<div class="crm-section-title">&#128197; Activity Timeline</div>'+
-    (timeline.length?
-      timeline.map(e=>'<div class="crm-timeline-item">'+
-        '<div class="crm-tl-icon">'+e.icon+'</div>'+
-        '<div class="crm-tl-body">'+
-          '<div class="crm-tl-title">'+e.title+'</div>'+
-          '<div class="crm-tl-meta">'+e.date+(e.meta?' &middot; '+escHtml(e.meta):'')+'</div>'+
-        '</div>'+
-        (e.amt?'<div class="crm-tl-amt">&#8369;'+fmt(e.amt)+'</div>':'')+
-      '</div>').join('')
-    :'<div class="tm">No activity recorded yet.</div>')+
-    '<div class="fe" style="margin-top:16px;">'+
-      '<button class="btn btn-outline" onclick="closeModal()">Close</button>'+
+      '<div class="cl-stat"><div class="cl-stat-val" style="font-size:12px;">&#8369;'+fmt(avgSpent)+'</div><div class="cl-stat-lbl">Avg/Visit</div></div>'+
+      '<div class="cl-stat"><div class="cl-stat-val" style="font-size:11px;color:'+(churnRisk==='high'?'var(--danger)':churnRisk==='med'?'var(--gold)':'var(--text)')+';">'+daysSince+'</div><div class="cl-stat-lbl">Last Visit</div></div>'+
+      '<div class="cl-stat"><div class="cl-stat-val" style="font-size:12px;">'+(avgDaysBetween==='—'?'—':avgDaysBetween)+'</div><div class="cl-stat-lbl">Avg Interval</div></div>'+
+      '<div class="cl-stat"><div class="cl-stat-val" style="font-size:12px;">'+(visitStreak>0?visitStreak+'mo &#128293;':'—')+'</div><div class="cl-stat-lbl">Streak</div></div>'+
     '</div>';
 
+  // Upcoming booking
+  if(upcoming.length){
+    var nx = upcoming[0];
+    html += '<div style="background:rgba(81,137,125,0.07);border:1px solid rgba(81,137,125,0.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;">'+
+      '<span style="font-size:20px;">&#128197;</span>'+
+      '<div style="flex:1;">'+
+        '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--teal);">Next Booking</div>'+
+        '<div style="font-weight:600;">'+escHtml(nx.service||'—')+'</div>'+
+        '<div style="font-size:11px;color:var(--muted);">'+nx.bookDate+' &middot; DP &#8369;'+fmt(+nx.downpayment||0)+' '+escHtml(nx.mop||'')+'</div>'+
+      '</div>'+
+      '<span class="badge '+(String(nx.status||'').toLowerCase().includes('confirm')?'b-teal':'b-gold')+'">'+
+        (String(nx.status||'').toLowerCase().includes('confirm')?'Confirmed':'Pending')+
+      '</span>'+
+    '</div>';
+  }
+
+  // Visit heatmap (day of week)
+  if(regs.length){
+    html += '<div class="crm-section-title">&#128200; When They Visit</div>'+
+      '<div style="display:flex;gap:4px;margin-bottom:6px;">'+heatHtml+'</div>'+
+      '<div style="display:flex;gap:16px;font-size:11px;color:var(--muted);margin-bottom:14px;">'+
+        (peakDay?'<span>&#128197; Fav day: <strong>'+peakDay+'</strong></span>':'')+
+        (peakHour?'<span>&#128336; Fav time: <strong>'+peakHour+'</strong></span>':'')+
+        (peakMonth?'<span>&#127793; Peak month: <strong>'+peakMonth+'</strong></span>':'')+
+      '</div>';
+
+    // Visit frequency bar chart (last 12 months)
+    if(barHtml){
+      html += '<div class="crm-section-title">&#128198; Last 12 Months</div>'+
+        '<div style="display:flex;gap:2px;margin-bottom:14px;align-items:flex-end;">'+barHtml+'</div>';
+    }
+  }
+
+  // Package preferences
+  if(topPkg.length){
+    html += '<div class="crm-section-title">&#128247; Preferred Packages</div>'+
+      '<div style="margin-bottom:14px;">'+
+      topPkg.map(function(p){
+        return '<div class="chart-bar-row">'+
+          '<div class="chart-bar-label" style="min-width:130px;font-size:12px;">'+escHtml(p[0])+'</div>'+
+          '<div class="chart-bar-track"><div class="chart-bar-fill" style="width:'+Math.round(p[1]/Math.max(topPkg[0][1],1)*100)+'%;background:var(--teal);"></div></div>'+
+          '<div style="font-size:11px;color:var(--muted);min-width:30px;text-align:right;">'+p[1]+'x</div>'+
+        '</div>';
+      }).join('')+'</div>';
+  }
+
+  // Loyalty + referrals
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">'+
+    '<div style="background:var(--light);border-radius:10px;padding:12px 14px;">'+
+      '<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Loyalty Score</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;">'+
+        '<div style="font-size:22px;font-weight:700;color:'+loyaltyColor+';">'+loyaltyScore+'</div>'+
+        '<div style="flex:1;">'+
+          '<div style="height:6px;background:var(--light2);border-radius:3px;overflow:hidden;margin-bottom:3px;">'+
+            '<div style="height:100%;width:'+loyaltyScore+'%;background:'+loyaltyColor+';border-radius:3px;"></div>'+
+          '</div>'+
+          '<div style="font-size:10px;color:'+loyaltyColor+';">'+loyaltyLabel+'</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="background:var(--light);border-radius:10px;padding:12px 14px;">'+
+      '<div style="font-size:10px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Summary</div>'+
+      '<div style="font-size:11px;color:var(--text);">'+
+        (firstVisit!=='—'?'<div>First visit: <strong>'+firstVisit+'</strong></div>':'')+
+        (referrals.length?'<div>Referred <strong>'+referrals.length+'</strong> client'+(referrals.length!==1?'s':'')+'</div>':'')+
+        (c.referredBy?'<div>Referred by: <strong>'+escHtml(c.referredBy)+'</strong></div>':'')+
+        '<div>Feedback: <strong>'+(fbks.length?fbks.length+' submitted':'none')+'</strong></div>'+
+        '<div>Gifts: <strong>'+(clientGifts.length||'none')+'</strong></div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+
+  // Booking receipts
+  if(acks.length){
+    html += '<div class="crm-section-title">&#128197; Booking Receipts ('+acks.length+')</div>'+
+      '<div style="margin-bottom:14px;">';
+    acks.slice().sort(function(a,b){ return String(b.bookDate||b.date).localeCompare(String(a.bookDate||a.date)); })
+        .slice(0,5).forEach(function(a){
+      var isConf = String(a.status||'').toLowerCase().includes('confirm');
+      var isCanc = String(a.status||'').toLowerCase().includes('cancel');
+      var stColor = isConf?'var(--success)':isCanc?'var(--danger)':'var(--gold)';
+      var stLabel = isConf?'Confirmed':isCanc?'Cancelled':'Pending';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--light2);">'+
+        '<span class="badge b-gold" style="font-size:9px;flex-shrink:0;">'+escHtml(a.ackNum||'—')+'</span>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:12px;font-weight:500;">'+escHtml(a.service||'—')+'</div>'+
+          '<div style="font-size:10px;color:var(--muted);">'+escHtml(a.bookDate||'—')+' &middot; DP &#8369;'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
+        '</div>'+
+        '<span style="font-size:10px;font-weight:600;color:'+stColor+';">'+stLabel+'</span>'+
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  // CRM Actions
+  html += '<div class="crm-section-title">&#9993; CRM Actions</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">'+
+      '<button class="btn btn-teal btn-sm" data-n="'+encodeURIComponent(name)+'" data-t="" onclick="crmBtnClick(this)">&#128231; Email</button>'+
+      '<button class="btn btn-sm btn-outline" data-n="'+encodeURIComponent(name)+'" data-t="promo" onclick="crmBtnClick(this)">&#127873; Promo</button>'+
+      '<button class="btn btn-sm btn-outline" data-n="'+encodeURIComponent(name)+'" data-t="reminder" onclick="crmBtnClick(this)">&#9200; We Miss You</button>'+
+      '<button class="btn btn-sm btn-outline" data-n="'+encodeURIComponent(name)+'" data-t="followup" onclick="crmBtnClick(this)">&#128172; Follow-up</button>'+
+      '<button class="btn btn-sm btn-outline" data-n="'+encodeURIComponent(name)+'" onclick="closeModal();openNewAck()" title="Create booking receipt">&#128197; Book</button>'+
+    '</div>'+
+    (!c.email?'<div style="font-size:11px;color:var(--gold);margin-bottom:10px;">&#9888; No email on file — add one to enable messaging.</div>':'')+
+
+  // Staff notes
+  '<div style="background:var(--light);border-radius:10px;padding:12px 14px;margin-bottom:14px;">'+
+    '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px;">&#128221; Staff Notes <span style="font-weight:400;font-size:10px;">(private)</span></div>'+
+    '<textarea id="crm-staff-notes" class="sinput" rows="2" placeholder="Preferences, allergies, special notes, alerts…" style="width:100%;resize:vertical;font-size:12px;">'+escHtml(c.staffNotes||c.notes||'')+'</textarea>'+
+    '<div class="fe" style="margin-top:6px;"><button class="btn btn-sm btn-teal" data-n="'+encodeURIComponent(name)+'" onclick="saveCRMNotes(this.dataset.n)">Save Notes</button></div>'+
+  '</div>'+
+
+  // Edit details
+  '<div style="background:var(--light);border-radius:10px;padding:12px 14px;margin-bottom:14px;">'+
+    '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px;">&#9998; Edit Details</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'+
+      '<div><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Email</label>'+
+        '<input type="email" id="crm-email-input" class="sinput" value="'+escHtml(c.email||'')+'" placeholder="email@example.com" style="width:100%;font-size:12px;"></div>'+
+      '<div><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Phone</label>'+
+        '<input type="tel" id="crm-phone-input" class="sinput" value="'+escHtml(c.phone||'')+'" placeholder="09xx xxx xxxx" style="width:100%;font-size:12px;"></div>'+
+      '<div><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Birthday</label>'+
+        '<input type="date" id="crm-bday-input" class="sinput" value="'+escHtml(c.birthday||'')+'" style="width:100%;font-size:12px;"></div>'+
+      '<div><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">Referred By</label>'+
+        '<input type="text" id="crm-ref-input" class="sinput" value="'+escHtml(c.referredBy||'')+'" list="client-names-list" style="width:100%;font-size:12px;"></div>'+
+    '</div>'+
+    '<div style="margin-bottom:8px;"><label style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;">SM Consent</label>'+
+      '<select id="crm-smc-input" class="sinput" style="width:100%;font-size:12px;">'+
+        '<option value="">Not set</option>'+
+        '<option value="yes"'+(c.socialConsent==='yes'?' selected':'')+'>Yes - allowed</option>'+
+        '<option value="no"'+(c.socialConsent==='no'?' selected':'')+'>No - private</option>'+
+      '</select></div>'+
+    '<div class="fe"><button class="btn btn-sm btn-teal" data-n="'+encodeURIComponent(JSON.stringify(name))+'" onclick="saveCRMClient(this.dataset.n)">&#128190; Save Details</button></div>'+
+  '</div>';
+
+  // Feedback
+  if(fbks.length){
+    html += '<div class="crm-section-title">&#128172; Feedback ('+fbks.length+')</div>'+
+      '<div style="margin-bottom:14px;">'+
+      fbks.map(function(f){
+        return '<div style="background:var(--light);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px;">'+
+          (f.rating?'<div style="font-size:15px;margin-bottom:3px;">'+'&#9733;'.repeat(Math.min(5,+f.rating||0))+'</div>':'')+
+          '<div>'+escHtml(f.message||f.feedback||'—')+'</div>'+
+          '<div style="color:var(--muted);font-size:11px;margin-top:3px;">'+escHtml(f.date||'')+'</div>'+
+        '</div>';
+      }).join('')+'</div>';
+  }
+
+  // Referrals
+  if(referrals.length){
+    html += '<div class="crm-section-title">&#129309; Referred Clients ('+referrals.length+')</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">'+
+      referrals.map(function(r){ return '<span style="background:rgba(81,137,125,0.08);border:1px solid rgba(81,137,125,0.2);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--teal);">'+escHtml(r.fbName||'')+'</span>'; }).join('')+
+      '</div>';
+  }
+
+  // Timeline
+  html += '<div class="crm-section-title">&#128197; Full Activity Timeline</div>'+
+    (timeline.length?
+      timeline.slice(0,30).map(function(e){
+        return '<div class="crm-timeline-item">'+
+          '<div class="crm-tl-icon">'+e.icon+'</div>'+
+          '<div class="crm-tl-body">'+
+            '<div class="crm-tl-title">'+e.title+'</div>'+
+            '<div class="crm-tl-meta">'+e.date+(e.meta?' &middot; '+escHtml(e.meta):'')+'</div>'+
+          '</div>'+
+          (e.amt?'<div class="crm-tl-amt">&#8369;'+fmt(e.amt)+'</div>':'')+
+        '</div>';
+      }).join('')
+    :'<div class="tm">No activity recorded yet.</div>')+
+
+    '<div class="fe" style="margin-top:16px;"><button class="btn btn-outline" onclick="closeModal()">Close</button></div>';
+
   openModal(html, 'large');
+}
+
+function saveCRMNotes(encodedName){
+  var name = decodeURIComponent(encodedName);
+  var c = (DB.clients||[]).find(function(x){ return x.fbName===name; });
+  if(!c){ notify('Client not found','error'); return; }
+  c.staffNotes = (document.getElementById('crm-staff-notes')?.value||'').trim();
+  saveLocal();
+  push('saveClient', c);
+  notify('Notes saved ✓','success');
 }
 
 function crmBtnClick(btn){
