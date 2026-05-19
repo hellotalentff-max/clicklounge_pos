@@ -2990,12 +2990,22 @@ function renderCalendar(){
     var conf     = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); });
     var canc     = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('cancel'); });
 
-    // Google Calendar events for this day
+    // Google Calendar events for this day — exclude those already receipted
     var dayEvents = calEvents.filter(function(ev){
-      var evDate = String(ev.start||'').slice(0,10);
-      return evDate === dateStr;
+      return String(ev.start||'').slice(0,10) === dateStr;
     });
-    var evPend = dayEvents.filter(function(ev){ return ev.status==='pending'; });
+    var evPend = dayEvents.filter(function(ev){
+      if(ev.status !== 'pending') return false;
+      // Exclude if an ack receipt already exists for this date with matching name
+      var evTitle    = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+      var nameMatch  = evTitle.match(/—\s*(.+?)\s*[\(\|]/);
+      var clientName = (nameMatch ? nameMatch[1] : evTitle).trim().toLowerCase();
+      var receipted  = dayAcks.some(function(a){
+        var ackName = String(a.fbName||'').toLowerCase();
+        return ackName.includes(clientName.split(' ')[0]) || clientName.includes(ackName.split(' ')[0]);
+      });
+      return !receipted;
+    });
     var evConf = dayEvents.filter(function(ev){ return ev.status==='confirmed'; });
 
     var bg = 'var(--white)';
