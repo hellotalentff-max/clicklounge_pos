@@ -2679,50 +2679,55 @@ function genEODlive(){
   if(repEl) repEl.innerHTML = html;
 }
 async function genEOD(){
-  const today    = todayStr();
-  const txns     = (DB.transactions||[]).filter(function(t){ return dateOnly(t.date)===today&&!String(t.invoiceNum||'').startsWith('[VOID]'); });
-  const staff    = document.getElementById('eod-staff')?.value || CURR_USER;
-  const opening  = parseFloat(document.getElementById('eod-opening')?.value)||0;
-  const cashHand = parseFloat(document.getElementById('eod-cash')?.value)||0;
-  const notes    = (document.getElementById('eod-notes')?.value||'').trim();
-  const fts      = DB._eodFT||[];
+  var today    = todayStr();
+  var txns     = (DB.transactions||[]).filter(function(t){ return dateOnly(t.date)===today&&!String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var staff    = document.getElementById('eod-staff')?.value || CURR_USER;
+  var opening  = parseFloat(document.getElementById('eod-opening')?.value)||0;
+  var cashHand = parseFloat(document.getElementById('eod-cash')?.value)||0;
+  var notes    = (document.getElementById('eod-notes')?.value||'').trim();
+  var fts      = DB._eodFT||[];
 
-  const totalRev   = txns.reduce(function(s,t){ return s+(+t.total||0); },0);
-  const cashRev    = txns.filter(function(t){ return t.balanceMOP==='Cash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
-  const gcashRev   = txns.filter(function(t){ return t.balanceMOP==='GCash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
-  const cashToBank = fts.filter(function(f){ return String(f.type||'').includes('Cash to Bank'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
-  const gcashBank  = fts.filter(function(f){ return String(f.type||'').includes('GCash to Bank'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
-  const refunds    = fts.filter(function(f){ return String(f.type||'').includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  // Sales
+  var totalRev   = txns.reduce(function(s,t){ return s+(+t.total||0); },0);
+  var totalDisc  = txns.reduce(function(s,t){ return s+(+t.discount||0); },0);
+  var cashRev    = txns.filter(function(t){ return t.balanceMOP==='Cash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  var gcashRev   = txns.filter(function(t){ return t.balanceMOP==='GCash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
 
-  // Acknowledgement receipt downpayments collected today
-  const todayAcks   = (DB.acknowledgements||[]).filter(function(a){ return dateOnly(a.date)===today; });
-  const ackCashDP   = todayAcks.filter(function(a){ return a.mop==='Cash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
-  const ackGcashDP  = todayAcks.filter(function(a){ return a.mop==='GCash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
-  const totalCashIn = cashRev + ackCashDP;
-  const cashExpenses= todayExp.filter(function(e){ return (e.mop||'Cash')==='Cash'; }).reduce(function(s,e){ return s+(+e.amt||0); },0);
-  const expectedCashVal = opening + totalCashIn - cashToBank - refunds - cashExpenses;
+  // Fund transfers
+  var cashToBank = fts.filter(function(f){ return String(f.type||'').includes('Cash to Bank'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  var gcashBank  = fts.filter(function(f){ return String(f.type||'').includes('GCash to Bank'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
+  var refunds    = fts.filter(function(f){ return String(f.type||'').includes('Refund'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
 
-  const totalDisc   = txns.reduce(function(s,t){ return s+(+t.discount||0); },0);
-  const totalAckDP  = todayAcks.reduce(function(s,a){ return s+(+a.downpayment||0); },0);
-  const todayExp    = (DB.expenses||[]).filter(function(e){ return dateOnly(e.date)===today; });
-  const totalExp    = todayExp.reduce(function(s,e){ return s+(+e.amt||0); },0);
-  const variance    = cashHand - expectedCashVal;
+  // Acknowledgement downpayments
+  var todayAcks  = (DB.acknowledgements||[]).filter(function(a){ return dateOnly(a.date)===today; });
+  var ackCashDP  = todayAcks.filter(function(a){ return a.mop==='Cash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  var ackGcashDP = todayAcks.filter(function(a){ return a.mop==='GCash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  var totalAckDP = todayAcks.reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  var totalCashIn= cashRev + ackCashDP;
 
-  const report = {
+  // Expenses (must be defined BEFORE usage)
+  var todayExp    = (DB.expenses||[]).filter(function(e){ return dateOnly(e.date)===today; });
+  var totalExp    = todayExp.reduce(function(s,e){ return s+(+e.amt||0); },0);
+  var cashExpenses= todayExp.filter(function(e){ return (e.mop||'Cash')==='Cash'; }).reduce(function(s,e){ return s+(+e.amt||0); },0);
+
+  // Expected cash = opening + cash in - cash out
+  var expectedCashVal = opening + totalCashIn - cashToBank - refunds - cashExpenses;
+  var variance        = cashHand - expectedCashVal;
+
+  var report = {
     id: uid(), date: today, staff: staff,
-    totalSales:   totalRev,
-    totalDP:      totalAckDP,
-    totalDisc:    totalDisc,
-    totalExp:     totalExp,
-    expectedCash: expectedCashVal,
-    cashOnHand:   cashHand,
-    variance:     variance,
-    expenses:     JSON.stringify(todayExp),
-    notes:        notes,
-    // Extra detail fields (not in Sheets headers but saved locally)
-    openingCash:  opening,
+    totalSales:    totalRev,
+    totalDP:       totalAckDP,
+    totalDisc:     totalDisc,
+    totalExp:      totalExp,
+    expectedCash:  expectedCashVal,
+    cashOnHand:    cashHand,
+    variance:      variance,
+    expenses:      JSON.stringify(todayExp),
+    notes:         notes,
+    openingCash:   opening,
     cashFromSales: cashRev, ackCashDP: ackCashDP, ackGcashDP: ackGcashDP,
-    gcashCollected: gcashRev, cashToBank: cashToBank, gcashToBank: gcashBank,
+    gcashCollected:gcashRev, cashToBank: cashToBank, gcashToBank: gcashBank,
     refunds: refunds, closingCash: expectedCashVal,
     ackCount: todayAcks.length, fundTransfers: fts, txnCount: txns.length
   };
@@ -2731,12 +2736,19 @@ async function genEOD(){
   if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='Saving…'; }
 
   if(!DB.eodReports) DB.eodReports=[];
-  const idx = DB.eodReports.findIndex(function(r){ return dateOnly(r.date)===today&&r.staff===staff; });
+  var idx = DB.eodReports.findIndex(function(r){ return dateOnly(r.date)===today&&r.staff===staff; });
   if(idx>=0) DB.eodReports[idx]=report; else DB.eodReports.push(report);
   DB._eodFT = [];
   saveLocal();
-  push('saveEOD', report);
-  notify('EOD Report submitted ✓','success');
+
+  // Save to Sheets
+  try{
+    await push('saveEOD', report);
+    notify('EOD Report submitted ✓','success');
+  }catch(e){
+    notify('EOD saved locally — Sheets sync failed: '+e.message,'error');
+  }
+
   logActivity('EOD Report', staff+' — ₱'+fmt(totalRev)+' total, ₱'+fmt(cashHand)+' cash on hand','success');
   renderFTList();
   genEODlive();
@@ -2744,29 +2756,33 @@ async function genEOD(){
   if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='📤 Submit & Email Report'; }
 
   // Send email report
-  const toEmail = (DB.studioInfo?.eodEmail||'').trim();
+  var toEmail = (DB.studioInfo?.eodEmail||'').trim();
   if(toEmail && hasUrl()){
     notify('Sending EOD report to '+toEmail+'…','info');
-    const emailPayload = {
+    var emailPayload = {
       toEmail: toEmail,
       studioInfo: DB.studioInfo||{},
-      report: Object.assign({}, report, {
-        totalSales:   totalRev,
-        totalDP:      totalAckDP,
-        ackCashDP:    ackCashDP,
-        totalDisc:    totalDisc,
-        totalExp:     totalExp,
-        expectedCash: expectedCashVal,
-        cashOnHand:   cashHand,
-        variance:     variance,
-        fundTransfers:fts,
-        expenses:     todayExp
-      })
+      report: {
+        date:          today,
+        staff:         staff,
+        openingCash:   opening,
+        totalSales:    totalRev,
+        totalDP:       totalAckDP,
+        ackCashDP:     ackCashDP,
+        totalDisc:     totalDisc,
+        totalExp:      totalExp,
+        expectedCash:  expectedCashVal,
+        cashOnHand:    cashHand,
+        variance:      variance,
+        fundTransfers: fts,
+        expenses:      todayExp,
+        notes:         notes
+      }
     };
     gasCall('sendEODEmail', emailPayload)
-      .then(function(r){
-        if(r.ok) notify('✓ EOD email sent to '+toEmail,'success');
-        else notify('EOD saved — email failed: '+(r.error||'check Apps Script'),'error');
+      .then(function(res){
+        if(res.ok) notify('✓ EOD email sent to '+toEmail,'success');
+        else notify('EOD saved — email failed: '+(res.error||'check Apps Script'),'error');
       })
       .catch(function(e){ notify('EOD saved — email error: '+e.message,'error'); });
   } else if(!toEmail){
