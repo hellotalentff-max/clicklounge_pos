@@ -963,7 +963,7 @@ tr:hover td { background:var(--light); }
         <div id="dash-task-msg" style="font-size:11px;color:var(--text);margin-top:2px;"></div>
       </div>
     </div>
-    <button class="btn btn-sm btn-gold" onclick="showPage('tasks')">View Tasks</button>
+    
   </div>
 
   <!-- Two column layout: Transactions + Mini Calendar -->
@@ -989,260 +989,19 @@ tr:hover td { background:var(--light); }
 <div id="page-tasks" class="page">
   <div class="ph">
     <div><h2>Tasks</h2><p>Studio workflow — editing, printing, framing and more</p></div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <button class="btn btn-sm btn-outline" id="task-view-list-btn" onclick="setTaskView('list')">☰ List</button>
-      <button class="btn btn-sm btn-teal" id="task-view-board-btn" onclick="setTaskView('board')">⊞ Board</button>
-      <button class="btn btn-sm btn-outline" id="task-archive-btn" onclick="toggleShowArchived()" style="font-size:11px;">📦 Archived</button>
-      <button class="btn btn-gold" onclick="openNewTask()">+ New Task</button>
-    </div>
   </div>
-
-  <!-- List view filters -->
-  <div id="task-list-filters" style="display:none;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-    <button class="btn btn-sm btn-outline task-filter-btn active" onclick="filterTasks('all')" id="tf-all">All</button>
-    <button class="btn btn-sm btn-outline task-filter-btn" onclick="filterTasks('new')" id="tf-new">🆕 New</button>
-    <button class="btn btn-sm btn-outline task-filter-btn" onclick="filterTasks('inprogress')" id="tf-inprogress">⚙ In Progress</button>
-    <button class="btn btn-sm btn-outline task-filter-btn" onclick="filterTasks('review')" id="tf-review">👁 For Review</button>
-    <button class="btn btn-sm btn-outline task-filter-btn" onclick="filterTasks('pickup')" id="tf-pickup">📦 Ready</button>
-    <button class="btn btn-sm btn-outline task-filter-btn" onclick="filterTasks('delivered')" id="tf-delivered">✓ Delivered</button>
-    <button class="btn btn-sm btn-outline task-filter-btn" onclick="filterTasks('overdue')" id="tf-overdue">⚠ Overdue</button>
-  </div>
-
-  <!-- List view -->
-  <div id="task-list-view" style="display:none;">
-    <div id="task-list"></div>
-  </div>
-
-  <!-- Kanban board view -->
-  <div id="task-board-view" style="display:block;">
-    <div style="display:grid;grid-template-columns:repeat(5,minmax(190px,1fr));gap:10px;overflow-x:auto;padding-bottom:8px;" id="kanban-board"></div>
-  </div>
-</div>
-
-<!-- REGISTRATION -->
-<div id="page-registration" class="page">
-  <div class="ph"><div><h2>Client Registration</h2><p>Day-of session check-in</p></div></div>
-  <div class="card" style="max-width:600px;">
-    <div class="ct">Arrival Type</div>
-    <div class="arr-tog mb16">
-      <div class="arr-opt sel" id="arr-walkin" onclick="setArr('walkin')">Walk-in</div>
-      <div class="arr-opt" id="arr-booked" onclick="setArr('booked')">Booked</div>
-    </div>
-    <div id="reg-wi">
-      <div class="frow c2">
-        <div class="field"><label for="reg-fb">FB Name *</label>
-          <input type="text" id="reg-fb" placeholder="Facebook display name" autocomplete="off" list="client-names-list">
-        </div>
-        <div class="field"><label for="reg-email-pos">Email <span style="font-size:10px;color:var(--muted);font-weight:400;">(optional)</span></label>
-          <input type="email" id="reg-email-pos" placeholder="client@email.com">
-        </div>
-      </div>
-      <!-- Optional additional details toggle -->
-      <div style="margin-bottom:12px;">
-        <button type="button" class="btn btn-sm btn-outline" style="font-size:11px;" onclick="toggleRegOptional()">
-          ➕ <span id="reg-optional-label">Add more details</span>
-        </button>
-      </div>
-      <div id="reg-optional" style="display:none;">
-        <div class="frow c2">
-          <div class="field"><label for="reg-phone">Phone / Mobile <span style="font-size:10px;color:var(--muted);font-weight:400;">(optional)</span></label>
-            <input type="tel" id="reg-phone" placeholder="09xx xxx xxxx">
-          </div>
-          <div class="field"><label for="reg-bday">Birthday <span style="font-size:10px;color:var(--muted);font-weight:400;">(optional)</span></label>
-            <input type="date" id="reg-bday">
-          </div>
-        </div>
-        <div class="field mb12"><label for="reg-notes-pos">Notes <span style="font-size:10px;color:var(--muted);font-weight:400;">(optional)</span></label>
-          <input type="text" id="reg-notes-pos" placeholder="e.g. Regular client, allergies, preferences…">
-        </div>
-      </div>
-    </div>
-    <div id="reg-bk" style="display:none">
-      <div class="field mb16"><label for="booked-sel">Select Booked Client</label>
-        <select id="reg-bk-sel" onchange="prefillBooked(this.value)"><option value="">— choose —</option></select>
-      </div>
-      <div id="bk-pull" style="display:none" class="ack-pull">
-        <strong id="bkp-name"></strong><br>
-        <span id="bkp-svc"></span> · ₱<span id="bkp-dp"></span> · <span id="bkp-mop"></span>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div class="field mb16">
-      <div style="background:var(--light);border:1px solid var(--light2);border-radius:6px;padding:10px;font-size:10px;max-height:68px;overflow-y:auto;color:var(--muted);line-height:1.6;margin-bottom:8px;">
-        By registering, client agrees that ClickLounge Studio is not liable for personal belongings. All digital files remain property of ClickLounge Studio until full payment is received. No refunds after session starts. Photos may be used for promotional purposes unless opted out in writing.
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <input type="checkbox" id="reg-agree">
-        <label for="reg-agree" style="margin:0;text-transform:none;letter-spacing:0;font-size:12px;font-weight:400;color:var(--text);">Client agrees to Terms and Conditions</label>
-      </div>
-      <!-- Social media consent -->
-      <div style="background:rgba(81,137,125,0.06);border:1.5px solid rgba(81,137,125,0.2);border-radius:8px;padding:12px 14px;">
-        <div style="font-size:11px;font-weight:600;color:var(--teal);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-          📸 Social Media Consent
-        </div>
-        <p style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:10px;">
-          May ClickLounge Studio post photos or videos from this session on our social media accounts (Facebook, Instagram, TikTok) for marketing and promotional purposes?
-        </p>
-        <div style="display:flex;gap:16px;">
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text);">
-            <input type="radio" name="smc" id="smc-yes" value="yes" style="accent-color:var(--teal);width:16px;height:16px;">
-            ✅ Yes, you may post
-          </label>
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text);">
-            <input type="radio" name="smc" id="smc-no" value="no" style="accent-color:var(--danger);width:16px;height:16px;">
-            🚫 No, keep it private
-          </label>
-        </div>
-        <div id="smc-warn" style="font-size:11px;color:var(--danger);margin-top:6px;display:none;">Please select a social media consent option.</div>
-      </div>
-    </div>
-    <div class="fe"><button class="btn btn-teal" onclick="submitReg()">Register Client</button></div>
-  </div>
-  <div class="card"><div class="ct">Today's Registered Clients</div><div id="reg-list"></div></div>
-
-  <!-- MONTHLY REGISTRATION REPORT -->
-  <div class="card" id="reg-report-card">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
-      <div class="ct" style="margin:0;">📊 Monthly Registration Report</div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <select id="reg-report-month" class="sinput" style="width:160px;" onchange="renderRegReport()">
-          <option value="">This Month</option>
-        </select>
-        <button class="btn btn-sm btn-outline" onclick="printRegReport()">🖨 Print</button>
-      </div>
-    </div>
-    <!-- Summary Stats -->
-    <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;" id="reg-report-stats">
-      <div class="stat"><div class="sl">Total Sessions</div><div class="sv" id="rr-total">—</div></div>
-      <div class="stat"><div class="sl">Walk-ins</div><div class="sv" id="rr-walkin">—</div></div>
-      <div class="stat"><div class="sl">Booked</div><div class="sv" id="rr-booked">—</div></div>
-      <div class="stat"><div class="sl">Social Consent</div><div class="sv" id="rr-consent">—</div></div>
-    </div>
-    <!-- Package Breakdown -->
-    <div id="reg-report-packages" style="margin-bottom:16px;"></div>
-    <!-- Hourly Heatmap -->
-    <div id="reg-report-heatmap" style="margin-bottom:16px;"></div>
-    <!-- Full Table -->
-    <div id="reg-report-table"></div>
-  </div>
-</div>
-
-<!-- ACKNOWLEDGEMENT -->
-<div id="page-acknowledgement" class="page">
-  <div class="ph">
-    <div><h2>Acknowledgement Receipts</h2><p>Booked / pre-payment clients</p></div>
-    <button class="btn btn-gold" onclick="openNewAck()">+ New Receipt</button>
-  </div>
-  <div class="card" style="margin-bottom:12px;">
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-      <input type="text" id="ack-search" class="sinput" style="flex:1;min-width:140px;" placeholder="Search by name or receipt #…" oninput="renderAcks()">
-      <select id="ack-filter" class="sinput" onchange="renderAcks()">
-        <option value="all">All</option>
-        <option value="pending">Pending Payment</option>
-        <option value="confirmed">Confirmed</option>
-        <option value="today">Today</option>
-        <option value="upcoming">Upcoming</option>
-      </select>
-      <button id="ack-sort-btn" class="btn btn-sm btn-outline" onclick="toggleAckSort()" title="Sort by name">A→Z</button>
-      <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;">
-        <input type="checkbox" id="ack-show-hidden" onchange="renderAcks()" style="accent-color:var(--teal);"> Show hidden
-      </label>
-    </div>
-    <div id="ack-list"></div>
-  </div>
-</div>
-
-<!-- INVOICE / POS -->
-<div id="page-invoice" class="page">
-  <div class="ph"><div><h2>Invoice / POS</h2><p>Process client session</p></div></div>
-  <div class="inv-grid">
-    <!-- LEFT -->
-    <div>
-      <div class="card">
-        <div class="ct">Invoice Details</div>
-        <div class="frow c2">
-          <div class="field"><label for="inv-num">Invoice # *</label><input type="text" id="inv-num" placeholder="INV-001"></div>
-          <div class="field"><label for="inv-staff">Staff</label><input type="text" id="inv-staff" placeholder="Staff name"></div>
-        </div>
-        <div class="field" style="margin-bottom:12px;"><label for="inv-client">Client *</label>
-          <input type="text" id="inv-client" placeholder="Type client name…" autocomplete="off"
-            list="client-names-list" oninput="onClientChange(this.value)"
-            style="width:100%;background:var(--light);border:1px solid var(--light2);color:var(--text);border-radius:6px;padding:8px 10px;font-size:12px;font-family:inherit;">
-          <datalist id="client-names-list"></datalist>
-        </div>
-        <div id="inv-ack" style="display:none" class="ack-pull">
-          <strong>Booked</strong> — <span id="ia-name"></span> · MOP: <span id="ia-mop"></span> · Down: ₱<span id="ia-dp"></span>
-          <br><button class="btn btn-sm btn-outline mt8" style="margin-top:8px;" onclick="viewAckFromInv()">View Acknowledgement</button>
-        </div>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden;">
-        <!-- Tab bar -->
-        <div id="svc-tabs" style="display:flex;border-bottom:1px solid var(--light2);overflow-x:auto;scrollbar-width:none;">
-          <button class="stab active" onclick="showSvcTab('ss')" id="stab-ss">Self Shoot</button>
-          <button class="stab" onclick="showSvcTab('ph')" id="stab-ph">Photographer</button>
-          <button class="stab" onclick="showSvcTab('ot')" id="stab-ot">Others</button>
-          <button class="stab" onclick="showSvcTab('as')" id="stab-as">Add-ons SS</button>
-          <button class="stab" onclick="showSvcTab('ap')" id="stab-ap">Add-ons Photo</button>
-        </div>
-        <!-- Tab panels -->
-        <div style="padding:14px;">
-          <div id="stab-panel-ss" class="stab-panel"><div class="svc-grid" id="sg-ss"></div></div>
-          <div id="stab-panel-ph" class="stab-panel" style="display:none;"><div class="svc-grid" id="sg-ph"></div></div>
-          <div id="stab-panel-ot" class="stab-panel" style="display:none;"><div class="svc-grid" id="sg-ot"></div></div>
-          <div id="stab-panel-as" class="stab-panel" style="display:none;"><div class="svc-grid" id="sg-as"></div></div>
-          <div id="stab-panel-ap" class="stab-panel" style="display:none;">
-            <div class="svc-grid" id="sg-ap"></div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--light2);">
-              <div class="ct" style="margin-bottom:8px;">Custom Add-on</div>
-              <div style="display:flex;gap:8px;">
-                <input type="text" id="ao-name" placeholder="Description" style="flex:2;background:var(--light);border:1px solid var(--light2);color:var(--text);border-radius:6px;padding:7px 10px;font-size:12px;font-family:inherit;">
-                <input type="number" id="ao-price" placeholder="₱" style="flex:1;background:var(--light);border:1px solid var(--light2);color:var(--text);border-radius:6px;padding:7px 10px;font-size:12px;font-family:inherit;">
-                <button class="btn btn-outline btn-sm" onclick="addCustom()">Add</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- RIGHT -->
-    <div>
-      <div class="card" style="position:sticky;top:24px;">
-        <div class="ct">Invoice Summary</div>
-        <div id="inv-lines" style="min-height:56px;margin-bottom:12px;"></div>
-        <div class="divider"></div>
-        <div class="ct" style="margin-top:12px;">Discounts & Payments</div>
-        <div class="frow c2">
-          <div class="field"><label for="d-pax">Total Pax</label><input type="number" id="d-pax" value="1" min="1" onchange="recalc()"></div>
-          <div class="field"><label for="d-sc">PWD/SC Count</label><input type="number" id="d-sc" value="0" min="0" onchange="recalc()"></div>
-        </div>
-        <div class="field mb16">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <input type="checkbox" id="d-en" onchange="recalc()">
-            <label for="d-en" style="margin:0;text-transform:none;letter-spacing:0;font-size:12px;font-weight:400;color:var(--text);">Apply PWD/SC Discount</label>
-          </div>
-          <div id="d-show" class="tm mt8" style="display:none;"></div>
-        </div>
-        <div class="field mb16">
-          <label for="d-voucher">Voucher Amount (₱100–₱500)</label>
-          <input type="number" id="v-amt" placeholder="0" min="0" max="500" onchange="recalc()">
-          <div class="tm mt8">Cannot combine with PWD/SC discount</div>
-        </div>
-        <div class="field mb16">
-          <label for="dp-amt">Downpayment (₱)</label>
-          <input type="number" id="dp-amt" placeholder="0" min="0" onchange="recalc()">
-        </div>
-        <div class="divider"></div>
-        <div id="inv-totals"></div>
-        <div class="field mt8 mb16">
-          <label for="d-mop">Balance Mode of Payment</label>
-          <select id="bal-mop">
-            <option value="">— select —</option>
-            <option>Cash</option><option>BPI</option><option>GCash</option>
-            <option>Maya</option><option>Credit Card</option><option>Mixed</option>
-          </select>
-        </div>
-        <button class="btn btn-gold" style="width:100%;font-size:13px;padding:12px;" onclick="submitInvoice()">Submit Transaction</button>
-      </div>
+  <div class="card" style="text-align:center;padding:40px 20px;">
+    <div style="font-size:48px;margin-bottom:16px;">📋</div>
+    <h3 style="margin-bottom:8px;">Tasks Manager</h3>
+    <p style="color:var(--muted);margin-bottom:20px;font-size:13px;">
+      Tasks have moved to a dedicated web app for a better experience.<br>
+      Connected to the same Google Sheet — all your client data is synced.
+    </p>
+    <a id="tasks-app-link" href="#" target="_blank" class="btn btn-gold" style="display:inline-flex;align-items:center;gap:8px;padding:14px 28px;font-size:14px;text-decoration:none;">
+      Open Tasks App ↗
+    </a>
+    <div style="margin-top:16px;font-size:11px;color:var(--muted);">
+      <strong>Tip:</strong> Set the Tasks App URL in Settings to link it here.
     </div>
   </div>
 </div>
@@ -1878,6 +1637,11 @@ tr:hover td { background:var(--light); }
           <label for="set-eod-email">EOD Report Email</label>
           <input type="email" id="set-eod-email" placeholder="owner@gmail.com">
           <div style="font-size:10px;color:var(--muted);margin-top:4px;">End of Shift reports will be emailed here after each submission.</div>
+        <div class="field mb16">
+          <label for="set-tasks-url">Tasks App URL</label>
+          <input type="url" id="set-tasks-url" placeholder="https://your-tasks-app-url.com">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">Link to your external Tasks Manager web app.</div>
+        </div>
         </div>
         <div style="background:rgba(192,84,74,0.06);border:1px solid rgba(192,84,74,0.2);border-radius:8px;padding:12px;margin-bottom:12px;">
           <div style="font-size:12px;font-weight:600;color:var(--danger);margin-bottom:6px;">Offline Queue</div>
@@ -2416,12 +2180,13 @@ function saveAdminPw(){
 }
 
 function saveStudio(){
-  const name     = (document.getElementById('set-name')?.value||'').trim();
-  const contact  = (document.getElementById('set-contact')?.value||'').trim();
-  const address  = (document.getElementById('set-address')?.value||document.getElementById('set-addr')?.value||'').trim();
-  const fbUrl    = (document.getElementById('set-feedback-url')?.value||'').trim();
-  const eodEmail = (document.getElementById('set-eod-email')?.value||'').trim();
-  DB.studioInfo  = Object.assign(DB.studioInfo||{}, {name, contact, address, feedbackUrl:fbUrl, eodEmail});
+  const name      = (document.getElementById('set-name')?.value||'').trim();
+  const contact   = (document.getElementById('set-contact')?.value||'').trim();
+  const address   = (document.getElementById('set-address')?.value||document.getElementById('set-addr')?.value||'').trim();
+  const fbUrl     = (document.getElementById('set-feedback-url')?.value||'').trim();
+  const eodEmail  = (document.getElementById('set-eod-email')?.value||'').trim();
+  const tasksUrl  = (document.getElementById('set-tasks-url')?.value||'').trim();
+  DB.studioInfo   = Object.assign(DB.studioInfo||{}, {name, contact, address, feedbackUrl:fbUrl, eodEmail, tasksAppUrl:tasksUrl});
   saveLocal();
   if(hasUrl()) push('saveSettings', DB.studioInfo);
   notify('Studio info saved ✓','success');
@@ -3168,7 +2933,7 @@ function showPage(pg){
     settings:     renderSettings,
     calendar:     renderCalendar,
     reports:      renderReports,
-    tasks:        ()=>{ loadTasks(); if(TASK_VIEW==='board') renderKanban(); else renderTasks(); updateDashTaskAlert(); if((!DB.tasks||!DB.tasks.length)&&hasUrl()){ syncAll().then(()=>{ loadTasks(); if(TASK_VIEW==='board') renderKanban(); else renderTasks(); }); } }
+    tasks: function(){ var link=document.getElementById('tasks-app-link'); if(link&&DB.studioInfo&&DB.studioInfo.tasksAppUrl) link.href=DB.studioInfo.tasksAppUrl; }
   };
   if(map[pg]) map[pg]();
 }
@@ -3201,26 +2966,8 @@ function fmtDue(d){
   }catch(e){ return d; }
 }
 
-function updateDashTaskAlert(){
-  if(typeof loadTasks==='function') loadTasks();
-  const today   = todayStr();
-  const overdue = TASKS.filter(t=>t.stage!=='delivered' && t.due && String(t.due).slice(0,10) < today);
-  const dueToday= TASKS.filter(t=>t.stage!=='delivered' && String(t.due||'').slice(0,10) === today);
-  const pending  = TASKS.filter(t=>t.stage!=='delivered');
-  const alertEl  = document.getElementById('dash-task-alert');
-  const msgEl    = document.getElementById('dash-task-msg');
-  if(!alertEl||!msgEl) return;
-  if(!pending.length){ alertEl.style.display='none'; return; }
-  alertEl.style.display='flex';
-  const parts=[];
-  if(overdue.length)  parts.push(overdue.length+' overdue');
-  if(dueToday.length) parts.push(dueToday.length+' due today');
-  const rest = pending.length - overdue.length - dueToday.length;
-  if(rest>0) parts.push(rest+' upcoming');
-  msgEl.textContent = parts.join(' · ')+' — '+pending.length+' total pending';
-  alertEl.style.borderColor = overdue.length?'rgba(192,84,74,0.45)':'rgba(215,144,104,0.35)';
-  alertEl.style.background  = overdue.length?'rgba(192,84,74,0.07)':'rgba(215,144,104,0.1)';
-}
+function updateDashTaskAlert(){ return; }
+
 
 function renderDashboard(){
   document.getElementById('dash-date').textContent=dateLabelPH();
@@ -3451,672 +3198,25 @@ function printCashflowReport(){
 // ================================================================
 //  TASKS — Kanban Workflow
 // ================================================================
-const STAGES = [
-  { id:'new',        label:'🆕 New',               color:'#6b8c8c' },
-  { id:'inprogress', label:'⚙ In Progress',         color:'#4a7fb5' },
-  { id:'review',     label:'👁 For Review',          color:'#d79068' },
-  { id:'pickup',     label:'📦 Ready for Pickup',    color:'#51897d' },
-  { id:'delivered',  label:'✓ Delivered',            color:'#3d8c6e' }
-];
-// Archived tasks are hidden from board but kept in DB
-let SHOW_ARCHIVED = false;
-const STAGE_IDS = STAGES.map(s=>s.id);
-const TASK_TYPES = {
-  edit:    { label:'Editing',         icon:'✏' },
-  digital: { label:'Digital Copies',  icon:'💾' },
-  print:   { label:'Print-out',       icon:'🖨' },
-  frame:   { label:'Framing',         icon:'🖼' },
-  pickup:  { label:'Pickup',          icon:'📦' },
-  deliver: { label:'Delivery',        icon:'🚚' },
-  other:   { label:'Other',           icon:'📋' }
-};
 
-let TASKS = [], TASK_FILTER = 'all', TASK_VIEW = 'board';
-
-
-// ================================================================
-//  TASK DRAG MANAGER — click-hold-drag to reorder
-// ================================================================
-let _drag = {
-  el:        null,   // card being dragged
-  ghost:     null,   // floating clone
-  tid:       null,   // task id
-  view:      null,   // 'board' or 'list'
-  startX:    0,
-  startY:    0,
-  active:    false,
-  threshold: 6       // px before drag starts
-};
-
-function initDragCard(el, tid, view){
-  el._wasDragged = false;
-
-  el.addEventListener('mousedown', function(e){
-    if(e.button !== 0) return; // left click only
-    if(e.target.tagName==='A'||e.target.tagName==='BUTTON'||e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
-    _drag.el    = el;
-    _drag.tid   = tid;
-    _drag.view  = view;
-    _drag.startX = e.clientX;
-    _drag.startY = e.clientY;
-    _drag.active = false;
-    e.preventDefault();
-  });
-
-  // Touch support
-  el.addEventListener('touchstart', function(e){
-    if(e.target.tagName==='A'||e.target.tagName==='BUTTON') return;
-    const t = e.touches[0];
-    _drag.el    = el;
-    _drag.tid   = tid;
-    _drag.view  = view;
-    _drag.startX = t.clientX;
-    _drag.startY = t.clientY;
-    _drag.active = false;
-  }, { passive: true });
-}
-
-function _startDrag(clientX, clientY){
-  const el = _drag.el;
-  const rect = el.getBoundingClientRect();
-
-  // Create ghost
-  const ghost = el.cloneNode(true);
-  ghost.style.cssText = 'position:fixed;left:'+rect.left+'px;top:'+rect.top+'px;width:'+rect.width+'px;opacity:0.85;pointer-events:none;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,0.25);transform:rotate(1.5deg) scale(1.02);transition:none;';
-  document.body.appendChild(ghost);
-  _drag.ghost  = ghost;
-  _drag.active = true;
-  _drag.offsetX = clientX - rect.left;
-  _drag.offsetY = clientY - rect.top;
-
-  el._wasDragged = true;
-  el.style.opacity = '0.35';
-  el.style.transform = 'scale(0.97)';
-  document.body.style.cursor = 'grabbing';
-}
-
-function _moveDrag(clientX, clientY){
-  if(!_drag.ghost) return;
-  _drag.ghost.style.left = (clientX - _drag.offsetX)+'px';
-  _drag.ghost.style.top  = (clientY - _drag.offsetY)+'px';
-
-  // Highlight card under cursor
-  _drag.ghost.style.pointerEvents = 'none';
-  const under = document.elementFromPoint(clientX, clientY);
-  _drag.ghost.style.pointerEvents = '';
-
-  document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
-  const targetCard = under ? under.closest('.kanban-card, .task-card') : null;
-  if(targetCard && targetCard !== _drag.el){
-    targetCard.classList.add('drag-over');
-    _drag.targetEl = targetCard;
-  } else {
-    _drag.targetEl = null;
-  }
-}
-
-function _endDrag(clientX, clientY){
-  if(!_drag.el) return;
-
-  if(_drag.active){
-    // Find drop target
-    if(_drag.ghost) _drag.ghost.style.pointerEvents = 'none';
-    const under = document.elementFromPoint(clientX, clientY);
-    const targetCard = under ? under.closest('.kanban-card, .task-card') : null;
-    if(targetCard && targetCard !== _drag.el){
-      const toId = targetCard.dataset.tid;
-      if(toId && toId !== _drag.tid) reorderTask(_drag.tid, toId);
-    }
-
-    // Cleanup
-    if(_drag.ghost){ _drag.ghost.remove(); _drag.ghost = null; }
-    if(_drag.el){
-      _drag.el.style.opacity = '';
-      _drag.el.style.transform = '';
-    }
-    document.querySelectorAll('.drag-over').forEach(el=>el.classList.remove('drag-over'));
-    document.body.style.cursor = '';
-
-    setTimeout(()=>{
-      if(_drag.el) _drag.el._wasDragged = false;
-      _drag.el = null; _drag.tid = null; _drag.active = false;
-    }, 150);
-  } else {
-    _drag.el = null; _drag.tid = null;
-  }
-}
-
-// Global mouse events
-document.addEventListener('mousemove', function(e){
-  if(!_drag.el) return;
-  const dx = Math.abs(e.clientX - _drag.startX);
-  const dy = Math.abs(e.clientY - _drag.startY);
-  if(!_drag.active && (dx>_drag.threshold || dy>_drag.threshold)){
-    _startDrag(e.clientX, e.clientY);
-  }
-  if(_drag.active) _moveDrag(e.clientX, e.clientY);
-});
-
-document.addEventListener('mouseup', function(e){
-  if(!_drag.el) return;
-  _endDrag(e.clientX, e.clientY);
-});
-
-// Touch events
-document.addEventListener('touchmove', function(e){
-  if(!_drag.el) return;
-  const t = e.touches[0];
-  const dx = Math.abs(t.clientX - _drag.startX);
-  const dy = Math.abs(t.clientY - _drag.startY);
-  if(!_drag.active && (dx>_drag.threshold || dy>_drag.threshold)){
-    _startDrag(t.clientX, t.clientY);
-  }
-  if(_drag.active){ _moveDrag(t.clientX, t.clientY); e.preventDefault(); }
-}, { passive:false });
-
-document.addEventListener('touchend', function(e){
-  if(!_drag.el) return;
-  const t = e.changedTouches[0];
-  _endDrag(t.clientX, t.clientY);
-});
-
-function loadTasks(){
-  const raw = DB.tasks||[];
-  TASKS = raw.map(t=>{
-    const driveLink = t.driveLink || t['Drive Link'] || t['drivelink'] || '';
-    const stage = t.stage || t['Stage'] || 'new';
-    const safeStage = STAGE_IDS.includes(stage) ? stage : 'new';
-    return {
-      id:          String(t.id||t['ID']||''),
-      type:        t.type||t['Type']||'other',
-      title:       t.title||t['Title']||'',
-      client:      t.client||t['Client']||'',
-      due:         t.due||t['Due'] ? String(t.due||t['Due']||'').trim().slice(0,10) : '',
-      notes:       t.notes||t['Notes']||'',
-      driveLink,
-      stage:       safeStage,
-      clientEmail: t.clientEmail||t['Client Email']||'',
-      done:        t.done==='true'||t.done===true||t['Done']==='true',
-      archived:    t.archived==='true'||t.archived===true,
-      order:       parseInt(t.order||t['Order']||'0')||0,
-      completedAt: t.completedAt||t['Completed']||'',
-      createdAt:   t.createdAt||t['Created']||''
-    };
-  }).filter(t=>t.id && t.title)
-    .filter(t=> SHOW_ARCHIVED ? t.archived : !t.archived); // filter archived
-}
-
-function setTaskView(v){
-  TASK_VIEW = v;
-  const listEl  = document.getElementById('task-list-view');
-  const boardEl = document.getElementById('task-board-view');
-  const filEl   = document.getElementById('task-list-filters');
-  const listBtn = document.getElementById('task-view-list-btn');
-  const boardBtn= document.getElementById('task-view-board-btn');
-  if(listEl)  listEl.style.display   = v==='list'  ? '' : 'none';
-  if(boardEl) boardEl.style.display  = v==='board' ? '' : 'none';
-  if(filEl)   filEl.style.display    = v==='list'  ? 'flex' : 'none';
-  if(listBtn)  listBtn.className  = v==='list'  ? 'btn btn-sm btn-teal'    : 'btn btn-sm btn-outline';
-  if(boardBtn) boardBtn.className = v==='board' ? 'btn btn-sm btn-teal'    : 'btn btn-sm btn-outline';
-  loadTasks();
-  if(v==='board') renderKanban(); else renderTasks();
-}
-
-function renderTasks(){
-  loadTasks();
-  const today = todayStr();
-  let filtered = TASKS.slice();
-  if(TASK_FILTER==='overdue')       filtered = filtered.filter(t=>t.stage!=='delivered'&&t.due&&t.due<today);
-  else if(TASK_FILTER!=='all')      filtered = filtered.filter(t=>t.stage===TASK_FILTER);
-  // Sort by custom order first, then due date
-  filtered.sort((a,b)=>{
-    if(a.order!==b.order) return (a.order||0)-(b.order||0);
-    if(!a.due&&!b.due) return 0; if(!a.due) return 1; if(!b.due) return -1;
-    return a.due.localeCompare(b.due);
-  });
-  const el = document.getElementById('task-list');
-  if(!el) return;
-  el.innerHTML = '';
-  if(!filtered.length){
-    el.innerHTML = '<div class="tm" style="text-align:center;padding:24px;">No tasks found.</div>';
-    return;
-  }
-  filtered.forEach(t=>{ const c=buildTaskCard(t,'list'); if(c) el.appendChild(c); });
-}
-
-function renderKanban(){
-  loadTasks();
-  const board = document.getElementById('kanban-board');
-  if(!board) return;
-  while(board.firstChild) board.removeChild(board.firstChild);
-
-  STAGES.forEach(stage=>{
-    const cards = TASKS.filter(t=>t.stage===stage.id);
-    const col = document.createElement('div');
-    col.className = 'kanban-col';
-
-    const hdr = document.createElement('div');
-    hdr.className = 'kanban-col-hdr stage-'+stage.id;
-    hdr.style.borderColor = stage.color;
-    hdr.innerHTML =
-      '<span>'+stage.label+'</span>' +
-      '<span style="background:'+stage.color+';color:#fff;border-radius:10px;padding:1px 8px;font-size:10px;">'+cards.length+'</span>';
-    col.appendChild(hdr);
-
-    if(cards.length){
-      cards.forEach(t=>{ const c=buildTaskCard(t,'board'); if(c) col.appendChild(c); });
-    } else {
-      const empty = document.createElement('div');
-      empty.style.cssText='font-size:11px;color:var(--muted);text-align:center;padding:16px 0;';
-      empty.textContent='Empty';
-      col.appendChild(empty);
-    }
-    board.appendChild(col);
-  });
-}
-
-function buildTaskCard(t, view){
-  const today = todayStr();
-  const due   = t.due ? String(t.due).slice(0,10) : '';
-  const isOverdue = t.stage!=='delivered' && due && due<today;
-  const isToday   = due===today && t.stage!=='delivered';
-  const dueLabel  = due ? (isOverdue?'⚠ Overdue: ':isToday?'📅 Today: ':'Due: ')+fmtDue(due) : '';
-  const typeInfo  = TASK_TYPES[t.type]||TASK_TYPES.other;
-  const stage     = STAGES.find(s=>s.id===t.stage)||STAGES[0];
-  const borderCol = isOverdue ? 'var(--danger)' : stage.color;
-  const curIdx    = STAGE_IDS.indexOf(t.stage);
-
-  const div = document.createElement('div');
-
-  if(view==='board'){
-    div.className = 'kanban-card stage-'+t.stage;
-    div.style.cssText = 'border-left-color:'+borderCol+';cursor:pointer;margin-bottom:8px;';
-
-    div.innerHTML =
-      '<div class="kc-type" style="color:'+stage.color+';">'+typeInfo.icon+' '+typeInfo.label+'</div>'+
-      '<div class="kc-title">'+escHtml(t.title)+'</div>'+
-      (t.client ? '<div class="kc-client">👤 '+escHtml(t.client)+'</div>' : '')+
-      (dueLabel  ? '<div class="kc-due" style="color:'+(isOverdue?'var(--danger)':isToday?'var(--gold)':'var(--muted)')+';">'+dueLabel+'</div>' : '')+
-      (t.driveLink ? '<div style="margin-top:6px;"><a class="kc-drive" href="'+t.driveLink+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">📁 Open Drive</a></div>' : '')+
-      '<div class="kc-moves" style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap;"></div>';
-
-    div.addEventListener('click', function(){ openTaskDetail(t.id); });
-
-    const movesDiv = div.querySelector('.kc-moves');
-    if(curIdx > 0){
-      const b = document.createElement('button');
-      b.className='btn btn-sm btn-outline'; b.style.cssText='font-size:10px;padding:2px 7px;';
-      b.textContent='← '+STAGES[curIdx-1].label.replace(/[^\w\s]/gu,'').trim().split(' ').slice(0,2).join(' ');
-      b.addEventListener('click',function(e){ e.stopPropagation(); moveTaskStage(t.id, STAGES[curIdx-1].id); });
-      movesDiv.appendChild(b);
-    }
-    if(curIdx < STAGES.length-1){
-      const b = document.createElement('button');
-      b.className='btn btn-sm btn-teal'; b.style.cssText='font-size:10px;padding:2px 7px;';
-      b.textContent=STAGES[curIdx+1].label.replace(/[^\w\s]/gu,'').trim().split(' ').slice(0,2).join(' ')+' →';
-      b.addEventListener('click',function(e){ e.stopPropagation(); moveTaskStage(t.id, STAGES[curIdx+1].id); });
-      movesDiv.appendChild(b);
-    }
-    const ab = document.createElement('button');
-    ab.className='btn btn-sm btn-outline'; ab.style.cssText='font-size:10px;padding:2px 7px;';
-    ab.textContent='📦'; ab.title='Archive';
-    ab.addEventListener('click',function(e){ e.stopPropagation(); archiveTask(t.id); });
-    movesDiv.appendChild(ab);
-
-  } else {
-    div.className='task-card'+(t.stage==='delivered'?' done':'');
-    div.id='tc-'+t.id;
-    div.draggable=true;
-    div.dataset.tid=tid;
-    div.style.cssText='border-left:3px solid '+borderCol+';display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--light2);cursor:grab;';
-    div.style.userSelect = 'none';
-    initDragCard(div, tid, 'list');
-
-    const body = document.createElement('div');
-    body.style.cssText='flex:1;min-width:0;';
-    body.innerHTML=
-      '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">'+
-        '<span class="task-type '+t.type+'" style="background:'+stage.color+'22;color:'+stage.color+';">'+typeInfo.icon+' '+typeInfo.label+'</span>'+
-        '<span style="font-size:9px;font-weight:700;color:'+stage.color+';text-transform:uppercase;letter-spacing:1px;">'+stage.label.replace(/[^\w\s]/gu,'').trim()+'</span>'+
-      '</div>'+
-      '<div style="font-size:13px;font-weight:600;color:var(--'+(t.stage==='delivered'?'muted':'text')+');text-decoration:'+(t.stage==='delivered'?'line-through':'none')+';margin-bottom:2px;">'+escHtml(t.title)+'</div>'+
-      (t.client ? '<div style="font-size:11px;color:var(--muted);">'+escHtml(t.client)+'</div>' : '')+
-      (dueLabel  ? '<div class="task-due '+(isOverdue?'overdue':isToday?'today':'ok')+'">'+dueLabel+'</div>' : '')+
-      (t.notes   ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">'+escHtml(t.notes)+'</div>' : '')+
-      (t.driveLink ? '<a href="'+t.driveLink+'" target="_blank" rel="noopener" style="font-size:11px;font-weight:500;color:var(--teal);text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:4px 10px;border:1px solid rgba(81,137,125,0.3);border-radius:6px;background:rgba(81,137,125,0.06);" onclick="event.stopPropagation()">📁 Open Drive</a>' : '');
-
-    const btns = document.createElement('div');
-    btns.style.cssText='display:flex;flex-direction:column;gap:4px;flex-shrink:0;';
-
-    const editBtn = document.createElement('button');
-    editBtn.className='btn btn-sm btn-outline'; editBtn.textContent='Edit';
-    editBtn.addEventListener('click',function(){ openTaskDetail(t.id); });
-
-    const arcBtn = document.createElement('button');
-    arcBtn.className='btn btn-sm btn-outline'; arcBtn.textContent='📦';
-    arcBtn.title = 'Archive task';
-    arcBtn.style.fontSize='11px';
-    arcBtn.addEventListener('click',function(){ archiveTask(t.id); });
-
-    const delBtn = document.createElement('button');
-    delBtn.className='btn btn-sm btn-danger'; delBtn.textContent='✕';
-    delBtn.addEventListener('click',function(){ deleteTask(t.id); });
-
-    btns.appendChild(editBtn); btns.appendChild(arcBtn); btns.appendChild(delBtn);
-    div.appendChild(body); div.appendChild(btns);
-  }
-  return div;
-}
-
-function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function toggleShowArchived(){
-  SHOW_ARCHIVED = !SHOW_ARCHIVED;
-  const btn = document.getElementById('task-archive-btn');
-  if(btn){
-    btn.textContent = SHOW_ARCHIVED ? '📋 Active Tasks' : '📦 Archived';
-    btn.className   = SHOW_ARCHIVED ? 'btn btn-sm btn-teal' : 'btn btn-sm btn-outline';
-  }
-  loadTasks();
-  if(TASK_VIEW==='board') renderKanban(); else renderTasks();
-}
-
-function reorderTask(fromId, toId){
-  loadTasks();
-  const fromT = TASKS.find(t=>t.id===fromId);
-  const toT   = TASKS.find(t=>t.id===toId);
-  if(!fromT||!toT) return;
-
-  // Reorder within DB.tasks
-  const dbTasks = DB.tasks||[];
-  const fromIdx = dbTasks.findIndex(t=>t.id===fromId);
-  const toIdx   = dbTasks.findIndex(t=>t.id===toId);
-  if(fromIdx<0||toIdx<0) return;
-
-  const [moved] = dbTasks.splice(fromIdx, 1);
-  dbTasks.splice(toIdx, 0, moved);
-
-  // Update order field
-  dbTasks.forEach((t,i)=>{ t.order = i; });
-  DB.tasks = dbTasks;
-  saveLocal();
-
-  // Re-render immediately
-  loadTasks();
-  if(TASK_VIEW==='board') renderKanban(); else renderTasks();
-
-  // Sync order to Sheets (batch update)
-  push('updateTask', { id:fromId, order:String(toIdx) });
-  notify('Task reordered','info');
-}
-
-async function archiveTask(id){
-  const dbT=(DB.tasks||[]).find(x=>x.id===id); if(!dbT) return;
-  dbT.archived = dbT.archived ? false : true;
-  saveLocal();
-  await push('updateTask',{id, archived:String(dbT.archived)});
-  notify(dbT.archived?'Task archived':'Task restored','info');
-  loadTasks();
-  if(TASK_VIEW==='board') renderKanban(); else renderTasks();
-  updateDashTaskAlert();
-}
-
-function filterTasks(f){
-  TASK_FILTER=f;
-  document.querySelectorAll('.task-filter-btn').forEach(b=>b.classList.remove('active'));
-  const btn=document.getElementById('tf-'+f); if(btn) btn.classList.add('active');
-  renderTasks();
-}
-
-function openTaskDetail(id){
-  loadTasks();
-  const t      = id ? TASKS.find(x=>x.id===id) : null;
-  const isNew  = !t;
-
-  // Auto-lookup email when existing task has a client
-  const autoEmail = t && t.client ? getClientEmail(t.client) : '';
-
-  const stageOpts = STAGES.map(s=>'<option value="'+s.id+'"'+(t&&t.stage===s.id?' selected':'')+'>'+s.label+'</option>').join('');
-  const typeOpts  = Object.entries(TASK_TYPES).map(([k,v])=>'<option value="'+k+'"'+(t&&t.type===k?' selected':'')+'>'+v.icon+' '+v.label+'</option>').join('');
-
-  const html=
-    '<h3>'+(isNew?'New Task':'Edit Task')+'</h3>'+
-    '<div class="frow c2">'+
-      '<div class="field"><label for="tk-type">Type</label><select id="tk-type">'+typeOpts+'</select></div>'+
-      '<div class="field"><label for="tk-stage">Stage</label><select id="tk-stage">'+stageOpts+'</select></div>'+
-    '</div>'+
-    '<div class="field mb16"><label for="tk-title">Task Description *</label><input type="text" id="tk-title" placeholder="e.g. Edit photos for Santos session"></div>'+
-    '<div class="frow c2">'+
-      '<div class="field mb16"><label for="tk-client">Client Name</label>'+
-        '<input type="text" id="tk-client" placeholder="Related client" list="client-names-list" oninput="onTaskClientChange(this.value)"></div>'+
-      '<div class="field mb16"><label for="tk-due">Due Date</label><input type="date" id="tk-due"></div>'+
-    '</div>'+
-    // Client email field
-    '<div class="field mb16">'+
-      '<label for="tk-email">Client Email</label>'+
-      '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;">'+
-        '<input type="email" id="tk-email" placeholder="client@email.com" style="width:100%;">'+
-        '<button class="btn btn-sm btn-teal" id="tk-send-btn" style="white-space:nowrap;font-size:12px;" title="Send email with Drive link to client">📧 Send</button>'+
-      '</div>'+
-      '<div id="tk-send-status" style="font-size:11px;margin-top:4px;display:none;"></div>'+
-    '</div>'+
-    '<div class="field mb16"><label for="tk-drive">Google Drive Link</label>'+
-      '<input type="url" id="tk-drive" placeholder="https://drive.google.com/..." oninput="previewDriveLink(this.value)">'+
-      '<div id="tk-drive-preview" style="margin-top:6px;display:none;">'+
-        '<a id="tk-drive-link" href="#" target="_blank" rel="noopener" style="font-size:12px;font-weight:500;color:var(--teal);text-decoration:none;display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border:1px solid rgba(81,137,125,0.3);border-radius:6px;background:rgba(81,137,125,0.06);">📁 Open Drive link in new tab</a>'+
-      '</div>'+
-      '<div style="font-size:10px;color:var(--muted);margin-top:4px;">Paste a Google Drive folder or file link.</div>'+
-    '</div>'+
-    '<div class="field mb16"><label for="tk-notes">Notes</label><input type="text" id="tk-notes" placeholder="Additional details"></div>'+
-    '<div class="fe">'+
-      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>'+
-      (!isNew?'<button class="btn btn-danger btn-sm" id="tk-del-btn">Delete</button>':'')+
-      '<button class="btn btn-gold" id="tk-save-btn">'+(isNew?'Add Task':'Save Changes')+'</button>'+
-    '</div>';
-
-  openModal(html);
-
-  // Populate fields
-  if(t){
-    const g = id=>document.getElementById(id);
-    if(g('tk-title'))  g('tk-title').value  = t.title||'';
-    if(g('tk-client')) g('tk-client').value = t.client||'';
-    if(g('tk-email'))  g('tk-email').value  = t.clientEmail || autoEmail || '';
-    if(g('tk-due'))    g('tk-due').value    = t.due||'';
-    if(g('tk-drive'))  { g('tk-drive').value = t.driveLink||''; previewDriveLink(t.driveLink||''); }
-    if(g('tk-notes'))  g('tk-notes').value  = t.notes||'';
-  } else {
-    const st=document.getElementById('tk-stage'); if(st) st.value='new';
-  }
-
-  // Wire buttons
-  const saveBtn=document.getElementById('tk-save-btn');
-  if(saveBtn) saveBtn.addEventListener('click',function(){ saveTaskFromModal(t?t.id:''); });
-
-  const delBtn=document.getElementById('tk-del-btn');
-  if(delBtn)  delBtn.addEventListener('click',function(){ deleteTask(t.id); closeModal(); });
-
-  const sendBtn=document.getElementById('tk-send-btn');
-  if(sendBtn) sendBtn.addEventListener('click',function(){ sendTaskEmail(t); });
-}
-
-function onTaskClientChange(name){
-  // Auto-fill email when client name is selected
-  if(!name) return;
-  const email = getClientEmail(name);
-  const emailEl = document.getElementById('tk-email');
-  if(emailEl && email && !emailEl.value) emailEl.value = email;
-}
-
-async function sendTaskEmail(t){
-  const emailEl  = document.getElementById('tk-email');
-  const driveEl  = document.getElementById('tk-drive');
-  const titleEl  = document.getElementById('tk-title');
-  const typeEl   = document.getElementById('tk-type');
-  const statusEl = document.getElementById('tk-send-status');
-  const sendBtn  = document.getElementById('tk-send-btn');
-
-  const email     = (emailEl?.value||'').trim();
-  const driveLink = (driveEl?.value||'').trim();
-  const title     = (titleEl?.value||t?.title||'').trim();
-  const type      = typeEl?.value || t?.type || 'other';
-  const client    = document.getElementById('tk-client')?.value || t?.client || '';
-
-  if(!email){
-    statusEl.style.display=''; statusEl.style.color='var(--danger)';
-    statusEl.textContent='Please enter client email first.'; return;
-  }
-  if(!driveLink){
-    statusEl.style.display=''; statusEl.style.color='var(--danger)';
-    statusEl.textContent='Please paste a Google Drive link first.'; return;
-  }
-  if(!hasUrl()){
-    statusEl.style.display=''; statusEl.style.color='var(--danger)';
-    statusEl.textContent='No Apps Script URL set in Settings.'; return;
-  }
-
-  sendBtn.disabled=true; sendBtn.textContent='Sending…';
-  statusEl.style.display=''; statusEl.style.color='var(--muted)';
-  statusEl.textContent='Sending email…';
-
-  try{
-    const studioInfo = DB.studioInfo||{};
-    const r = await gasCall('sendTaskNotification',{
-      toEmail:     email,
-      clientName:  client,
-      taskTitle:   title,
-      taskType:    type,
-      driveLink,
-      trigger:     type==='digital' ? 'digital' : 'pickup',
-      studioName:  studioInfo.name||'ClickLounge Studio',
-      studioInfo
-    });
-    if(r.ok){
-      statusEl.style.color='var(--success)';
-      statusEl.textContent='✓ Email sent to '+email+(type==='digital'?' with 14-day download reminder scheduled':'');
-      sendBtn.textContent='✓ Sent'; sendBtn.style.background='var(--success)';
-      logActivity('Task Email Sent', (client||'Client')+' — '+title+' → '+email,'success');
-      notify('📧 Email sent to '+client,'success');
-
-      // Save email to task
-      if(t){
-        const dbT=(DB.tasks||[]).find(x=>x.id===t.id);
-        if(dbT){ dbT.clientEmail=email; saveLocal(); push('updateTask',{id:t.id,clientEmail:email}); }
-      }
-    } else {
-      statusEl.style.color='var(--danger)'; statusEl.textContent='Error: '+r.error;
-      sendBtn.disabled=false; sendBtn.textContent='📧 Send';
-    }
-  } catch(e){
-    statusEl.style.color='var(--danger)'; statusEl.textContent='Error: '+e.message;
-    sendBtn.disabled=false; sendBtn.textContent='📧 Send';
-  }
-}
-
-
-function previewDriveLink(val){
-  const preview = document.getElementById('tk-drive-preview');
-  const link    = document.getElementById('tk-drive-link');
-  if(!preview||!link) return;
-  const isValid = val && (val.startsWith('https://drive.google.com') || val.startsWith('https://docs.google.com'));
-  preview.style.display = isValid ? '' : 'none';
-  if(isValid) link.href = val;
-}
-
-function openNewTask(){ openTaskDetail(null); }
-
-async function saveTaskFromModal(existingId){
-  const title = (document.getElementById('tk-title')?.value||'').trim();
-  if(!title){ notify('Enter task description','error'); return; }
-  const taskData = {
-    type:        document.getElementById('tk-type')?.value||'other',
-    stage:       document.getElementById('tk-stage')?.value||'new',
-    title,
-    client:      (document.getElementById('tk-client')?.value||'').trim(),
-    clientEmail: (document.getElementById('tk-email')?.value||'').trim(),
-    due:         document.getElementById('tk-due')?.value||'',
-    driveLink:   (document.getElementById('tk-drive')?.value||'').trim(),
-    notes:       (document.getElementById('tk-notes')?.value||'').trim(),
-    done:        String(document.getElementById('tk-stage')?.value==='delivered')
-  };
-
-  if(existingId){
-    const dbT=(DB.tasks||[]).find(x=>x.id===existingId);
-    const prevStage = dbT?dbT.stage:'';
-    if(dbT) Object.keys(taskData).forEach(k=>{ dbT[k]=taskData[k]; });
-    saveLocal();
-    await push('updateTask', Object.assign({id:existingId}, taskData));
-    if(taskData.stage==='pickup' && prevStage!=='pickup' && taskData.client){
-      const email=getClientEmail(taskData.client);
-      if(email) await sendTaskNotification(Object.assign({id:existingId},taskData), email, 'pickup');
-    }
-    notify('Task updated','success');
-  } else {
-    const task=Object.assign({id:uid(), createdAt:todayStr(), completedAt:''}, taskData);
-    DB.tasks=DB.tasks||[]; DB.tasks.push(task); saveLocal();
-    await push('saveTask', task);
-    notify('Task added: '+title,'success');
-  }
-  closeModal(); loadTasks();
-  if(TASK_VIEW==='board') renderKanban(); else renderTasks();
-  updateDashTaskAlert();
-}
-
-async function moveTaskStage(id, newStage){
-  const dbT=(DB.tasks||[]).find(x=>x.id===id); if(!dbT) return;
-  const prevStage=dbT.stage;
-  dbT.stage=newStage;
-  dbT.done=String(newStage==='delivered');
-  if(newStage==='delivered') dbT.completedAt=todayStr(); else dbT.completedAt='';
-  saveLocal();
-  await push('updateTask',{id, stage:newStage, done:dbT.done, completedAt:dbT.completedAt});
-  if(newStage==='pickup' && prevStage!=='pickup' && dbT.client){
-    const email = dbT.clientEmail || getClientEmail(dbT.client);
-    if(email){
-      await sendTaskNotification(dbT, email, dbT.type==='digital'?'digital':'pickup');
-    } else {
-      notify('Ready! No email found for '+dbT.client+' — open task to add email and send manually','info');
-    }
-  }
-  // When delivered and has Drive link — log 15-day reminder
-  if(newStage==='delivered' && dbT.driveLink && dbT.client){
-    const email=getClientEmail(dbT.client);
-    if(email){
-      // Push a reminder record — Apps Script will send email on day 15
-      const deliveredDate = todayStr();
-      push('scheduleDownloadReminder',{
-        clientName: dbT.client,
-        email,
-        driveLink:  dbT.driveLink,
-        taskTitle:  dbT.title,
-        deliveredDate,
-        remindDate: addDays(deliveredDate, 15)
-      });
-      notify('📧 15-day download reminder scheduled for '+dbT.client,'info');
-    }
-  }
-  loadTasks();
-  if(TASK_VIEW==='board') renderKanban(); else renderTasks();
-  updateDashTaskAlert();
-}
-
-async function toggleTask(id){
-  const dbT=(DB.tasks||[]).find(x=>x.id===id); if(!dbT) return;
-  const newStage=dbT.stage==='delivered'?'new':'delivered';
-  await moveTaskStage(id, newStage);
-}
-
-async function deleteTask(id){
-  if(!confirm('Delete this task?')) return;
-  _deletedTaskIds.add(String(id)); // prevent sync from restoring it
-  DB.tasks=(DB.tasks||[]).filter(x=>x.id!==id); saveLocal();
-  loadTasks();
-  if(TASK_VIEW==='board') renderKanban(); else renderTasks();
-  updateDashTaskAlert();
-  // Push delete AFTER re-render so UI is instant
-  try { await push('deleteTask',{id}); } catch(e){ notify('Delete sync failed — try again','error'); }
-}
-
+// Tasks moved to external app
+function loadTasks(){}
+function renderTasks(){}
+function renderKanban(){}
+function openNewTask(){}
+function buildTaskCard(){}
+function filterTasks(){}
+function setTaskView(){}
+function toggleShowArchived(){}
+function deleteTask(){}
+function archiveTask(){}
+function moveTaskStage(){}
+function reorderTask(){}
+function openTaskDetail(){}
+function saveTaskFromModal(){}
+function onTaskClientChange(){}
+function sendTaskEmail(){}
+function toggleTask(){}
 
 // ================================================================
 //  REST DAYS & HOLIDAYS — Settings
@@ -6282,6 +5382,7 @@ function renderSettings(){
   setVal('set-admin-pw',     '');
   setVal('set-feedback-url', si.feedbackUrl||'');
   setVal('set-eod-email',    si.eodEmail||'');
+  setVal('set-tasks-url',    si.tasksAppUrl||'');
   SVC = loadSVC();
   renderSvcMgr();
   updateQueueCount();
@@ -7802,20 +6903,8 @@ function renderOperationsReport(txns, eods, allFT, gifts, label){
   '</div>';
   document.getElementById('ops-cash-chart').innerHTML = cashHtml||'<div class="tm">No cash data this period.</div>';
 
-  // Task summary
-  const stageData = STAGES.map(s=>({ label:s.label, count:tasks.filter(t=>t.stage===s.id&&!t.archived).length, color:s.color }));
-  const taskMax = Math.max(...stageData.map(s=>s.count), 1);
-  let taskHtml = stageData.map(s=>'<div class="chart-bar-row">'+
-    '<div class="chart-bar-label" style="font-size:11px;">'+s.label+'</div>'+
-    '<div class="chart-bar-track"><div class="chart-bar-fill" style="width:'+Math.round(s.count/taskMax*100)+'%;background:'+s.color+';"></div></div>'+
-    '<div class="chart-bar-val">'+s.count+'</div>'+
-  '</div>').join('');
-  const totalTasks=stageData.reduce((s,t)=>s+t.count,0);
-  taskHtml+='<div style="margin-top:12px;">'+
-    '<span class="insight-pill">📋 '+totalTasks+' active tasks total</span>'+
-    (tasksDone>0?'<span class="insight-pill">✅ '+tasksDone+' delivered (all time)</span>':'')+
-  '</div>';
-  document.getElementById('ops-task-chart').innerHTML = taskHtml;
+  // Task summary — Tasks moved to external app
+  document.getElementById('ops-task-chart').innerHTML = '<div class="tm">Tasks have been moved to a dedicated app.</div>';
 
   // Fund transfers table
   let ftHtml='<div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Type</th><th style="text-align:right;">Amount</th><th>Ref / Notes</th></tr></thead><tbody>';
