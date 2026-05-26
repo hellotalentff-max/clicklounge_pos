@@ -985,6 +985,168 @@ tr:hover td { background:var(--light); }
   </div>
 </div>
 
+<!-- REGISTRATION -->
+<div id="page-registration" class="page">
+  <div class="ph">
+    <div><h2>Registration</h2><p>Client check-in for today's sessions</p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
+    <div class="card">
+      <div class="ct">New Registration</div>
+      <div class="field"><label>Arrival Type</label>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <div class="arr-opt sel" id="arr-walkin" onclick="setArr('walkin')">Walk-in</div>
+          <div class="arr-opt" id="arr-booked" onclick="setArr('booked')">Booked</div>
+        </div>
+      </div>
+      <div id="bk-sel" style="display:none;margin-bottom:12px;">
+        <div class="field"><label>Select Booked Client</label>
+          <select id="booked-sel" class="sinput" onchange="prefillBooked(this.value)">
+            <option value="">— Choose —</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Facebook Name *</label>
+        <input type="text" id="reg-fb" class="sinput" placeholder="Client's Facebook name" autocomplete="off" list="client-names-list"></div>
+      <div class="field"><label>Email</label>
+        <input type="email" id="reg-email" class="sinput" placeholder="client@email.com"></div>
+      <div id="reg-optional" style="display:none;">
+        <div class="field"><label>Mobile</label>
+          <input type="tel" id="reg-phone" class="sinput" placeholder="09xx xxx xxxx"></div>
+        <div class="field"><label>Birthday</label>
+          <input type="date" id="reg-bday" class="sinput"></div>
+      </div>
+      <button type="button" onclick="toggleRegOptional()" id="reg-opt-btn" style="background:none;border:1.5px dashed rgba(81,137,125,0.4);color:var(--teal);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;width:100%;margin-bottom:12px;font-family:inherit;">
+        ➕ Add phone & birthday
+      </button>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">📸 Social Media Consent</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <label id="reg-smc-yes-lbl" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--light2);border-radius:8px;cursor:pointer;transition:all .15s;">
+            <input type="radio" name="reg-smc" id="reg-smc-yes" value="yes" style="accent-color:var(--teal);"> <span style="font-size:12px;">✅ Yes, may post</span>
+          </label>
+          <label id="reg-smc-no-lbl" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--light2);border-radius:8px;cursor:pointer;transition:all .15s;">
+            <input type="radio" name="reg-smc" id="reg-smc-no" value="no" style="accent-color:var(--danger);"> <span style="font-size:12px;">🚫 Keep private</span>
+          </label>
+        </div>
+        <div id="smc-warn" style="font-size:11px;color:var(--danger);margin-top:6px;display:none;">Please select a social media consent option.</div>
+      </div>
+      <div class="fe"><button class="btn btn-gold" onclick="submitReg()">Register ✓</button></div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Today's Registrations</div>
+        <div id="reg-table"><div class="tm">No registrations yet today.</div></div>
+      </div>
+      <div class="card">
+        <div class="ct">Registration Report</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <select id="reg-report-month" class="sinput" style="flex:1;" onchange="renderRegReport()"></select>
+          <button class="btn btn-sm btn-outline" onclick="printRegReport()">🖨</button>
+        </div>
+        <div id="reg-report"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ACKNOWLEDGEMENT RECEIPTS -->
+<div id="page-acknowledgement" class="page">
+  <div class="ph">
+    <div><h2>Acknowledgement Receipts</h2><p>Booking receipts and downpayment records</p></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-gold" onclick="openNewAck()">+ New Receipt</button>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
+    <input type="text" id="ack-search" class="sinput" placeholder="Search by name or receipt #..." oninput="renderAcks()" style="max-width:260px;">
+    <select id="ack-filter" class="sinput" onchange="renderAcks()" style="max-width:180px;">
+      <option value="all">All</option>
+      <option value="pending">Pending Payment</option>
+      <option value="confirmed">Confirmed</option>
+      <option value="today">Today</option>
+      <option value="upcoming">Upcoming</option>
+    </select>
+    <button class="btn btn-sm btn-outline" id="ack-sort-btn" onclick="toggleAckSort()">A→Z</button>
+    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer;">
+      <input type="checkbox" id="ack-show-hidden" onchange="renderAcks()"> Show hidden
+    </label>
+  </div>
+  <div id="ack-list"></div>
+</div>
+
+<!-- INVOICE / POS -->
+<div id="page-invoice" class="page">
+  <div class="ph">
+    <div><h2>Invoice / POS</h2><p>Create invoices and process payments</p></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;">
+    <div>
+      <div class="card">
+        <div class="ct">Client</div>
+        <div class="field">
+          <input type="text" id="inv-client" class="sinput" placeholder="Start typing client name..." autocomplete="off" list="client-names-list" oninput="onClientChange(this.value)">
+        </div>
+        <div id="inv-client-info" style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:8px;"></div>
+        <div id="inv-ack-link" style="display:none;margin-bottom:8px;">
+          <button class="btn btn-sm btn-outline" onclick="viewAckFromInv()">View linked receipt</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">Services</div>
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="svc-tabs"></div>
+        <div id="svc-grid"></div>
+        <div style="margin-top:12px;border-top:1px solid var(--light2);padding-top:12px;">
+          <div class="ct" style="font-size:11px;">Add Custom Item</div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="custom-name" class="sinput" placeholder="Item name" style="flex:1;">
+            <input type="number" id="custom-price" class="sinput" placeholder="Price" style="width:100px;">
+            <button class="btn btn-sm btn-teal" onclick="addCustom()">Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="position:sticky;top:80px;">
+        <div class="ct">Invoice Summary</div>
+        <div id="inv-items" style="margin-bottom:12px;"><div class="tm" style="font-size:11px;">No items added yet.</div></div>
+        <div style="border-top:1px solid var(--light2);padding-top:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;color:var(--muted);">
+            <span>Subtotal</span><span id="inv-sub">₱0</span>
+          </div>
+          <div class="field" style="margin-bottom:6px;">
+            <label style="font-size:10px;">Discount (₱)</label>
+            <input type="number" id="inv-disc" class="sinput" value="0" min="0" oninput="recalc()" style="padding:6px 10px;">
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:var(--slate);margin-bottom:12px;">
+            <span>TOTAL</span><span id="inv-total">₱0</span>
+          </div>
+          <div class="field" style="margin-bottom:8px;">
+            <label>Downpayment (₱)</label>
+            <input type="number" id="inv-dp" class="sinput" value="0" min="0" oninput="recalc()" style="padding:6px 10px;">
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--gold);">
+            <span>Balance Due</span><span id="inv-bal">₱0</span>
+          </div>
+          <div class="field" style="margin-bottom:10px;">
+            <label>Payment Method</label>
+            <select id="inv-mop" class="sinput">
+              <option>Cash</option><option>GCash</option><option>Maya</option><option>BPI</option><option>Mixed</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:12px;">
+            <label>Notes</label>
+            <input type="text" id="inv-notes" class="sinput" placeholder="Optional notes">
+          </div>
+          <button class="btn btn-gold" style="width:100%;padding:12px;font-size:14px;" onclick="submitInvoice()">
+            💰 Submit Invoice
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- TASKS -->
 <div id="page-tasks" class="page">
   <div class="ph">
