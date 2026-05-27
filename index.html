@@ -4056,8 +4056,9 @@ async function submitReg(){
 }
 function renderReg(){
   populateBookedSel();
-  const regs=DB.registrations.filter(r=>dateOnly(r.date) === todayStr());
-  const el=document.getElementById('reg-list');
+  var regs=DB.registrations.filter(function(r){ return dateOnly(r.date) === todayStr(); });
+  var el=document.getElementById('reg-table');
+  if(!el) return;
   if(!regs.length){ el.innerHTML='<div class="tm">No registrations yet today.</div>'; return; }
   var regRows='';
   regs.forEach(function(r){
