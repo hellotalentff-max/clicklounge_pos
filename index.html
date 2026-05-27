@@ -1082,16 +1082,32 @@ tr:hover td { background:var(--light); }
   </div>
   <div style="display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;">
     <div>
+      <!-- Invoice # and Staff -->
+      <div class="card">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field"><label>Invoice Number *</label>
+            <input type="text" id="inv-num" class="sinput" placeholder="Auto-generated" autocomplete="off">
+          </div>
+          <div class="field"><label>Staff</label>
+            <select id="inv-staff" class="sinput"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Client -->
       <div class="card">
         <div class="ct">Client</div>
         <div class="field">
           <input type="text" id="inv-client" class="sinput" placeholder="Start typing client name..." autocomplete="off" list="client-names-list" oninput="onClientChange(this.value)">
         </div>
         <div id="inv-client-info" style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:8px;"></div>
-        <div id="inv-ack-link" style="display:none;margin-bottom:8px;">
-          <button class="btn btn-sm btn-outline" onclick="viewAckFromInv()">View linked receipt</button>
+        <div id="inv-ack" style="display:none;background:rgba(81,137,125,0.06);border:1px solid rgba(81,137,125,0.15);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:600;color:var(--teal);margin-bottom:4px;">📋 Linked Acknowledgement Receipt</div>
+          <div id="inv-ack-info" style="font-size:12px;"></div>
         </div>
       </div>
+
+      <!-- Services -->
       <div class="card">
         <div class="ct">Services</div>
         <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;" id="svc-tabs"></div>
@@ -1106,42 +1122,56 @@ tr:hover td { background:var(--light); }
         </div>
       </div>
     </div>
+
+    <!-- RIGHT COLUMN: Summary -->
     <div>
       <div class="card" style="position:sticky;top:80px;">
         <div class="ct">Invoice Summary</div>
-        <div id="inv-items" style="margin-bottom:12px;"><div class="tm" style="font-size:11px;">No items added yet.</div></div>
-        <div style="border-top:1px solid var(--light2);padding-top:12px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;color:var(--muted);">
-            <span>Subtotal</span><span id="inv-sub">₱0</span>
+        <div id="inv-lines" style="margin-bottom:12px;"><div class="tm" style="font-size:11px;">No items added yet.</div></div>
+
+        <!-- PWD / SC Discount -->
+        <div style="background:var(--light);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:6px;">
+            <input type="checkbox" id="d-en" onchange="recalc()" style="accent-color:var(--teal);"> PWD / Senior Citizen Discount
+          </label>
+          <div style="display:flex;gap:8px;">
+            <div class="field" style="margin:0;flex:1;"><label style="font-size:9px;">Pax</label>
+              <input type="number" id="d-pax" class="sinput" value="1" min="1" oninput="recalc()" style="padding:5px 8px;font-size:12px;">
+            </div>
+            <div class="field" style="margin:0;flex:1;"><label style="font-size:9px;"># SC/PWD</label>
+              <input type="number" id="d-sc" class="sinput" value="0" min="0" oninput="recalc()" style="padding:5px 8px;font-size:12px;">
+            </div>
           </div>
-          <div class="field" style="margin-bottom:6px;">
-            <label style="font-size:10px;">Discount (₱)</label>
-            <input type="number" id="inv-disc" class="sinput" value="0" min="0" oninput="recalc()" style="padding:6px 10px;">
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;color:var(--slate);margin-bottom:12px;">
-            <span>TOTAL</span><span id="inv-total">₱0</span>
-          </div>
-          <div class="field" style="margin-bottom:8px;">
-            <label>Downpayment (₱)</label>
-            <input type="number" id="inv-dp" class="sinput" value="0" min="0" oninput="recalc()" style="padding:6px 10px;">
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:10px;font-size:13px;font-weight:600;color:var(--gold);">
-            <span>Balance Due</span><span id="inv-bal">₱0</span>
-          </div>
-          <div class="field" style="margin-bottom:10px;">
-            <label>Payment Method</label>
-            <select id="inv-mop" class="sinput">
-              <option>Cash</option><option>GCash</option><option>Maya</option><option>BPI</option><option>Mixed</option>
-            </select>
-          </div>
-          <div class="field" style="margin-bottom:12px;">
-            <label>Notes</label>
-            <input type="text" id="inv-notes" class="sinput" placeholder="Optional notes">
-          </div>
-          <button class="btn btn-gold" style="width:100%;padding:12px;font-size:14px;" onclick="submitInvoice()">
-            💰 Submit Invoice
-          </button>
+          <div id="d-show" style="display:none;font-size:11px;color:var(--success);margin-top:4px;font-weight:500;"></div>
         </div>
+
+        <!-- Voucher -->
+        <div class="field" style="margin-bottom:8px;">
+          <label style="font-size:10px;">Voucher Amount (₱100–₱500)</label>
+          <input type="number" id="v-amt" class="sinput" value="0" min="0" max="500" oninput="recalc()" style="padding:6px 10px;">
+        </div>
+
+        <!-- Downpayment -->
+        <div class="field" style="margin-bottom:8px;">
+          <label style="font-size:10px;">Downpayment Applied (₱)</label>
+          <input type="number" id="dp-amt" class="sinput" value="0" min="0" oninput="recalc()" style="padding:6px 10px;">
+        </div>
+
+        <!-- Totals -->
+        <div id="inv-totals" style="border-top:1px solid var(--light2);padding-top:12px;margin-bottom:12px;"></div>
+
+        <!-- Balance MOP -->
+        <div class="field" style="margin-bottom:10px;">
+          <label>Balance Mode of Payment</label>
+          <select id="bal-mop" class="sinput">
+            <option value="">— Select —</option>
+            <option>Cash</option><option>GCash</option><option>Maya</option><option>BPI</option><option>Mixed</option>
+          </select>
+        </div>
+
+        <button class="btn btn-gold" style="width:100%;padding:12px;font-size:14px;" onclick="submitInvoice()">
+          💰 Submit Invoice
+        </button>
       </div>
     </div>
   </div>
@@ -4502,14 +4532,39 @@ function renderInvoicePage(){
   tabsEl.innerHTML = tabHtml;
   gridEl.innerHTML = gridHtml;
 
-  // Now render each service grid
+  // Render each service grid
   renderSvcGrid('sg-ss',SVC.ss,false); renderSvcGrid('sg-ph',SVC.ph,false);
   renderSvcGrid('sg-ot',SVC.ot,false); renderSvcGrid('sg-as',SVC.as,true);
   renderSvcGrid('sg-ap',SVC.ap,true);
 
+  // Populate staff dropdown
+  var staffSel = document.getElementById('inv-staff');
+  if(staffSel){
+    var staffOpts = '<option value="">— Staff —</option>';
+    (DB.staff||[]).forEach(function(s){
+      staffOpts += '<option value="'+escHtml(s)+'"'+(s===CURR_USER?' selected':'')+'>'+escHtml(s)+'</option>';
+    });
+    staffSel.innerHTML = staffOpts;
+  }
+
+  // Auto-generate invoice number
+  var invNumEl = document.getElementById('inv-num');
+  if(invNumEl && !invNumEl.value){
+    invNumEl.value = generateInvNum();
+  }
+
   populateInvClient();
-  var si=document.getElementById('inv-staff'); if(si) si.value=CURR_USER;
   recalc();
+}
+
+function generateInvNum(){
+  var today = todayStr().replace(/-/g,'');
+  var prefix = 'INV-'+today+'-';
+  var existing = (DB.transactions||[]).filter(function(t){
+    return String(t.invoiceNum||'').startsWith(prefix);
+  });
+  var next = existing.length + 1;
+  return prefix + String(next).padStart(3,'0');
 }
 function showSvcTab(key){
   document.querySelectorAll('.stab').forEach(function(b){b.classList.remove('active');});
@@ -4649,14 +4704,14 @@ function recalc(){
   } else { if(ds) ds.style.display='none'; document.getElementById('v-amt').disabled=false; }
   const vApp=(!dEn&&vAmt>=100&&vAmt<=500)?vAmt:0;
   const totalDisc=disc+vApp, total=sub-totalDisc, balance=Math.max(0,total-dpAmt);
-  tEl.innerHTML=`
-    <div class="il"><span class="tm">Services</span><span>₱${fmt(svcsT)}</span></div>
-    <div class="il"><span class="tm">Add-ons</span><span>₱${fmt(addsT)}</span></div>
-    ${disc>0?`<div class="il"><span class="tm">PWD/SC Discount</span><span style="color:var(--success)">-₱${fmt(disc)}</span></div>`:''}
-    ${vApp>0?`<div class="il"><span class="tm">Voucher</span><span style="color:var(--success)">-₱${fmt(vApp)}</span></div>`:''}
-    ${dpAmt>0?`<div class="il"><span class="tm">Downpayment Paid</span><span style="color:var(--info)">-₱${fmt(dpAmt)}</span></div>`:''}
-    <div class="inv-total"><span>Total Amount</span><span>₱${fmt(total)}</span></div>
-    <div class="inv-bal"><span>Balance Due</span><span>₱${fmt(balance)}</span></div>`;
+  var totHtml = '<div class="il"><span class="tm">Services</span><span>&#8369;'+fmt(svcsT)+'</span></div>'+
+    '<div class="il"><span class="tm">Add-ons</span><span>&#8369;'+fmt(addsT)+'</span></div>';
+  if(disc>0) totHtml+='<div class="il"><span class="tm">PWD/SC Discount</span><span style="color:var(--success)">-&#8369;'+fmt(disc)+'</span></div>';
+  if(vApp>0) totHtml+='<div class="il"><span class="tm">Voucher</span><span style="color:var(--success)">-&#8369;'+fmt(vApp)+'</span></div>';
+  if(dpAmt>0) totHtml+='<div class="il"><span class="tm">Downpayment Paid</span><span style="color:var(--teal)">-&#8369;'+fmt(dpAmt)+'</span></div>';
+  totHtml+='<div class="inv-total"><span>Total Amount</span><span>&#8369;'+fmt(total)+'</span></div>'+
+    '<div class="inv-bal"><span>Balance Due</span><span>&#8369;'+fmt(balance)+'</span></div>';
+  tEl.innerHTML=totHtml;
 }
 async function submitInvoice(){
   const invNum=document.getElementById('inv-num').value.trim();
