@@ -1086,7 +1086,7 @@ tr:hover td { background:var(--light); }
       <div class="card">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="field"><label>Invoice Number *</label>
-            <input type="text" id="inv-num" class="sinput" placeholder="Auto-generated" autocomplete="off">
+            <input type="text" id="inv-num" class="sinput" placeholder="Enter invoice #" autocomplete="off">
           </div>
           <div class="field"><label>Staff</label>
             <select id="inv-staff" class="sinput"></select>
@@ -1101,9 +1101,15 @@ tr:hover td { background:var(--light); }
           <input type="text" id="inv-client" class="sinput" placeholder="Start typing client name..." autocomplete="off" list="client-names-list" oninput="onClientChange(this.value)">
         </div>
         <div id="inv-client-info" style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:8px;"></div>
+        <!-- Linked ack receipt auto-detected -->
         <div id="inv-ack" style="display:none;background:rgba(81,137,125,0.06);border:1px solid rgba(81,137,125,0.15);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
-          <div style="font-size:11px;font-weight:600;color:var(--teal);margin-bottom:4px;">📋 Linked Acknowledgement Receipt</div>
-          <div id="inv-ack-info" style="font-size:12px;"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--teal);margin-bottom:6px;">📋 Downpayment Found</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px;">
+            <div><span style="color:var(--muted);font-size:10px;">Client</span><br><strong id="ia-name">—</strong></div>
+            <div><span style="color:var(--muted);font-size:10px;">MOP</span><br><strong id="ia-mop">—</strong></div>
+            <div><span style="color:var(--muted);font-size:10px;">Downpayment</span><br><strong id="ia-dp" style="color:var(--teal);">—</strong></div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:6px;">This downpayment will be auto-deducted from the balance.</div>
         </div>
       </div>
 
@@ -1151,7 +1157,7 @@ tr:hover td { background:var(--light); }
           <input type="number" id="v-amt" class="sinput" value="0" min="0" max="500" oninput="recalc()" style="padding:6px 10px;">
         </div>
 
-        <!-- Downpayment -->
+        <!-- Downpayment (auto-filled when ack receipt found) -->
         <div class="field" style="margin-bottom:8px;">
           <label style="font-size:10px;">Downpayment Applied (₱)</label>
           <input type="number" id="dp-amt" class="sinput" value="0" min="0" oninput="recalc()" style="padding:6px 10px;">
@@ -4548,13 +4554,12 @@ function renderInvoicePage(){
     staffSel.innerHTML = staffOpts;
   }
 
-  // Auto-generate invoice number
+  // Invoice number left blank — staff must fill it in
   var invNumEl = document.getElementById('inv-num');
-  if(invNumEl && !invNumEl.value){
-    invNumEl.value = generateInvNum();
-  }
+  if(invNumEl) invNumEl.value = '';
 
-  populateInvClient();
+  // Populate client datalist with ALL known names
+  updateClientDatalist();
   recalc();
 }
 
@@ -4605,12 +4610,20 @@ function populateInvClient(){
 }
 
 function updateClientDatalist(){
-  const todayRegs = DB.registrations.filter(r => dateOnly(r.date) === todayStr());
-  const allNames  = new Set();
-  todayRegs.forEach(r => allNames.add(r.fbName));
-  DB.clients.forEach(c => allNames.add(c.fbName));
-  const opts = [...allNames].sort().map(n => '<option value="' + n + '">').join('');
-  document.querySelectorAll('datalist').forEach(dl => { dl.innerHTML = opts; });
+  var allNames = {};
+  // From CRM clients
+  (DB.clients||[]).forEach(function(c){ if(c.fbName) allNames[c.fbName.toLowerCase()] = c.fbName; });
+  // From registrations (today and past)
+  (DB.registrations||[]).forEach(function(r){ if(r.fbName) allNames[r.fbName.toLowerCase()] = r.fbName; });
+  // From transactions
+  (DB.transactions||[]).forEach(function(t){ if(t.clientName) allNames[t.clientName.toLowerCase()] = t.clientName; });
+  // From acknowledgement receipts
+  (DB.acknowledgements||[]).forEach(function(a){ if(a.fbName) allNames[a.fbName.toLowerCase()] = a.fbName; });
+
+  var sorted = Object.values(allNames).sort(function(a,b){ return a.localeCompare(b); });
+  var opts = '';
+  sorted.forEach(function(n){ opts += '<option value="'+escHtml(n)+'">'; });
+  document.querySelectorAll('datalist').forEach(function(dl){ dl.innerHTML = opts; });
 }
 
 function getClientEmail(name){
@@ -4628,44 +4641,58 @@ function getClientEmail(name){
 }
 function onClientChange(name){
   if(!name || name.length < 2) return;
-  const box = document.getElementById('inv-ack');
-  const dpEl = document.getElementById('dp-amt');
+  var box = document.getElementById('inv-ack');
+  var dpEl = document.getElementById('dp-amt');
+  var infoEl = document.getElementById('inv-client-info');
+  var nameLower = name.toLowerCase();
 
-  // Look for today's registration with an ACK receipt (booked client)
-  const reg = DB.registrations.find(r =>
-    r.fbName.toLowerCase() === name.toLowerCase() && dateOnly(r.date) === todayStr()
-  );
+  // Show client info (email, type)
+  if(infoEl){
+    var cl = (DB.clients||[]).find(function(c){ return (c.fbName||'').toLowerCase()===nameLower; });
+    if(cl){
+      infoEl.innerHTML = (cl.email?'✉ '+escHtml(cl.email):'') + (cl.phone?' · 📱 '+escHtml(cl.phone):'') + (cl.type?' · '+cl.type:'');
+    } else { infoEl.innerHTML = ''; }
+  }
 
+  // Search for downpayment: first check today's registration with linked ack
+  var reg = (DB.registrations||[]).find(function(r){
+    return (r.fbName||'').toLowerCase()===nameLower && dateOnly(r.date)===todayStr();
+  });
   if(reg && reg.ackId){
-    const a = DB.acknowledgements.find(x => x.id === reg.ackId);
-    if(a){
-      document.getElementById('ia-name').textContent = a.fbName;
-      document.getElementById('ia-mop').textContent  = a.mop;
-      document.getElementById('ia-dp').textContent   = fmt(+a.downpayment);
-      // Auto-populate downpayment amount
-      if(dpEl && !dpEl.value) dpEl.value = a.downpayment;
-      box.style.display = '';
+    var a = (DB.acknowledgements||[]).find(function(x){ return x.id===reg.ackId; });
+    if(a && +a.downpayment > 0){
+      showAckDP(a, dpEl, box);
       recalc();
       return;
     }
   }
 
-  // Also search acknowledgements directly by name even if not registered today
-  const a2 = DB.acknowledgements
-    .slice().reverse()
-    .find(a => a.fbName.toLowerCase() === name.toLowerCase() && a.bookDate >= todayStr());
-  if(a2){
-    document.getElementById('ia-name').textContent = a2.fbName;
-    document.getElementById('ia-mop').textContent  = a2.mop;
-    document.getElementById('ia-dp').textContent   = fmt(+a2.downpayment);
-    if(dpEl && !dpEl.value) dpEl.value = a2.downpayment;
-    box.style.display = '';
+  // Search all acknowledgements by name — find most recent with downpayment
+  var allAcks = (DB.acknowledgements||[]).filter(function(a){
+    return (a.fbName||'').toLowerCase()===nameLower && +a.downpayment > 0;
+  }).sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+
+  if(allAcks.length > 0){
+    showAckDP(allAcks[0], dpEl, box);
     recalc();
     return;
   }
 
-  box.style.display = 'none';
+  // No downpayment found
+  if(box) box.style.display = 'none';
+  if(dpEl) dpEl.value = 0;
   recalc();
+}
+
+function showAckDP(a, dpEl, box){
+  var iaName = document.getElementById('ia-name');
+  var iaMop  = document.getElementById('ia-mop');
+  var iaDp   = document.getElementById('ia-dp');
+  if(iaName) iaName.textContent = a.fbName||'';
+  if(iaMop)  iaMop.textContent  = a.mop||'—';
+  if(iaDp)   iaDp.textContent   = '₱'+fmt(+a.downpayment);
+  if(dpEl)   dpEl.value = a.downpayment;
+  if(box)    box.style.display = '';
 }
 function viewAckFromInv(){
   const name=document.getElementById('inv-client').value.trim();
