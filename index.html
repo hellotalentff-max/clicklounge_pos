@@ -2158,6 +2158,7 @@ function saveLocal(){ try{ localStorage.setItem('cl_db',JSON.stringify(DB)); }ca
 // ================================================================
 function uid()  { return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
 function fmt(n) { return (+(n||0)).toLocaleString('en-PH'); }
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function todayTxns() { return DB.transactions.filter(t=>dateOnly(t.date) === todayStr() && !String(t.invoiceNum||'').startsWith('[VOID]')); }
 function notify(msg,type='success'){
   const el=document.createElement('div'); el.className='ni-item '+type; el.textContent=msg;
@@ -3936,8 +3937,9 @@ function setArr(t){
   if(t==='booked') populateBookedSel();
 }
 function populateBookedSel(){
-  const sel=document.getElementById('reg-bk-sel');
-  sel.innerHTML='<option value="">— choose —</option>'+DB.acknowledgements.map(function(a){return '<option value="'+a.id+'">'+a.fbName+'</option>';}).join('');
+  var sel=document.getElementById('booked-sel');
+  if(!sel) return;
+  sel.innerHTML='<option value="">— choose —</option>'+DB.acknowledgements.map(function(a){return '<option value="'+a.id+'">'+escHtml(a.fbName)+'</option>';}).join('');
 }
 function prefillBooked(id){
   const a=DB.acknowledgements.find(x=>x.id===id);
@@ -4435,13 +4437,13 @@ function renderSvcMgr(){
   const el = document.getElementById('svc-mgr-list');
   if(!el) return;
   if(!items.length){ el.innerHTML='<div class="tm">No services in this category.</div>'; return; }
-  el.innerHTML = items.map((s,i)=>
-    `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--light2);">
-      <span style="flex:1;font-size:13px;">${escHtml(s.n)}</span>
-      <span style="font-size:12px;color:var(--teal);font-weight:600;min-width:60px;text-align:right;">₱${fmt(s.p)}</span>
-      <button class="btn btn-sm btn-danger" onclick="delSvcItem(${i})" style="padding:3px 8px;font-size:10px;">✕</button>
-    </div>`
-  ).join('');
+  el.innerHTML = items.map(function(s,i){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--light2);">'+
+      '<span style="flex:1;font-size:13px;">'+escHtml(s.n)+'</span>'+
+      '<span style="font-size:12px;color:var(--teal);font-weight:600;min-width:60px;text-align:right;">&#8369;'+fmt(s.p)+'</span>'+
+      '<button class="btn btn-sm btn-danger" onclick="delSvcItem('+i+')" style="padding:3px 8px;font-size:10px;">&#10005;</button>'+
+    '</div>';
+  }).join('');
 }
 
 function addSvcItem(){
@@ -4486,21 +4488,23 @@ function renderInvoicePage(){
   recalc();
 }
 function showSvcTab(key){
-  document.querySelectorAll('.stab').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.stab-panel').forEach(p=>p.style.display='none');
-  document.getElementById('stab-'+key).classList.add('active');
-  document.getElementById('stab-panel-'+key).style.display='';
+  document.querySelectorAll('.stab').forEach(function(b){b.classList.remove('active');});
+  document.querySelectorAll('.stab-panel').forEach(function(p){p.style.display='none';});
+  var tabEl = document.getElementById('stab-'+key);
+  var panelEl = document.getElementById('stab-panel-'+key);
+  if(tabEl) tabEl.classList.add('active');
+  if(panelEl) panelEl.style.display='';
 }
 function renderSvcGrid(id,items,isAddon){
-  const el = document.getElementById(id);
+  var el = document.getElementById(id);
   if(!el) return;
   if(!Array.isArray(items)||!items.length){
     el.innerHTML='<div class="tm" style="font-size:11px;">No services. Go to Settings → Services to configure.</div>';
     return;
   }
-  el.innerHTML=items.map(s=>
-    `<button class="svc-btn" onclick="addItem('${s.n.replace(/'/g,"\\'")}',${s.p},${isAddon})">${s.n}<span class="svc-price">₱${fmt(s.p)}</span></button>`
-  ).join('');
+  el.innerHTML=items.map(function(s){
+    return '<button class="svc-btn" onclick="addItem(\''+s.n.replace(/'/g,"\\'")+'\','+s.p+','+isAddon+')">'+escHtml(s.n)+'<span class="svc-price">&#8369;'+fmt(s.p)+'</span></button>';
+  }).join('');
 }
 function addItem(name,price,isAddon){
   const ex=INV.find(i=>i.name===name&&i.isAddon===isAddon);
