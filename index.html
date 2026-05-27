@@ -2903,21 +2903,23 @@ function renderCalendarLists(acks, yr, mo){
     // Google Cal pending events (booking requests not yet turned into receipts)
     calPending.forEach(function(ev){
       var name = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
-      // Try to extract client name from title format: "Service — Client (₱300 DP)"
       var nameMatch = name.match(/—\s*(.+?)\s*\(/);
       var clientName = nameMatch ? nameMatch[1].trim() : name;
       var svcMatch   = name.match(/^(.+?)\s*—/);
       var service    = svcMatch ? svcMatch[1].trim() : '';
       var date = String(ev.start||'').slice(0,10);
-      var evId = encodeURIComponent(ev.id||'');
+      var evId = ev.id||'';
+      // Extract email from event description
+      var emailMatch = (ev.description||'').match(/Email:\s*(\S+@\S+)/i);
+      var evEmail = emailMatch ? emailMatch[1].trim() : '';
       pendHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);background:rgba(255,243,205,0.2);">'+
         '<div style="width:8px;height:8px;border-radius:50%;background:#ffc107;flex-shrink:0;"></div>'+
         '<div style="flex:1;">'+
           '<div style="font-weight:600;font-size:13px;">'+escHtml(clientName)+'</div>'+
-          '<div style="font-size:11px;color:var(--muted);">📅 '+date+' · '+escHtml(service||'Booking request')+' · From booking form</div>'+
+          '<div style="font-size:11px;color:var(--muted);">📅 '+date+' · '+escHtml(service||'Booking request')+(evEmail?' · ✉ '+escHtml(evEmail):'')+' · From booking form</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
-          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" onclick="openNewAckFromCalEvent(this)">+ Create Receipt</button>'+
+          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">+ Create Receipt</button>'+
         '</div>'+
       '</div>';
     });
@@ -2984,18 +2986,25 @@ function calPrintAck(btn)  { var id=btn.dataset.aid; printAck(id); }
 function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal(); }
 
 function openNewAckFromCalEvent(btn){
-  // Pre-fill new receipt modal from a Google Calendar booking event
-  var name = decodeURIComponent(btn.dataset.name||'');
-  var date = btn.dataset.date||'';
-  var svc  = decodeURIComponent(btn.dataset.svc||'');
-  openNewAck();
+  var name  = decodeURIComponent(btn.dataset.name||'');
+  var date  = btn.dataset.date||'';
+  var svc   = decodeURIComponent(btn.dataset.svc||'');
+  var email = decodeURIComponent(btn.dataset.email||'');
+  var evId  = decodeURIComponent(btn.dataset.evid||'');
+
+  // Open the ack modal in "confirm booking" mode
+  openNewAck(true);
   setTimeout(function(){
-    var fbEl  = document.getElementById('ma-fb');
-    var dateEl= document.getElementById('ma-date');
-    var svcEl = document.getElementById('ma-svc');
-    if(fbEl)   fbEl.value   = name;
-    if(dateEl) dateEl.value = date;
-    if(svcEl)  svcEl.value  = svc;
+    var fbEl    = document.getElementById('ma-fb');
+    var dateEl  = document.getElementById('ma-date');
+    var svcEl   = document.getElementById('ma-svc');
+    var emailEl = document.getElementById('ma-email');
+    var evidEl  = document.getElementById('ma-evid');
+    if(fbEl)    fbEl.value    = name;
+    if(dateEl)  dateEl.value  = date;
+    if(svcEl)   svcEl.value   = svc;
+    if(emailEl) emailEl.value = email;
+    if(evidEl)  evidEl.value  = evId;
   }, 150);
 }
 
@@ -4083,21 +4092,26 @@ function renderReg(){
 // ================================================================
 //  ACKNOWLEDGEMENT
 // ================================================================
-function openNewAck(){
+function openNewAck(isConfirmMode){
   var today = todayStr();
+  var btnLabel = isConfirmMode ? '✓ Confirm & Send Email' : '💾 Save Receipt';
+  var btnClass = isConfirmMode ? 'btn btn-teal' : 'btn btn-gold';
   var html =
-    '<h3 style="margin-bottom:16px;">New Acknowledgement Receipt</h3>'+
+    '<h3 style="margin-bottom:16px;">'+(isConfirmMode?'Confirm Booking & Create Receipt':'New Acknowledgement Receipt')+'</h3>'+
+    (isConfirmMode?'<div style="background:rgba(81,137,125,0.06);border:1px solid rgba(81,137,125,0.15);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--teal);"><strong>📧 Confirmation email with Terms & Conditions</strong> will be sent to the client after saving.</div>':'')+
+    '<input type="hidden" id="ma-evid" value="">'+
+    '<input type="hidden" id="ma-confirm-mode" value="'+(isConfirmMode?'1':'0')+'">'+
     '<div class="field mb12">'+
       '<label>FB Name *</label>'+
       '<input type="text" id="ma-fb" class="sinput" placeholder="Client Facebook name" autocomplete="off" list="client-names-list" style="width:100%;">'+
     '</div>'+
     '<div class="field mb12">'+
-      '<label>Email <span style="font-size:10px;color:var(--muted);">(optional)</span></label>'+
+      '<label>Email '+(isConfirmMode?'*':'<span style="font-size:10px;color:var(--muted);">(for confirmation email)</span>')+'</label>'+
       '<input type="email" id="ma-email" class="sinput" placeholder="client@email.com" style="width:100%;">'+
     '</div>'+
     '<div class="frow c2" style="gap:10px;margin-bottom:12px;">'+
-      '<div class="field" style="margin:0;"><label>Service</label>'+
-      '<input type="text" id="ma-svc" class="sinput" placeholder="e.g. Styleshots S" style="width:100%;"></div>'+
+      '<div class="field" style="margin:0;"><label>Service / Package</label>'+
+      '<input type="text" id="ma-svc" class="sinput" placeholder="e.g. Self Shoot Solo" style="width:100%;"></div>'+
       '<div class="field" style="margin:0;"><label>Booking Date</label>'+
       '<input type="date" id="ma-date" class="sinput" value="'+today+'" style="width:100%;"></div>'+
     '</div>'+
@@ -4115,10 +4129,9 @@ function openNewAck(){
     '</div>'+
     '<div class="fe">'+
       '<button class="btn btn-outline" id="ack-cancel-btn">Cancel</button>'+
-      '<button class="btn btn-gold" id="ack-save-btn">💾 Save Receipt</button>'+
+      '<button class="'+btnClass+'" id="ack-save-btn">'+btnLabel+'</button>'+
     '</div>';
   openModal(html);
-  // Wire buttons via addEventListener — avoids Safari onclick issues
   setTimeout(function(){
     var cancelBtn = document.getElementById('ack-cancel-btn');
     var saveBtn   = document.getElementById('ack-save-btn');
@@ -4157,9 +4170,67 @@ async function saveAck(){
   var mop     = document.getElementById('ma-mop')?.value||'GCash';
   var dp      = parseFloat(document.getElementById('ma-dp')?.value)||0;
   var total   = parseFloat(document.getElementById('ma-total')?.value)||0;
+  var evId    = (document.getElementById('ma-evid')?.value||'').trim();
+  var isConfirm = document.getElementById('ma-confirm-mode')?.value === '1';
 
   if(!fbName){ notify('FB Name is required','error'); return; }
+  if(isConfirm && !email){ notify('Email is required to send confirmation','error'); return; }
 
+  var saveBtn = document.getElementById('ack-save-btn');
+  if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = 'Processing…'; }
+
+  if(isConfirm && evId && hasUrl()){
+    // Use confirmBooking on server — updates calendar, creates ack, sends email with T&C
+    try{
+      var result = await gasCall('confirmBooking', {
+        eventId: evId,
+        fbName: fbName,
+        email: email,
+        service: service,
+        mop: mop,
+        downpayment: dp,
+        bookDate: bookDate
+      });
+      if(result.ok){
+        // Add the ack receipt to local DB
+        var ack = result.ack || {
+          id: result.ackId||uid(), date: todayStr(), fbName: fbName, email: email,
+          service: service, bookDate: bookDate, mop: mop,
+          downpayment: dp, totalPrice: total, ackNum: result.ackNum||'', status: 'Confirmed'
+        };
+        ack.status = 'Confirmed';
+        if(!DB.acknowledgements) DB.acknowledgements = [];
+        DB.acknowledgements.push(ack);
+
+        // Add client if new
+        if(!DB.clients) DB.clients = [];
+        if(!DB.clients.find(function(c){ return (c.fbName||'').toLowerCase()===fbName.toLowerCase(); })){
+          var cl = {id:uid(), fbName:fbName, email:email, type:'booked', added:todayStr()};
+          DB.clients.push(cl);
+        }
+
+        saveLocal();
+        notify('✓ Booking confirmed! Email with T&C sent to '+email,'success');
+        closeModal();
+        renderAcks();
+        if(document.getElementById('page-calendar')?.classList.contains('active')) renderCalendar();
+        logActivity('Booking Confirmed & Email Sent', (result.ackNum||'')+' — '+fbName+' → '+email, 'success');
+      } else {
+        notify('Server error: '+(result.error||'Unknown'),'error');
+        if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent='✓ Confirm & Send Email'; }
+      }
+    }catch(e){
+      notify('Network error: '+e.message+'. Saving locally…','error');
+      // Fall through to local save
+      saveAckLocal(fbName, email, service, bookDate, mop, dp, total);
+    }
+  } else {
+    // Regular save (no email)
+    saveAckLocal(fbName, email, service, bookDate, mop, dp, total);
+  }
+}
+
+function saveAckLocal(fbName, email, service, bookDate, mop, dp, total){
   var ackNum = genARNum(service);
   var ack = {
     id: uid(), date: todayStr(), fbName: fbName, email: email,
@@ -4171,7 +4242,7 @@ async function saveAck(){
   DB.acknowledgements.push(ack);
 
   if(!DB.clients) DB.clients = [];
-  if(!DB.clients.find(function(c){ return c.fbName===fbName; })){
+  if(!DB.clients.find(function(c){ return (c.fbName||'').toLowerCase()===fbName.toLowerCase(); })){
     var cl = {id:uid(), fbName:fbName, email:email, type:'booked', added:todayStr()};
     DB.clients.push(cl);
     push('saveClient', cl);
@@ -4181,7 +4252,6 @@ async function saveAck(){
   notify('Receipt saved: '+ackNum,'success');
   closeModal();
   renderAcks();
-  // Refresh calendar so the new receipt replaces the Google Cal pending entry
   if(document.getElementById('page-calendar')?.classList.contains('active')) renderCalendar();
   logActivity('Acknowledgement Receipt Created', ackNum+' — '+fbName+(service?' ('+service+')':''), 'success');
   push('saveAcknowledgement', ack);
