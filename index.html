@@ -2909,17 +2909,31 @@ function renderCalendarLists(acks, yr, mo){
       var service    = svcMatch ? svcMatch[1].trim() : '';
       var date = String(ev.start||'').slice(0,10);
       var evId = ev.id||'';
-      // Extract email from event description
+      // Extract email and time from event description
       var emailMatch = (ev.description||'').match(/Email:\s*(\S+@\S+)/i);
       var evEmail = emailMatch ? emailMatch[1].trim() : '';
+      var timeMatch  = (ev.description||'').match(/Time:\s*(.+)/i);
+      var evTime  = timeMatch ? timeMatch[1].trim() : '';
+      // Fallback: extract time from ISO start
+      if(!evTime && ev.start){
+        try{
+          var d = new Date(ev.start);
+          var h = d.getHours(); var m = d.getMinutes();
+          var ap = h>=12?'PM':'AM'; h = h%12; if(h===0)h=12;
+          evTime = h+':'+String(m).padStart(2,'0')+' '+ap;
+        }catch(e){}
+      }
       pendHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);background:rgba(255,243,205,0.2);">'+
         '<div style="width:8px;height:8px;border-radius:50%;background:#ffc107;flex-shrink:0;"></div>'+
         '<div style="flex:1;">'+
           '<div style="font-weight:600;font-size:13px;">'+escHtml(clientName)+'</div>'+
-          '<div style="font-size:11px;color:var(--muted);">📅 '+date+' · '+escHtml(service||'Booking request')+(evEmail?' · ✉ '+escHtml(evEmail):'')+' · From booking form</div>'+
+          '<div style="font-size:11px;color:var(--muted);">'+
+            '📅 '+date+(evTime?' · 🕐 '+escHtml(evTime):'')+' · '+escHtml(service||'Booking request')+
+            (evEmail?' · ✉ '+escHtml(evEmail):'')+
+          '</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
-          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">+ Create Receipt</button>'+
+          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">+ Create Receipt</button>'+
         '</div>'+
       '</div>';
     });
@@ -2991,8 +3005,8 @@ function openNewAckFromCalEvent(btn){
   var svc   = decodeURIComponent(btn.dataset.svc||'');
   var email = decodeURIComponent(btn.dataset.email||'');
   var evId  = decodeURIComponent(btn.dataset.evid||'');
+  var time  = decodeURIComponent(btn.dataset.time||'');
 
-  // Open the ack modal in "confirm booking" mode
   openNewAck(true);
   setTimeout(function(){
     var fbEl    = document.getElementById('ma-fb');
@@ -3000,11 +3014,13 @@ function openNewAckFromCalEvent(btn){
     var svcEl   = document.getElementById('ma-svc');
     var emailEl = document.getElementById('ma-email');
     var evidEl  = document.getElementById('ma-evid');
+    var timeEl  = document.getElementById('ma-time');
     if(fbEl)    fbEl.value    = name;
     if(dateEl)  dateEl.value  = date;
     if(svcEl)   svcEl.value   = svc;
     if(emailEl) emailEl.value = email;
     if(evidEl)  evidEl.value  = evId;
+    if(timeEl)  timeEl.value  = time;
   }, 150);
 }
 
@@ -4101,6 +4117,7 @@ function openNewAck(isConfirmMode){
     (isConfirmMode?'<div style="background:rgba(81,137,125,0.06);border:1px solid rgba(81,137,125,0.15);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--teal);"><strong>📧 Confirmation email with Terms & Conditions</strong> will be sent to the client after saving.</div>':'')+
     '<input type="hidden" id="ma-evid" value="">'+
     '<input type="hidden" id="ma-confirm-mode" value="'+(isConfirmMode?'1':'0')+'">'+
+    '<input type="hidden" id="ma-time" value="">'+
     '<div class="field mb12">'+
       '<label>FB Name *</label>'+
       '<input type="text" id="ma-fb" class="sinput" placeholder="Client Facebook name" autocomplete="off" list="client-names-list" style="width:100%;">'+
@@ -4189,7 +4206,8 @@ async function saveAck(){
         service: service,
         mop: mop,
         downpayment: dp,
-        bookDate: bookDate
+        bookDate: bookDate,
+        timeSlot: (document.getElementById('ma-time')?.value||'').trim()
       });
       if(result.ok){
         // Add the ack receipt to local DB
