@@ -2014,6 +2014,7 @@ tr:hover td { background:var(--light); }
 
 <!-- MODAL -->
 <div id="modal-ov" onclick="closeMOv(event)"><div id="modal-box"><div id="modal-cnt"></div></div></div>
+<datalist id="client-names-list"></datalist>
 
 <!-- KIOSK ALERT -->
 <div id="kiosk-alert">
@@ -4523,11 +4524,11 @@ function renderInvoicePage(){
   if(!tabsEl || !gridEl) return;
 
   var categories = [
-    {key:'ss', label:'Styleshots'},
-    {key:'ph', label:'Photo Packages'},
-    {key:'ot', label:'Other Services'},
-    {key:'as', label:'Add-ons (Soft)'},
-    {key:'ap', label:'Add-ons (Print)'}
+    {key:'ss', label:'Self Shoot'},
+    {key:'ph', label:'Photographer'},
+    {key:'ot', label:'Promo & Other Services'},
+    {key:'as', label:'Add-ons Self Shoot'},
+    {key:'ap', label:'Add-ons Photographer'}
   ];
 
   var tabHtml = '';
@@ -7976,6 +7977,7 @@ function dismissBookingAlert(){
 
 loadLocal();
 populateLoginStaff();
+updateClientDatalist();
 // If no staff in DB, default to admin tab so you can log in and add staff
 if(!DB.staff || !DB.staff.length) {
   setLoginMode('admin');
