@@ -4479,12 +4479,36 @@ function resetSvcDefaults(){
 
 function renderInvoicePage(){
   SVC = loadSVC();
+
+  // Build service category tabs
+  var tabsEl = document.getElementById('svc-tabs');
+  var gridEl = document.getElementById('svc-grid');
+  if(!tabsEl || !gridEl) return;
+
+  var categories = [
+    {key:'ss', label:'Styleshots'},
+    {key:'ph', label:'Photo Packages'},
+    {key:'ot', label:'Other Services'},
+    {key:'as', label:'Add-ons (Soft)'},
+    {key:'ap', label:'Add-ons (Print)'}
+  ];
+
+  var tabHtml = '';
+  var gridHtml = '';
+  categories.forEach(function(cat, idx){
+    tabHtml += '<button class="stab'+(idx===0?' active':'')+'" id="stab-'+cat.key+'" onclick="showSvcTab(\''+cat.key+'\')">'+cat.label+'</button>';
+    gridHtml += '<div class="stab-panel" id="stab-panel-'+cat.key+'" style="'+(idx===0?'':'display:none;')+'"><div id="sg-'+cat.key+'"></div></div>';
+  });
+  tabsEl.innerHTML = tabHtml;
+  gridEl.innerHTML = gridHtml;
+
+  // Now render each service grid
   renderSvcGrid('sg-ss',SVC.ss,false); renderSvcGrid('sg-ph',SVC.ph,false);
   renderSvcGrid('sg-ot',SVC.ot,false); renderSvcGrid('sg-as',SVC.as,true);
   renderSvcGrid('sg-ap',SVC.ap,true);
-  showSvcTab('ss');
+
   populateInvClient();
-  const si=document.getElementById('inv-staff'); if(si) si.value=CURR_USER;
+  var si=document.getElementById('inv-staff'); if(si) si.value=CURR_USER;
   recalc();
 }
 function showSvcTab(key){
@@ -4511,11 +4535,11 @@ function addItem(name,price,isAddon){
   if(ex) ex.qty++; else INV.push({name,price,qty:1,isAddon}); recalc();
 }
 function addCustom(){
-  const name=document.getElementById('ao-name').value.trim();
-  const price=parseFloat(document.getElementById('ao-price').value)||0;
+  var name=(document.getElementById('custom-name')?.value||'').trim();
+  var price=parseFloat(document.getElementById('custom-price')?.value)||0;
   if(!name){ notify('Enter description','error'); return; }
   addItem(name,price,true);
-  document.getElementById('ao-name').value=''; document.getElementById('ao-price').value='';
+  document.getElementById('custom-name').value=''; document.getElementById('custom-price').value='';
 }
 function rmItem(idx){ INV.splice(idx,1); recalc(); }
 function chgQty(idx,d){ INV[idx].qty+=d; if(INV[idx].qty<=0) INV.splice(idx,1); recalc(); }
