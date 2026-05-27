@@ -3142,13 +3142,15 @@ function renderDashboard(){
     <div class="stat"><div class="sl">Downpayments</div><div class="sv">₱${fmt(tDP)}</div></div>`;
   const el=document.getElementById('dash-txns');
   if(!txns.length){ el.innerHTML='<div class="tm">No transactions today.</div>'; }
-  else { el.innerHTML=`<table><thead><tr><th>Invoice</th><th>Client</th><th>Staff</th><th>Total</th><th>MOP</th><th></th></tr></thead><tbody>
-    ${txns.slice().reverse().map(t=>`<tr>
-      <td><span class="badge b-gold">${t.invoiceNum}</span></td><td>${t.clientName}</td>
-      <td>${t.staff}</td><td>₱${fmt(+t.total)}</td><td>${t.balanceMOP||'—'}</td>
-      <td><button class="btn btn-sm btn-outline" onclick="printInvoice('${t.id}')">Print</button></td>
-    </tr>`).join('')}
-  </tbody></table>`; }
+  else {
+    var rows='';
+    txns.slice().reverse().forEach(function(t){
+      rows+='<tr><td><span class="badge b-gold">'+escHtml(t.invoiceNum)+'</span></td><td>'+escHtml(t.clientName)+'</td>'+
+        '<td>'+escHtml(t.staff||'')+'</td><td>&#8369;'+fmt(+t.total)+'</td><td>'+(t.balanceMOP||'—')+'</td>'+
+        '<td><button class="btn btn-sm btn-outline" data-tid="'+t.id+'" onclick="printInvoice(this.dataset.tid)">Print</button></td></tr>';
+    });
+    el.innerHTML='<table><thead><tr><th>Invoice</th><th>Client</th><th>Staff</th><th>Total</th><th>MOP</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
   // Task alerts
   updateDashTaskAlert();
   // Init known gift IDs
@@ -3935,7 +3937,7 @@ function setArr(t){
 }
 function populateBookedSel(){
   const sel=document.getElementById('reg-bk-sel');
-  sel.innerHTML='<option value="">— choose —</option>'+DB.acknowledgements.map(a=>`<option value="${a.id}">${a.fbName}</option>`).join('');
+  sel.innerHTML='<option value="">— choose —</option>'+DB.acknowledgements.map(function(a){return '<option value="'+a.id+'">'+a.fbName+'</option>';}).join('');
 }
 function prefillBooked(id){
   const a=DB.acknowledgements.find(x=>x.id===id);
@@ -4025,20 +4027,17 @@ function renderReg(){
   const regs=DB.registrations.filter(r=>dateOnly(r.date) === todayStr());
   const el=document.getElementById('reg-list');
   if(!regs.length){ el.innerHTML='<div class="tm">No registrations yet today.</div>'; return; }
-  el.innerHTML=`<table><thead><tr><th>Time</th><th>FB Name</th><th>Email</th><th>Type</th><th>📸 SM Consent</th></tr></thead><tbody>
-    ${regs.map(r=>`<tr>
-      <td style="white-space:nowrap;font-family:'DM Mono',monospace;font-size:12px;">${fmtTimePHT(r.time)}</td>
-      <td>${r.fbName}</td>
-      <td>${r.email||'—'}</td>
-      <td><span class="badge ${r.arrType==='booked'?'b-gold':'b-teal'}">${r.arrType}</span></td>
-      <td>${r.socialConsent==='yes'
-        ? '<span class="badge" style="background:rgba(61,140,110,0.12);color:var(--success);">✅ Allowed</span>'
-        : r.socialConsent==='no'
-          ? '<span class="badge" style="background:rgba(192,84,74,0.1);color:var(--danger);">🚫 Private</span>'
-          : '<span style="color:var(--muted);font-size:11px;">—</span>'
-      }</td>
-    </tr>`).join('')}
-  </tbody></table>`;
+  var regRows='';
+  regs.forEach(function(r){
+    var sm = r.socialConsent==='yes' ? '<span class="badge" style="background:rgba(61,140,110,0.12);color:var(--success);">✅ Allowed</span>'
+      : r.socialConsent==='no' ? '<span class="badge" style="background:rgba(192,84,74,0.1);color:var(--danger);">🚫 Private</span>'
+      : '<span style="color:var(--muted);font-size:11px;">—</span>';
+    regRows+='<tr><td style="white-space:nowrap;font-family:monospace;font-size:12px;">'+fmtTimePHT(r.time)+'</td>'+
+      '<td>'+escHtml(r.fbName)+'</td><td>'+(r.email||'—')+'</td>'+
+      '<td><span class="badge '+(r.arrType==='booked'?'b-gold':'b-teal')+'">'+r.arrType+'</span></td>'+
+      '<td>'+sm+'</td></tr>';
+  });
+  el.innerHTML='<table><thead><tr><th>Time</th><th>FB Name</th><th>Email</th><th>Type</th><th>📸 SM Consent</th></tr></thead><tbody>'+regRows+'</tbody></table>';
 }
 
 // ================================================================
@@ -4593,14 +4592,18 @@ function recalc(){
   const lEl=document.getElementById('inv-lines'), tEl=document.getElementById('inv-totals');
   if(!lEl) return;
   if(!INV.length){ lEl.innerHTML='<div class="tm">No services added yet.</div>'; tEl.innerHTML=''; return; }
-  lEl.innerHTML=INV.map((item,idx)=>`<div class="il">
-    <span style="font-weight:500;">${item.name} <span class="tm">x${item.qty}</span>${item.isAddon?` <span class="badge b-teal" style="font-size:9px;">add-on</span>`:''}</span>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <div class="qty-ctrl"><button onclick="chgQty(${idx},-1)">-</button><span>${item.qty}</span><button onclick="chgQty(${idx},1)">+</button></div>
-      <span style="min-width:58px;text-align:right;font-weight:500;">₱${fmt(item.price*item.qty)}</span>
-      <button class="rb" onclick="rmItem(${idx})">✕</button>
-    </div>
-  </div>`).join('');
+  var itemHtml='';
+  INV.forEach(function(item,idx){
+    itemHtml+='<div class="il">'+
+      '<span style="font-weight:500;">'+escHtml(item.name)+' <span class="tm">x'+item.qty+'</span>'+(item.isAddon?' <span class="badge b-gold" style="font-size:9px;">Add-on</span>':'')+'</span>'+
+      '<div style="display:flex;align-items:center;gap:8px;">'+
+        '<div class="qty-ctrl"><button onclick="chgQty('+idx+',-1)">-</button><span>'+item.qty+'</span><button onclick="chgQty('+idx+',1)">+</button></div>'+
+        '<span style="min-width:58px;text-align:right;font-weight:500;">&#8369;'+fmt(item.price*item.qty)+'</span>'+
+        '<button class="btn btn-sm btn-outline" style="padding:2px 6px;color:var(--danger);" onclick="rmItem('+idx+')">✕</button>'+
+      '</div>'+
+    '</div>';
+  });
+  lEl.innerHTML=itemHtml;
   const svcs=INV.filter(i=>!i.isAddon), adds=INV.filter(i=>i.isAddon);
   const svcsT=svcs.reduce((s,i)=>s+i.price*i.qty,0), addsT=adds.reduce((s,i)=>s+i.price*i.qty,0), sub=svcsT+addsT;
   let disc=0;
@@ -4854,14 +4857,14 @@ function printInvoice(id){
   <div class="section-title">Services</div>
   <table class="items-table">
     <thead><tr><th>Service</th><th>Qty</th><th style="text-align:right;">Amount</th></tr></thead>
-    <tbody>${svcsOnly.map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td class="amount">₱${fmt(i.price*i.qty)}</td></tr>`).join('')}</tbody>
+    <tbody>${svcsOnly.map(function(i){return '<tr><td>'+i.name+'</td><td>'+i.qty+'</td><td class="amount">&#8369;'+fmt(i.price*i.qty)+'</td></tr>';}).join('')}</tbody>
   </table>`:''}
 
   ${addsOnly.length?`
   <div class="section-title">Add-ons</div>
   <table class="items-table">
     <thead><tr><th>Add-on</th><th>Qty</th><th style="text-align:right;">Amount</th></tr></thead>
-    <tbody>${addsOnly.map(i=>`<tr><td>${i.name}</td><td>${i.qty}</td><td class="amount">₱${fmt(i.price*i.qty)}</td></tr>`).join('')}</tbody>
+    <tbody>${addsOnly.map(function(i){return '<tr><td>'+i.name+'</td><td>'+i.qty+'</td><td class="amount">&#8369;'+fmt(i.price*i.qty)+'</td></tr>';}).join('')}</tbody>
   </table>`:''}
 
   <div class="totals-box">
@@ -7274,7 +7277,7 @@ function generateMonthlyReport(){
       <div class="ct">Payment Breakdown</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
         ${[['Cash',totalCash],['GCash',totalGcash],['BPI',totalBPI],['Maya',totalMaya],['Mixed',totalMixed]]
-          .map(([lbl,val])=>`<div class="il"><span class="tm">${lbl}</span><span style="font-weight:500;">₱${fmt(val)}</span></div>`).join('')}
+          .map(function(pair){return '<div class="il"><span class="tm">'+pair[0]+'</span><span style="font-weight:500;">&#8369;'+fmt(pair[1])+'</span></div>';}).join('')}
       </div>
     </div>
 
@@ -7286,13 +7289,13 @@ function generateMonthlyReport(){
           <th>Invoice #</th><th>Date</th><th>Client Name</th><th>Services Purchased</th><th style="text-align:right;">Total Amount Paid</th>
         </tr></thead>
         <tbody>
-          ${txnRows.map(r=>`<tr>
-            <td><span class="badge b-gold">${r.invoiceNum}</span></td>
-            <td style="white-space:nowrap;">${new Date(String(r.date).slice(0,10)+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric',timeZone:'Asia/Manila'})}</td>
-            <td style="font-weight:500;">${r.name}</td>
-            <td style="font-size:11px;color:var(--muted);">${r.services||'—'}</td>
-            <td style="text-align:right;font-weight:600;">₱${fmt(+r.total)}</td>
-          </tr>`).join('')}
+          '+txnRows.map(function(r){return '<tr>'+
+            '<td><span class="badge b-gold">'+r.invoiceNum+'</span></td>'+
+            '<td style="white-space:nowrap;">'+new Date(String(r.date).slice(0,10)+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})+'</td>'+
+            '<td style="font-weight:500;">'+r.name+'</td>'+
+            '<td style="font-size:11px;color:var(--muted);">'+(r.services||'—')+'</td>'+
+            '<td style="text-align:right;font-weight:600;">&#8369;'+fmt(+r.total)+'</td>'+
+            '<td style="font-size:11px;">'+(r.mop||'—')+'</td></tr>';}).join('')+'
           <tr style="background:var(--light);font-weight:700;border-top:2px solid var(--light2);">
             <td colspan="4">TOTAL (${txnRows.length} transactions)</td>
             <td style="text-align:right;">₱${fmt(totalSales)}</td>
@@ -7356,13 +7359,11 @@ function generateMonthlyReport(){
           <th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th>Mode</th><th>Notes</th>
         </tr></thead>
         <tbody>
-          ${allExpenses.map(e=>`<tr>
-            <td style="white-space:nowrap;">${new Date(String(e.date).slice(0,10)+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'})}</td>
-            <td style="font-weight:500;">${e.desc}</td>
-            <td style="text-align:right;color:var(--danger);font-weight:600;">₱${fmt(+e.amt)}</td>
-            <td><span class="badge b-teal">${e.mop}</span></td>
-            <td style="font-size:11px;color:var(--muted);">${e.notes||'—'}</td>
-          </tr>`).join('')}
+          '+allExpenses.map(function(e){return '<tr>'+
+            '<td style="white-space:nowrap;">'+new Date(String(e.date).slice(0,10)+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})+'</td>'+
+            '<td style="font-weight:500;">'+(e.desc||'')+'</td>'+
+            '<td style="text-align:right;color:var(--danger);font-weight:600;">&#8369;'+fmt(+e.amt)+'</td>'+
+            '<td><span class="badge b-teal">'+(e.mop||'Cash')+'</span></td></tr>';}).join('')+'
           <tr style="background:var(--light);font-weight:700;border-top:2px solid var(--light2);">
             <td colspan="2">TOTAL EXPENSES</td>
             <td style="text-align:right;color:var(--danger);">₱${fmt(totalExpenses)}</td>
@@ -7459,21 +7460,13 @@ function printReport(){
   const fmtP = n => '₱' + (+(n||0)).toLocaleString('en-PH',{minimumFractionDigits:2});
   const fmtD = d => { try{ return new Date(String(d).slice(0,10)+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return d;} };
 
-  const salesRows = txns.map(r=>`<tr>
-    <td>${r.invoiceNum||'—'}</td>
-    <td>${fmtD(r.date)}</td>
-    <td>${r.name}</td>
-    <td>${r.services||'—'}</td>
-    <td class="ra">${fmtP(r.total)}</td>
-  </tr>`).join('');
+  var salesRows=''; txns.forEach(function(r){
+    salesRows+='<tr><td>'+(r.invoiceNum||'—')+'</td><td>'+fmtD(r.date)+'</td><td>'+r.name+'</td><td>'+(r.services||'—')+'</td><td class="ra">'+fmtP(r.total)+'</td><td class="ca">'+(r.mop||'—')+'</td></tr>';
+  });
 
-  const expRows = expenses.map(e=>`<tr>
-    <td>${fmtD(e.date)}</td>
-    <td>${e.desc}</td>
-    <td class="ra">${fmtP(e.amt)}</td>
-    <td class="ca">${e.mop}</td>
-    <td>${e.notes||'—'}</td>
-  </tr>`).join('');
+  var expRows=''; expenses.forEach(function(e){
+    expRows+='<tr><td>'+fmtD(e.date)+'</td><td>'+e.desc+'</td><td class="ra">'+fmtP(e.amt)+'</td><td class="ca">'+(e.mop||'Cash')+'</td></tr>';
+  });
 
   const printHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>${studioName} — ${label} Report</title>
@@ -7542,13 +7535,7 @@ function printReport(){
   <table>
     <thead><tr><th>Date</th><th>Type</th><th class="ra">Amount</th><th>Reference</th><th>Notes</th></tr></thead>
     <tbody>
-      ${fundTransfers.map(f=>`<tr>
-        <td>${fmtD(f.date)}</td>
-        <td>${f.type}</td>
-        <td class="ra">${fmtP(f.amt)}</td>
-        <td>${f.ref||'—'}</td>
-        <td>${f.notes||'—'}</td>
-      </tr>`).join('')}
+      '+fundTransfers.map(function(f){return '<tr><td>'+fmtD(f.date)+'</td><td>'+f.type+'</td><td class="ra">'+fmtP(f.amt)+'</td><td>'+(f.ref||'—')+'</td><td>'+(f.notes||'—')+'</td></tr>';}).join('')+'
       <tr class="totrow">
         <td colspan="2">TOTAL REFUNDS</td>
         <td class="ra">${fmtP(fundTransfers.reduce((s,f)=>s+(+f.amt||0),0))}</td>
