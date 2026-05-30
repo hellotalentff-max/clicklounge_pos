@@ -1044,6 +1044,27 @@ tr:hover td { background:var(--light); }
           <select id="reg-report-month" class="sinput" style="flex:1;" onchange="renderRegReport()"></select>
           <button class="btn btn-sm btn-outline" onclick="printRegReport()">🖨</button>
         </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+          <div style="text-align:center;background:var(--light);border-radius:8px;padding:8px;">
+            <div style="font-size:18px;font-weight:700;color:var(--slate);" id="rr-total">0</div>
+            <div style="font-size:10px;color:var(--muted);">Total</div>
+          </div>
+          <div style="text-align:center;background:var(--light);border-radius:8px;padding:8px;">
+            <div style="font-size:18px;font-weight:700;color:var(--teal);" id="rr-walkin">0</div>
+            <div style="font-size:10px;color:var(--muted);">Walk-in</div>
+          </div>
+          <div style="text-align:center;background:var(--light);border-radius:8px;padding:8px;">
+            <div style="font-size:18px;font-weight:700;color:var(--gold);" id="rr-booked">0</div>
+            <div style="font-size:10px;color:var(--muted);">Booked</div>
+          </div>
+          <div style="text-align:center;background:var(--light);border-radius:8px;padding:8px;">
+            <div style="font-size:14px;font-weight:700;color:var(--slate);" id="rr-consent">—</div>
+            <div style="font-size:10px;color:var(--muted);">SM Consent</div>
+          </div>
+        </div>
+        <div id="reg-report-packages"></div>
+        <div id="reg-report-heatmap"></div>
+        <div id="reg-report-table"></div>
         <div id="reg-report"></div>
       </div>
     </div>
@@ -3746,15 +3767,22 @@ function renderRegReport(){
   const consYes = regs.filter(r=>r.socialConsent==='yes').length;
   const consNo  = regs.filter(r=>r.socialConsent==='no').length;
 
-  document.getElementById('rr-total').textContent   = total;
-  document.getElementById('rr-walkin').textContent  = walkins;
-  document.getElementById('rr-booked').textContent  = booked;
-  document.getElementById('rr-consent').textContent = consYes+'✅ / '+consNo+'🚫';
+  var rrTotal   = document.getElementById('rr-total');
+  var rrWalkin  = document.getElementById('rr-walkin');
+  var rrBooked  = document.getElementById('rr-booked');
+  var rrConsent = document.getElementById('rr-consent');
+  if(rrTotal)   rrTotal.textContent   = total;
+  if(rrWalkin)  rrWalkin.textContent  = walkins;
+  if(rrBooked)  rrBooked.textContent  = booked;
+  if(rrConsent) rrConsent.textContent = consYes+'✅ / '+consNo+'🚫';
 
   if(!total){
-    document.getElementById('reg-report-packages').innerHTML = '<div class="tm">No registrations this month.</div>';
-    document.getElementById('reg-report-heatmap').innerHTML  = '';
-    document.getElementById('reg-report-table').innerHTML    = '';
+    var pkgEl = document.getElementById('reg-report-packages');
+    var hmEl  = document.getElementById('reg-report-heatmap');
+    var tblEl = document.getElementById('reg-report-table');
+    if(pkgEl) pkgEl.innerHTML = '<div class="tm">No registrations this month.</div>';
+    if(hmEl)  hmEl.innerHTML  = '';
+    if(tblEl) tblEl.innerHTML = '';
     return;
   }
 
