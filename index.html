@@ -6901,7 +6901,20 @@ function generateAllReports(){
   const {prefixes, label} = getRepPrefixes();
   if(!prefixes.length){ notify('Select a valid period','error'); return; }
 
-  // ── Shared data ──
+  // Auto-sync first to get latest data from Sheets
+  if(hasUrl()){
+    notify('Syncing latest data…','info');
+    syncAll().then(function(){
+      _buildReports(prefixes, label);
+    }).catch(function(){
+      _buildReports(prefixes, label);
+    });
+  } else {
+    _buildReports(prefixes, label);
+  }
+}
+
+function _buildReports(prefixes, label){
   const txns = (DB.transactions||[]).filter(t=>{
     const d=String(dateOnly(t.date));
     return prefixes.some(p=>d.startsWith(p)) && !String(t.invoiceNum||'').startsWith('[VOID]');
@@ -7302,6 +7315,15 @@ function printPkgReport(){
 }
 
 function generateMonthlyReport(){
+  // Auto-sync first
+  if(hasUrl()){
+    notify('Syncing latest data…','info');
+    syncAll().then(function(){ _generateMonthlyReport(); }).catch(function(){ _generateMonthlyReport(); });
+  } else {
+    _generateMonthlyReport();
+  }
+}
+function _generateMonthlyReport(){
   const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
   let label, prefixes, studioName;
 
