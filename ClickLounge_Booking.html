@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ClickLounge Studio — Book a Session</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --teal:#51897d;--teal-dk:#3d6b61;--teal-lt:#7aada3;
+  --gold:#d79068;--gold-lt:#e8b08a;
+  --slate:#2f4f4f;--light:#f4f7f6;--light2:#e8efee;
+  --white:#fff;--text:#1e3333;--muted:#6b8c8c;
+  --border:rgba(81,137,125,0.2);--danger:#c0544a;--success:#3d8c6e;
+}
+html,body{min-height:100%;background:var(--light);}
+body{font-family:'Poppins',sans-serif;color:var(--text);}
+
+.hero{background:var(--slate);padding:32px 20px 28px;text-align:center;position:relative;overflow:hidden;}
+.hero::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:24px;background:var(--light);clip-path:ellipse(55% 100% at 50% 100%);}
+.hero-logo{width:58px;height:58px;border-radius:50%;background:rgba(215,144,104,0.15);border:1.5px solid rgba(215,144,104,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:22px;}
+.hero h1{font-size:17px;font-weight:700;color:var(--gold);letter-spacing:2px;text-transform:uppercase;}
+.hero-sub{font-size:11px;color:var(--teal-lt);letter-spacing:3px;text-transform:uppercase;font-weight:300;margin-top:3px;}
+.hero-tagline{font-size:13px;color:rgba(232,239,238,0.65);margin-top:10px;font-weight:300;line-height:1.5;}
+
+.page-body{max-width:520px;margin:0 auto;padding:28px 16px 40px;}
+
+.steps{display:flex;align-items:flex-start;margin-bottom:28px;}
+.scol{display:flex;flex-direction:column;align-items:center;}
+.sdot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;transition:all 0.3s;}
+.sdot.done{background:var(--teal);color:#fff;}
+.sdot.active{background:var(--gold);color:#fff;box-shadow:0 0 0 3px rgba(215,144,104,0.2);}
+.sdot.pending{background:var(--light2);color:var(--muted);}
+.slbl{font-size:9px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px;text-align:center;white-space:nowrap;}
+.sline{flex:1;height:1.5px;background:var(--light2);margin-top:14px;transition:background 0.3s;}
+.sline.done{background:var(--teal);}
+
+.screen{display:none;}
+.screen.active{display:block;}
+
+.card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(47,79,79,0.06);}
+.card-title{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--teal);margin-bottom:14px;font-weight:600;}
+
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;font-weight:500;}
+.field input{width:100%;background:var(--light);border:1.5px solid var(--light2);color:var(--text);border-radius:8px;padding:13px 14px;font-size:14px;font-family:'Poppins',sans-serif;transition:border-color 0.15s;}
+.field input:focus{outline:none;border-color:var(--teal);background:var(--white);}
+.field input.err{border-color:var(--danger);}
+.err-msg{font-size:11px;color:var(--danger);margin-top:5px;display:none;}
+.err-msg.show{display:block;}
+
+/* Package link button */
+.pkg-link{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:var(--slate);color:var(--gold-lt);border:none;border-radius:9px;font-size:13px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;text-decoration:none;transition:background 0.15s;margin-bottom:14px;}
+.pkg-link:hover{background:var(--teal-dk);}
+.pkg-link-note{font-size:11px;color:var(--muted);text-align:center;line-height:1.6;margin-bottom:4px;}
+
+.pkg-card{background:var(--light);border:1.5px solid var(--light2);border-radius:10px;padding:14px;cursor:pointer;transition:all 0.15s;position:relative;}
+.pkg-card:hover{border-color:var(--teal);background:var(--white);transform:translateY(-1px);box-shadow:0 3px 12px rgba(47,79,79,0.08);}
+.pkg-card:active{transform:scale(0.98);}
+.pkg-card.gold{border-color:rgba(215,144,104,0.15);} .pkg-card.gold:hover{border-color:var(--gold);}
+.pkg-card.grad{border-color:rgba(91,99,217,0.15);} .pkg-card.grad:hover{border-color:#5b63d9;}
+.pkg-name{font-size:13px;font-weight:600;color:var(--slate);margin-bottom:3px;}
+.pkg-desc{font-size:10px;color:var(--muted);margin-bottom:8px;}
+.pkg-book{font-size:10px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:0.5px;}
+.pkg-card.gold .pkg-book{color:var(--gold);}
+.pkg-card.grad .pkg-book{color:#5b63d9;}
+
+/* Slots */
+.slot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:8px;}
+.slot-btn{border:1.5px solid var(--light2);border-radius:8px;padding:11px 6px;cursor:pointer;transition:all 0.15s;background:var(--light);font-family:'Poppins',sans-serif;font-size:12px;font-weight:500;color:var(--text);text-align:center;line-height:1.4;}
+.slot-btn:hover:not(:disabled){border-color:var(--teal-lt);}
+.slot-btn.sel{border-color:var(--teal);background:rgba(81,137,125,0.08);color:var(--teal-dk);font-weight:600;}
+.slot-btn.taken{background:var(--light2);color:var(--muted);cursor:not-allowed;border-color:var(--light2);opacity:0.55;}
+.slot-loading{font-size:12px;color:var(--muted);padding:16px 0;text-align:center;}
+.spinner-sm{display:inline-block;width:14px;height:14px;border:2px solid var(--light2);border-top-color:var(--teal);border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Summary */
+.sum-row{display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--light2);font-size:13px;gap:12px;}
+.sum-row:last-child{border-bottom:none;}
+.sum-row .sl{color:var(--muted);font-size:11px;min-width:70px;}
+.sum-row .sv{font-weight:500;text-align:right;}
+
+/* Buttons */
+.btn-main{width:100%;padding:14px;background:var(--teal);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;transition:background 0.15s;}
+.btn-main:hover{background:var(--teal-dk);}
+.btn-main:disabled{background:var(--light2);color:var(--muted);cursor:not-allowed;}
+.btn-main.gold{background:var(--gold);}
+.btn-main.gold:hover{background:var(--gold-lt);}
+.btn-back{background:none;border:1.5px solid var(--border);color:var(--muted);border-radius:10px;padding:12px 20px;font-size:13px;font-family:'Poppins',sans-serif;cursor:pointer;transition:all 0.15s;}
+.btn-back:hover{border-color:var(--teal-lt);color:var(--teal);}
+.brow{display:flex;gap:10px;align-items:center;}
+.brow .btn-main{flex:1;}
+
+/* Payment box */
+.pay-box{background:var(--white);border:1.5px solid rgba(215,144,104,0.3);border-radius:12px;padding:18px;margin-bottom:14px;}
+.pay-title{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);font-weight:700;margin-bottom:12px;}
+.pay-amount{font-size:22px;font-weight:700;color:var(--slate);margin-bottom:14px;text-align:center;padding:10px;background:var(--light);border-radius:8px;}
+.pay-amount span{font-size:13px;font-weight:400;color:var(--muted);display:block;margin-bottom:2px;}
+.pay-method{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--light2);}
+.pay-method:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+.pay-icon{width:38px;height:38px;border-radius:10px;background:var(--light);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.pay-name{font-size:12px;font-weight:700;color:var(--slate);margin-bottom:2px;}
+.pay-detail{font-size:13px;font-weight:600;color:var(--text);}
+.pay-sub{font-size:11px;color:var(--muted);}
+
+.alert-box{background:rgba(192,84,74,0.07);border:1.5px solid rgba(192,84,74,0.2);border-radius:10px;padding:13px 16px;margin-bottom:14px;font-size:12px;line-height:1.7;color:var(--text);}
+.alert-box strong{color:var(--danger);}
+
+.instruction-box{background:rgba(81,137,125,0.07);border:1px solid rgba(81,137,125,0.2);border-radius:10px;padding:16px;margin-bottom:14px;}
+.step-item{display:flex;gap:10px;margin-bottom:10px;font-size:12px;line-height:1.6;}
+.step-item:last-child{margin-bottom:0;}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--teal);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+
+.success-ring{width:72px;height:72px;border-radius:50%;background:rgba(61,140,110,0.1);border:2px solid rgba(61,140,110,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px;}
+.success-title{font-size:20px;font-weight:700;color:var(--slate);text-align:center;margin-bottom:8px;}
+.success-sub{font-size:13px;color:var(--muted);text-align:center;line-height:1.7;margin-bottom:14px;}
+.ref-box{background:rgba(81,137,125,0.08);border:1px solid rgba(81,137,125,0.2);border-radius:9px;padding:12px 16px;text-align:center;margin:0 0 16px;}
+.ref-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px;}
+.ref-code{font-size:20px;font-weight:700;color:var(--teal-dk);letter-spacing:3px;}
+
+.page-footer{text-align:center;font-size:10px;color:var(--muted);padding:16px;border-top:1px solid var(--light2);margin-top:8px;}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-logo">📷</div>
+  <h1>ClickLounge</h1>
+  <div class="hero-sub">Studio</div>
+  <div class="hero-tagline">Book your session online.<br>Capture moments that last forever.</div>
+</div>
+
+<div id="url-banner" style="display:none;background:#fff3cd;border-bottom:2px solid #ffc107;padding:10px 16px;text-align:center;font-size:12px;color:#856404;font-family:'Poppins',sans-serif;">
+  ⚠ Booking system not configured. <a href="#" onclick="promptGasUrl()" style="color:#856404;font-weight:600;">Set up connection →</a>
+</div>
+<div class="page-body">
+
+  <div class="steps" id="steps-bar">
+    <div class="scol"><div class="sdot active" id="sd1">1</div><div class="slbl">Package</div></div>
+    <div class="sline" id="sl1"></div>
+    <div class="scol"><div class="sdot pending" id="sd2">2</div><div class="slbl">Schedule</div></div>
+    <div class="sline" id="sl2"></div>
+    <div class="scol"><div class="sdot pending" id="sd3">3</div><div class="slbl">Your Info</div></div>
+    <div class="sline" id="sl3"></div>
+    <div class="scol"><div class="sdot pending" id="sd4">4</div><div class="slbl">Confirm</div></div>
+    <div class="sline" id="sl4"></div>
+    <div class="scol"><div class="sdot pending" id="sd5">✓</div><div class="slbl">Done</div></div>
+  </div>
+
+  <!-- SCREEN 1: Package -->
+  <div class="screen active" id="sc1">
+    <div class="card">
+      <div class="card-title">Choose Your Package</div>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6;">Select a package below to get started. For full details and pricing, <a href="https://clubcreo.my.canva.site/packages" target="_blank" style="color:var(--teal);font-weight:600;">view our menu →</a></p>
+
+      <!-- Self Shoot Packages -->
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--teal);font-weight:600;margin-bottom:10px;">📸 Self Shoot — Basic</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;">
+        <div class="pkg-card" onclick="selectPkg('Snapshot Selfie','1-2 pax • 20 min • ₱500')">
+          <div class="pkg-name">Snapshot Selfie</div>
+          <div class="pkg-desc">1-2 pax • 20 min • ₱500</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card" onclick="selectPkg('Tribe Time','1-4 pax • 20 min • ₱800')">
+          <div class="pkg-name">Tribe Time</div>
+          <div class="pkg-desc">1-4 pax • 20 min • ₱800</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card" onclick="selectPkg('Crowd Cam','1-6 pax • 20 min • ₱1,000')">
+          <div class="pkg-name">Crew Captures</div>
+          <div class="pkg-desc">1-6 pax • 20 min • ₱1,000</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card" onclick="selectPkg('Crew Captures','1-10 pax • 20 min • ₱1,200')">
+          <div class="pkg-name">Crowd Cam</div>
+          <div class="pkg-desc">1-10 pax • 20 min • ₱1,200</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+      </div>
+
+      <!-- Photographer Packages -->
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--gold);font-weight:600;margin-bottom:10px;">🎬 Photographer Sessions</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;">
+        <div class="pkg-card gold" onclick="selectPkg('Styleshots','Solo portrait • from ₱1,500')">
+          <div class="pkg-name">Styleshots</div>
+          <div class="pkg-desc">Solo portrait • from ₱1,500</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card gold" onclick="selectPkg('Family Portraits','Up to 20 pax • from ₱1,700')">
+          <div class="pkg-name">Family Portraits</div>
+          <div class="pkg-desc">Up to 20 pax • from ₱1,700</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card gold" onclick="selectPkg('Radiant Mama','Maternity • from ₱2,000')">
+          <div class="pkg-name">Radiant Mama</div>
+          <div class="pkg-desc">Maternity • from ₱2,000</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card gold" onclick="selectPkg('Candid Kids','Kids 1-10yo • from ₱1,500')">
+          <div class="pkg-name">Candid Kids</div>
+          <div class="pkg-desc">Kids 1-10yo • from ₱1,500</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+      </div>
+
+      <!-- Graduation Packages -->
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#5b63d9;font-weight:600;margin-bottom:10px;">🎓 Graduation</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;">
+        <div class="pkg-card grad" onclick="selectPkg('Cap \& Gown','Toga shots • ₱700')">
+          <div class="pkg-name">Cap & Gown</div>
+          <div class="pkg-desc">Toga shots • ₱700</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card grad" onclick="selectPkg('Grad-U-Click','Grad + family • ₱1,500')">
+          <div class="pkg-name">Grad-U-Click</div>
+          <div class="pkg-desc">Grad + family • ₱1,500</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card grad" onclick="selectPkg('VIP Grad Glam','All-in + HMU • ₱3,000')">
+          <div class="pkg-name">VIP Grad Glam</div>
+          <div class="pkg-desc">All-in + HMU • ₱3,000</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+        <div class="pkg-card grad" onclick="selectPkg('PAWtraits','Pets + family • from ₱1,500')">
+          <div class="pkg-name">PAWtraits</div>
+          <div class="pkg-desc">Pets + family • from ₱1,500</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+      </div>
+
+      <!-- Other / Custom -->
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:600;margin-bottom:10px;">📋 Other Package</div>
+      <div class="field" style="margin-bottom:0;">
+        <input type="text" id="bk-pkg" placeholder="Type your package name here..." autocomplete="off">
+        <div class="err-msg" id="err-pkg">Please select or enter a package name.</div>
+      </div>
+      <button class="btn-main" style="margin-top:12px;" onclick="validatePkg()">Continue with Custom Package →</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: Schedule -->
+  <div class="screen" id="sc2">
+    <div id="pkg-confirm-banner"></div>
+    <div class="card">
+      <div class="card-title">Pick a Date & Time</div>
+      <div class="field">
+        <label for="bk-date">Date (Monday – Saturday only)</label>
+        <input type="date" id="bk-date" onchange="loadSlots()" min="">
+        <div class="err-msg" id="err-date">Please select a valid date (Mon–Sat).</div>
+      </div>
+      <div id="slots-wrap" style="display:none;">
+        <label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:500;display:block;margin-bottom:8px;">Available Time Slots</label>
+        <div id="slot-grid" class="slot-grid"></div>
+        <div id="err-slot" class="err-msg">Please select a time slot.</div>
+      </div>
+      <div id="slots-loading" style="display:none;" class="slot-loading"><span class="spinner-sm"></span>Checking live availability…</div>
+      <div id="slots-note" style="display:none;font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6;"></div>
+    </div>
+    <div class="brow">
+      <button class="btn-back" onclick="goSc(1)">← Back</button>
+      <button class="btn-main" onclick="validateSchedule()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: Your Info -->
+  <div class="screen" id="sc3">
+    <div class="card">
+      <div class="card-title">Your Information</div>
+      <div class="field">
+        <label for="bk-fb">Facebook Name *</label>
+        <input type="text" id="bk-fb" placeholder="Your Facebook display name" autocomplete="off">
+        <div class="err-msg" id="err-fb">Please enter your Facebook name.</div>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label for="bk-email">Email Address *</label>
+        <input type="email" id="bk-email" placeholder="email@example.com" autocomplete="off">
+        <div class="err-msg" id="err-email">Please enter a valid email address.</div>
+      </div>
+    </div>
+    <div class="brow">
+      <button class="btn-back" onclick="goSc(2)">← Back</button>
+      <button class="btn-main" onclick="validateInfo()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: Confirm -->
+  <div class="screen" id="sc4">
+    <div class="card">
+      <div class="card-title">Review Your Booking</div>
+      <div class="sum-row"><span class="sl">Package</span><span class="sv" id="sm-pkg">—</span></div>
+      <div class="sum-row"><span class="sl">Date</span><span class="sv" id="sm-date">—</span></div>
+      <div class="sum-row"><span class="sl">Time</span><span class="sv" id="sm-time">—</span></div>
+      <div class="sum-row"><span class="sl">Name</span><span class="sv" id="sm-name">—</span></div>
+      <div class="sum-row"><span class="sl">Email</span><span class="sv" id="sm-email">—</span></div>
+    </div>
+
+    <div style="background:rgba(81,137,125,0.1);border:1.5px solid rgba(81,137,125,0.4);border-radius:12px;padding:14px 16px;margin-bottom:16px;text-align:center;">
+      <div style="font-size:15px;margin-bottom:4px;">👇</div>
+      <div style="font-size:13px;font-weight:600;color:#2f4f4f;line-height:1.6;">Please review your booking details above, then click <strong style="color:#d79068;">Confirm Booking</strong> below to submit your request.</div>
+    </div>
+
+    <div class="pay-box">
+      <div class="pay-title">Downpayment Required to Reserve</div>
+      <div class="pay-amount"><span>Send exactly</span>₱300.00</div>
+      <div class="pay-method">
+        <div class="pay-icon">💚</div>
+        <div>
+          <div class="pay-name">GCash</div>
+          <div class="pay-detail">0919 662 8224</div>
+          <div class="pay-sub">Ma*****e M.</div>
+        </div>
+      </div>
+      <div class="pay-method">
+        <div class="pay-icon">🏦</div>
+        <div>
+          <div class="pay-name">BPI</div>
+          <div class="pay-detail">2829140848</div>
+        </div>
+      </div>
+      <div class="pay-method">
+        <div class="pay-icon">💵</div>
+        <div>
+          <div class="pay-name">Cash</div>
+          <div class="pay-detail">Pay in person at the studio</div>
+          <div class="pay-sub">Bring exact amount on session day</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-box">
+      ⚠ <strong>Your slot is held for 4 hours only.</strong> Non-payment within 4 hours will automatically release this slot to other clients. Send your proof of payment via Facebook Messenger immediately after paying.
+    </div>
+
+    <!-- Terms & Conditions -->
+    <div style="background:#fff;border:1.5px solid rgba(47,79,79,0.08);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="font-size:20px;">📋</span>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#2f4f4f;">Studio Terms & Conditions</div>
+          <div style="font-size:11px;color:rgba(47,79,79,0.5);">Please read before submitting your booking</div>
+        </div>
+      </div>
+      <a href="Terms_and_conditions.pdf" target="_blank" style="display:block;text-align:center;background:rgba(47,79,79,0.05);border:1.5px solid rgba(47,79,79,0.12);border-radius:8px;padding:12px;text-decoration:none;color:#2f4f4f;font-size:13px;font-weight:600;margin-bottom:14px;transition:all 0.15s;" onmouseover="this.style.background='rgba(81,137,125,0.1)';this.style.borderColor='rgba(81,137,125,0.3)'" onmouseout="this.style.background='rgba(47,79,79,0.05)';this.style.borderColor='rgba(47,79,79,0.12)'">
+        📄 View Terms & Conditions
+      </a>
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;background:rgba(215,144,104,0.04);border:1.5px solid rgba(215,144,104,0.12);border-radius:8px;" id="tc-label">
+        <input type="checkbox" id="tc-agree" onchange="onTCChange()" style="accent-color:#d79068;width:18px;height:18px;margin-top:2px;flex-shrink:0;">
+        <span style="font-size:12px;color:#2f4f4f;line-height:1.6;">I have read and agree to the <strong>Studio Terms & Conditions</strong>, including booking policies, cancellation rules, studio conduct, photo delivery, and copyright usage.</span>
+      </label>
+      <div id="tc-err" style="display:none;font-size:11px;color:#c0544a;margin-top:6px;padding-left:28px;">Please read and agree to the Terms & Conditions to continue.</div>
+    </div>
+
+    <div id="submit-err" class="err-msg" style="margin-bottom:12px;"></div>
+    <div class="brow">
+      <button class="btn-back" onclick="goSc(3)">← Back</button>
+      <button class="btn-main gold" id="btn-confirm" onclick="submitBooking()" disabled style="opacity:0.5;">Submit Booking Request</button>
+    </div>
+  </div>
+
+  <!-- SCREEN 5: Success -->
+  <div class="screen" id="sc5">
+    <div class="card" style="text-align:center;padding:28px 20px;">
+      <div class="success-ring">🎉</div>
+      <div class="success-title">Booking Received!</div>
+      <div class="success-sub">Thank you, <strong id="done-name"></strong>! Your session for <strong id="done-pkg"></strong> on <strong id="done-date"></strong> at <strong id="done-time"></strong> is tentatively reserved.</div>
+      <div class="ref-box">
+        <div class="ref-lbl">Booking Reference</div>
+        <div class="ref-code" id="done-ref">—</div>
+      </div>
+    </div>
+
+    <div class="instruction-box">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--teal);font-weight:700;margin-bottom:12px;">Next Steps — Complete Within 4 Hours</div>
+      <div class="step-item"><div class="step-num">1</div><div><strong>Screenshot this page</strong> as your booking reference.</div></div>
+      <div class="step-item"><div class="step-num">2</div><div>Send <strong>₱300 downpayment</strong> via GCash, BPI, or Cash.</div></div>
+      <div class="step-item"><div class="step-num">3</div><div><strong>Screenshot your payment receipt.</strong></div></div>
+      <div class="step-item"><div class="step-num">4</div><div>Message us on <strong>Facebook</strong> and send both screenshots — this booking page and your payment proof.</div></div>
+      <div class="step-item"><div class="step-num">5</div><div>We will send your <strong>Acknowledgement Receipt</strong> via Messenger once confirmed.</div></div>
+    </div>
+
+    <div class="pay-box">
+      <div class="pay-title">Send ₱300 Downpayment To</div>
+      <div class="pay-method">
+        <div class="pay-icon">💚</div>
+        <div><div class="pay-name">GCash</div><div class="pay-detail">0919 662 8224</div><div class="pay-sub">Ma*****e M.</div></div>
+      </div>
+      <div class="pay-method">
+        <div class="pay-icon">🏦</div>
+        <div><div class="pay-name">BPI</div><div class="pay-detail">2829140848</div></div>
+      </div>
+      <div class="pay-method">
+        <div class="pay-icon">💵</div>
+        <div><div class="pay-name">Cash</div><div class="pay-detail">Pay in person at the studio</div><div class="pay-sub">Tell us via Messenger if paying cash</div></div>
+      </div>
+    </div>
+
+    <div class="alert-box">
+      ⚠ <strong>Reminder:</strong> Non-payment within <strong>4 hours</strong> will release this slot. Your booking is only confirmed once we receive your payment proof via Facebook Messenger.
+    </div>
+
+    <a href="https://www.facebook.com/clickloungestudio" target="_blank" style="display:block;margin-bottom:10px;">
+      <button class="btn-main" style="background:var(--slate);">📘 Message Us on Facebook</button>
+    </a>
+    <button class="btn-back" style="width:100%;text-align:center;" onclick="resetForm()">← Book Another Session</button>
+  </div>
+
+</div>
+<div class="page-footer">ClickLounge Studio · All rights reserved</div>
+
+<script>
+// ================================================================
+//  IMPORTANT: PASTE YOUR APPS SCRIPT URL BETWEEN THE QUOTES BELOW
+//  This makes the booking form work for ALL clients on any device.
+//  Get this URL from: Apps Script → Deploy → Manage Deployments
+// ================================================================
+var HARDCODED_URL = 'https://script.google.com/macros/s/AKfycbx_Y5nH34Rq16JJ2AxBDr30ttmDFuic61OqoC0u3Wq0zogHEhfoV6qE7uiNagI43flVgw/exec';
+
+// Falls back to localStorage if set via ?gasurl= param
+var GAS_URL = HARDCODED_URL || localStorage.getItem('cl_booking_url') || '';
+(function(){
+  var u = new URLSearchParams(window.location.search).get('gasurl');
+  if (u) {
+    localStorage.setItem('cl_booking_url', u);
+    if (!HARDCODED_URL) location.replace(location.pathname);
+  }
+})();
+
+// 45-minute slots Mon-Sat 10AM-5:30PM
+var ALL_SLOTS = [
+  '10:00 AM','10:45 AM','11:30 AM','12:15 PM',
+  '1:00 PM','1:45 PM','2:30 PM','3:15 PM',
+  '4:00 PM','4:45 PM','5:30 PM'
+];
+
+var selDate = '', selSlot = '', takenSlots = [];
+
+// JSONP call — works on Safari/iPad, no CORS issues
+function gasCall(action, payload) {
+  return new Promise(function(resolve, reject) {
+    if (!GAS_URL) { reject(new Error('No server URL configured')); return; }
+    var cb  = '_gcb_' + Math.random().toString(36).slice(2);
+    var b64 = btoa(unescape(encodeURIComponent(JSON.stringify({action: action, payload: payload || {}}))));
+    var url = GAS_URL + '?d=' + encodeURIComponent(b64) + '&callback=' + cb;
+    var timer = setTimeout(function(){ cleanup(); reject(new Error('Request timed out')); }, 30000);
+    window[cb] = function(data) {
+      cleanup();
+      if (data && data.error) reject(new Error(data.error));
+      else resolve(data);
+    };
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      var el = document.getElementById(cb);
+      if (el) el.remove();
+    }
+    var s = document.createElement('script');
+    s.id  = cb;
+    s.src = url;
+    s.onerror = function() { cleanup(); reject(new Error('Network error — check connection')); };
+    document.head.appendChild(s);
+  });
+}
+
+// ── All date logic uses Philippine Standard Time (UTC+8) ──
+function nowPH() {
+  // Returns current time as a Date adjusted to PH time
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+}
+
+function todayStrPHBooking() {
+  // Returns today's date string YYYY-MM-DD in PH time
+  var ph = nowPH();
+  var y  = ph.getFullYear();
+  var m  = String(ph.getMonth()+1).padStart(2,'0');
+  var d  = String(ph.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + d;
+}
+
+function tomorrowStrPH() {
+  var ph = nowPH();
+  ph.setDate(ph.getDate() + 1);
+  var y  = ph.getFullYear();
+  var m  = String(ph.getMonth()+1).padStart(2,'0');
+  var d  = String(ph.getDate()).padStart(2,'0');
+  return y + '-' + m + '-' + d;
+}
+
+function setMinDate() {
+  var d = document.getElementById('bk-date');
+  d.min = tomorrowStrPH(); // tomorrow in PH time
+}
+
+function isSunday(dateStr) {
+  // Use Manila timezone to determine day of week
+  var day = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-PH', { weekday:'short', timeZone:'Asia/Manila' });
+  return day === 'Sun';
+}
+
+// Load available slots from calendar
+function loadSlots() {
+  var dateVal = document.getElementById('bk-date').value;
+  document.getElementById('err-date').classList.remove('show');
+  selSlot = '';
+
+  if (!dateVal) return;
+
+  if (isSunday(dateVal)) {
+    document.getElementById('err-date').textContent = 'Sorry, we are closed on Sundays. Please choose Monday to Saturday.';
+    document.getElementById('err-date').classList.add('show');
+    document.getElementById('bk-date').value = '';
+    document.getElementById('slots-wrap').style.display = 'none';
+    return;
+  }
+
+  selDate = dateVal;
+  document.getElementById('slots-wrap').style.display = 'none';
+  document.getElementById('slots-loading').style.display = '';
+  document.getElementById('slots-note').style.display = 'none';
+
+  gasCall('getBookedSlots', { date: dateVal })
+    .then(function(res) {
+      takenSlots = Array.isArray(res.takenSlots) ? res.takenSlots : [];
+      document.getElementById('slots-loading').style.display = 'none';
+      renderSlots();
+    })
+    .catch(function() {
+      takenSlots = [];
+      document.getElementById('slots-loading').style.display = 'none';
+      renderSlots();
+      document.getElementById('slots-note').style.display = '';
+      var errMsg = GAS_URL
+    ? '⚠ Could not reach the booking server. All slots shown — we will verify availability and confirm your booking.'
+    : '⚠ Booking system not connected. All time slots are shown. We will verify availability when you submit.';
+  document.getElementById('slots-note').textContent = errMsg;
+    });
+}
+
+function renderSlots() {
+  var grid = document.getElementById('slot-grid');
+  var html = '';
+  ALL_SLOTS.forEach(function(slot) {
+    var taken = takenSlots.indexOf(slot) !== -1;
+    if (taken) {
+      html += '<button class="slot-btn taken" disabled>';
+      html += '<span style="font-size:13px;font-weight:600;">' + slot + '</span>';
+      html += '<br><span style="font-size:9px;color:var(--danger);">Taken</span>';
+      html += '</button>';
+    } else {
+      html += '<button class="slot-btn" onclick="selectSlot(this, \'' + slot + '\')">';
+      html += '<span style="font-size:13px;font-weight:600;">' + slot + '</span>';
+      html += '<br><span style="font-size:9px;color:var(--muted);">Available</span>';
+      html += '</button>';
+    }
+  });
+  grid.innerHTML = html;
+  document.getElementById('err-slot').classList.remove('show');
+  document.getElementById('slots-wrap').style.display = '';
+}
+
+function selectSlot(el, slot) {
+  selSlot = slot;
+  var btns = document.querySelectorAll('.slot-btn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('sel');
+  el.classList.add('sel');
+  document.getElementById('err-slot').classList.remove('show');
+}
+
+// Navigation
+function goSc(n) {
+  var screens = document.querySelectorAll('.screen');
+  for (var i = 0; i < screens.length; i++) screens[i].classList.remove('active');
+  document.getElementById('sc' + n).classList.add('active');
+  updateSteps(n);
+  window.scrollTo(0, 0);
+}
+
+function updateSteps(cur) {
+  for (var i = 1; i <= 5; i++) {
+    var dot = document.getElementById('sd' + i);
+    dot.className = 'sdot ' + (i < cur ? 'done' : i === cur ? 'active' : 'pending');
+    dot.textContent = i === 5 ? '✓' : String(i);
+    if (i < 5) document.getElementById('sl' + i).className = 'sline' + (i < cur ? ' done' : '');
+  }
+}
+
+function selectPkg(name, desc, price){
+  if(!name) return;
+  document.getElementById('bk-pkg').value = name;
+  document.getElementById('bk-pkg').classList.remove('err');
+  var errEl = document.getElementById('err-pkg');
+  if(errEl) errEl.classList.remove('show');
+  
+  // Store price for display
+  window._selectedPkgPrice = price || '';
+  
+  // Show confirmation banner
+  var banner = document.getElementById('pkg-confirm-banner');
+  if(banner){
+    banner.innerHTML = '<div style="background:rgba(81,137,125,0.06);border:1.5px solid rgba(81,137,125,0.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;">'+
+      '<div style="font-size:11px;color:var(--teal);font-weight:600;margin-bottom:4px;">✓ Selected Package</div>'+
+      '<div style="font-size:16px;font-weight:700;color:var(--slate);">' + name + '</div>'+
+      (price ? '<div style="font-size:14px;color:var(--gold);font-weight:600;margin-top:2px;">₱' + price + '</div>' : '')+
+      (desc ? '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + desc + '</div>' : '')+
+      '<button onclick="goSc(1)" style="margin-top:8px;font-size:11px;color:var(--teal);background:none;border:none;cursor:pointer;font-family:inherit;text-decoration:underline;">← Change package</button>'+
+    '</div>';
+  }
+  goSc(2);
+}
+
+// Auto-detect ?pkg= URL parameter — show on screen 1 with confirmation first
+(function(){
+  var params = new URLSearchParams(window.location.search);
+  var pkg   = params.get('pkg');
+  var price = params.get('price') || '';
+  if(pkg){
+    var decodedPkg = decodeURIComponent(pkg);
+    // Pre-fill the package field
+    setTimeout(function(){
+      document.getElementById('bk-pkg').value = decodedPkg;
+      window._selectedPkgPrice = price;
+      
+      // Show confirmation card on screen 1 with a "Confirm & Choose Date" button
+      var banner = document.getElementById('pkg-confirm-banner');
+      if(banner){
+        banner.innerHTML =
+          '<div style="background:linear-gradient(135deg,rgba(81,137,125,0.06),rgba(215,144,104,0.06));border:2px solid rgba(81,137,125,0.2);border-radius:14px;padding:20px;margin-bottom:16px;text-align:center;">'+
+            '<div style="font-size:36px;margin-bottom:8px;">📸</div>'+
+            '<div style="font-size:11px;color:var(--teal);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Your Selected Package</div>'+
+            '<div style="font-size:20px;font-weight:700;color:var(--slate);margin-bottom:4px;">'+decodedPkg+'</div>'+
+            (price?'<div style="font-size:18px;font-weight:600;color:var(--gold);margin-bottom:12px;">₱'+price+'</div>':'')+
+            '<button onclick="selectPkg(\''+decodedPkg.replace(/'/g,"\\'")+'\',\'\',\''+price+'\')" style="background:var(--gold);color:#fff;border:none;padding:14px 36px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:0.5px;">Confirm & Choose Date →</button>'+
+            '<div style="margin-top:10px;">'+
+              '<button onclick="document.getElementById(\'pkg-confirm-banner\').innerHTML=\'\'" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;font-family:inherit;text-decoration:underline;">← Choose a different package</button>'+
+            '</div>'+
+          '</div>';
+      }
+    }, 200);
+  }
+})();
+
+// Validation
+function validatePkg() {
+  var pkg = document.getElementById('bk-pkg').value.trim();
+  if (!pkg) {
+    document.getElementById('bk-pkg').classList.add('err');
+    document.getElementById('err-pkg').classList.add('show');
+    return;
+  }
+  document.getElementById('bk-pkg').classList.remove('err');
+  document.getElementById('err-pkg').classList.remove('show');
+  goSc(2);
+}
+
+function validateSchedule() {
+  if (!selDate) {
+    document.getElementById('err-date').textContent = 'Please select a date.';
+    document.getElementById('err-date').classList.add('show');
+    return;
+  }
+  if (!selSlot) {
+    document.getElementById('err-slot').classList.add('show');
+    return;
+  }
+  goSc(3);
+}
+
+function validateInfo() {
+  var fb    = document.getElementById('bk-fb').value.trim();
+  var email = document.getElementById('bk-email').value.trim();
+  var ok    = true;
+
+  if (!fb) {
+    document.getElementById('bk-fb').classList.add('err');
+    document.getElementById('err-fb').classList.add('show');
+    ok = false;
+  } else {
+    document.getElementById('bk-fb').classList.remove('err');
+    document.getElementById('err-fb').classList.remove('show');
+  }
+
+  var emailOk = email && /^[^@]+@[^@]+\.[^@]+$/.test(email);
+  if (!emailOk) {
+    document.getElementById('bk-email').classList.add('err');
+    document.getElementById('err-email').classList.add('show');
+    ok = false;
+  } else {
+    document.getElementById('bk-email').classList.remove('err');
+    document.getElementById('err-email').classList.remove('show');
+  }
+
+  if (!ok) return;
+
+  document.getElementById('sm-pkg').textContent   = document.getElementById('bk-pkg').value.trim();
+  document.getElementById('sm-date').textContent  = new Date(selDate + 'T00:00:00').toLocaleDateString('en-PH', {weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone:'Asia/Manila'});
+  document.getElementById('sm-time').textContent  = selSlot;
+  document.getElementById('sm-name').textContent  = fb;
+  document.getElementById('sm-email').textContent = email;
+  goSc(4);
+}
+
+// Submit booking
+function onTCChange(){
+  var checked = document.getElementById('tc-agree').checked;
+  var btn = document.getElementById('btn-confirm');
+  var label = document.getElementById('tc-label');
+  var err = document.getElementById('tc-err');
+  if(btn){ btn.disabled = !checked; btn.style.opacity = checked ? '1' : '0.5'; }
+  if(label){ label.style.borderColor = checked ? 'rgba(61,140,110,0.4)' : 'rgba(215,144,104,0.12)'; label.style.background = checked ? 'rgba(61,140,110,0.04)' : 'rgba(215,144,104,0.04)'; }
+  if(err) err.style.display = 'none';
+}
+
+function submitBooking() {
+  // Check T&C agreement
+  var tcBox = document.getElementById('tc-agree');
+  if(!tcBox || !tcBox.checked){
+    var tcErr = document.getElementById('tc-err');
+    if(tcErr) tcErr.style.display = '';
+    return;
+  }
+
+  var btn   = document.getElementById('btn-confirm');
+  var errEl = document.getElementById('submit-err');
+  btn.disabled = true;
+  btn.textContent = 'Booking…';
+  errEl.style.display = 'none';
+
+  var payload = {
+    fbName:      document.getElementById('bk-fb').value.trim(),
+    email:       document.getElementById('bk-email').value.trim(),
+    package:     document.getElementById('bk-pkg').value.trim(),
+    date:        selDate,
+    timeSlot:    selSlot,
+    downpayment: 300
+  };
+
+  gasCall('createBooking', payload)
+    .then(function(res) {
+      if (res.ok) {
+        document.getElementById('done-name').textContent = payload.fbName;
+        document.getElementById('done-pkg').textContent  = payload.package;
+        document.getElementById('done-date').textContent = new Date(selDate + 'T00:00:00').toLocaleDateString('en-PH', {weekday:'long', month:'long', day:'numeric', year:'numeric', timeZone:'Asia/Manila'});
+        document.getElementById('done-time').textContent = selSlot;
+        document.getElementById('done-ref').textContent  = res.bookingId || '—';
+        goSc(5);
+      } else {
+        errEl.textContent = res.error || 'Something went wrong. Please try again.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Confirm Booking';
+      }
+    })
+    .catch(function(e) {
+      errEl.textContent = '⚠ ' + e.message + '. Please try again or contact us on Facebook.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Confirm Booking';
+    });
+}
+
+function resetForm() {
+  selDate = ''; selSlot = ''; takenSlots = [];
+  ['bk-pkg','bk-date','bk-fb','bk-email'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('slots-wrap').style.display = 'none';
+  goSc(1);
+}
+
+setMinDate();
+
+// ── Auto-test connection on load ──
+(function checkConnection(){
+  var banner = document.getElementById('url-banner');
+  if (!GAS_URL) {
+    if (banner) banner.style.display = 'block';
+    return;
+  }
+  // Silently test — if it fails the slots fallback message shows
+  gasCall('getAll', {})
+    .then(function(){ if (banner) banner.style.display = 'none'; })
+    .catch(function(){
+      // URL set but failing — show banner
+      if (banner) {
+        banner.style.display = 'block';
+        banner.innerHTML = '⚠ Cannot reach booking server. Slots may not be live. <a href="#" onclick="promptGasUrl()" style="color:#856404;font-weight:600;">Update URL →</a>';
+      }
+    });
+})();
+
+function promptGasUrl() {
+  var current = GAS_URL || '';
+  var url = window.prompt('Paste your Apps Script Web App URL:', current);
+  if (url && url.trim()) {
+    localStorage.setItem('cl_booking_url', url.trim());
+    location.reload();
+  }
+}
+</script>
+</body>
+</html>
