@@ -101,7 +101,7 @@ var POSTS = [];
 function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function todayStr(){ return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'}); }
-function getUrl(){ return localStorage.getItem('cl_announce_url') || localStorage.getItem('cl_tasks_url') || localStorage.getItem('cl_url') || ''; }
+function getUrl(){ return 'https://script.google.com/macros/s/AKfycbx_Y5nH34Rq16JJ2AxBDr30ttmDFuic61OqoC0u3Wq0zogHEhfoV6qE7uiNagI43flVgw/exec'; }
 function hasUrl(){ return !!getUrl(); }
 
 function notify(msg, type){
