@@ -69,7 +69,7 @@ button{cursor:pointer;border:none;font-family:inherit;}
 
   <!-- Toolbar -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-    <button class="btn btn-gold" onclick="openEditor(null)">+ New Post</button>
+    <button class="btn btn-gold" onclick="openEditor(null)">+ New Post</button> <button class="btn btn-sm btn-outline" onclick="testConnection()">🔌 Test Connection</button>
     <button class="btn btn-sm btn-outline" onclick="testConnection()">🔌 Test Connection</button>
     <div style="flex:1;"></div>
     <select id="filter-status" class="sinput" style="width:auto;" onchange="renderPosts()">
@@ -178,6 +178,7 @@ async function syncAll(){
   notify('Syncing…','info');
   try{
     var r = await gasCall('getAnnouncements');
+    console.log('getAnnouncements response:', JSON.stringify(r));
     if(r.ok && Array.isArray(r.data)){
       POSTS = r.data;
       savePosts();
@@ -343,6 +344,22 @@ function updateEmbed(){
 function copyEmbed(){
   var ta = document.getElementById('embed-code');
   if(ta){ ta.select(); document.execCommand('copy'); notify('Copied!','success'); }
+}
+
+async function testConnection(){
+  notify('Testing connection...','info');
+  try{
+    var r = await gasCall('getAnnouncements');
+    console.log('Test result:', JSON.stringify(r));
+    if(r.ok){
+      notify('✓ Connected! Sheet has '+((r.data||[]).length)+' announcements','success');
+    } else {
+      notify('API returned error: '+JSON.stringify(r),'error');
+    }
+  }catch(e){
+    notify('Connection failed: '+e.message,'error');
+    console.error('Test error:', e);
+  }
 }
 
 // Init
