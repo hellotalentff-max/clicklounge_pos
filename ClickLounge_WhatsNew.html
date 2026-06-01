@@ -70,6 +70,7 @@ button{cursor:pointer;border:none;font-family:inherit;}
   <!-- Toolbar -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
     <button class="btn btn-gold" onclick="openEditor(null)">+ New Post</button>
+    <button class="btn btn-sm btn-outline" onclick="testConnection()">🔌 Test Connection</button>
     <div style="flex:1;"></div>
     <select id="filter-status" class="sinput" style="width:auto;" onchange="renderPosts()">
       <option value="all">All Posts</option>
@@ -156,6 +157,20 @@ function loadPosts(){
 }
 function savePosts(){
   try{ localStorage.setItem('cl_announcements', JSON.stringify(POSTS)); }catch(e){}
+}
+
+async function testConnection(){
+  notify('Testing connection…','info');
+  try{
+    var r = await gasCall('getAnnouncements');
+    if(r.ok){
+      notify('✓ Connected! Sheet has '+((r.data||[]).length)+' announcements.','success');
+    } else {
+      notify('API responded but error: '+JSON.stringify(r),'error');
+    }
+  }catch(e){
+    notify('Connection failed: '+e.message,'error');
+  }
 }
 
 async function syncAll(){
@@ -279,9 +294,19 @@ async function savePost(existingId){
 
   savePosts();
   if(hasUrl()){
-    try{ await gasCall('saveAnnouncement', post); }catch(e){}
+    try{
+      var result = await gasCall('saveAnnouncement', post);
+      if(result && result.ok){
+        notify(existingId?'Post updated & synced ✓':'Post published & synced ✓','success');
+      } else {
+        notify('Saved locally but Sheets error: '+(result?result.error||JSON.stringify(result):'no response'),'error');
+      }
+    }catch(e){
+      notify('Saved locally but sync failed: '+e.message,'error');
+    }
+  } else {
+    notify('Saved locally (no URL configured)','error');
   }
-  notify(existingId?'Post updated ✓':'Post published ✓','success');
   closeModal();
   renderPosts();
   updateEmbed();
@@ -291,7 +316,7 @@ async function deletePost(id){
   if(!confirm('Delete this post?')) return;
   POSTS = POSTS.filter(function(x){return x.id!==id;});
   savePosts();
-  if(hasUrl()){ try{ await gasCall('deleteAnnouncement',{id:id}); }catch(e){} }
+  if(hasUrl()){ try{ await gasCall('deleteAnnouncement',{id:id}); }catch(e){ notify('Delete sync error: '+e.message,'error'); } }
   renderPosts();
   updateEmbed();
   notify('Deleted','info');
@@ -302,7 +327,7 @@ async function toggleActive(id){
   if(!p) return;
   p.active = (p.active==='yes'||p.active===true) ? 'no' : 'yes';
   savePosts();
-  if(hasUrl()){ try{ await gasCall('saveAnnouncement', p); }catch(e){} }
+  if(hasUrl()){ try{ var r=await gasCall('saveAnnouncement', p); if(!r||!r.ok) notify('Sync error','error'); }catch(e){ notify('Sync error: '+e.message,'error'); } }
   renderPosts();
   updateEmbed();
   notify(p.active==='yes'?'Published ✓':'Unpublished','success');
