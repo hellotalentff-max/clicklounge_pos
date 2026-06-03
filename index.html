@@ -8034,26 +8034,44 @@ function getLocalBlockedSlotsForDate(dateStr){
 async function pollBookings(){
   if(!hasUrl() || !CURR_USER) return;
   try{
-    const d = await gasCall('getAll');
-    // Check Bookings sheet — look for new PENDING rows
-    // We use the Acknowledgements sheet as proxy since Bookings
-    // sheet isn't in getAll — instead check calendar events
+    // PRIMARY: check Google Calendar [PENDING] events
     const res = await gasCall('getCalendarEvents',{
       year:  mnlYear(),
       month: mnlMonth()
     });
-    const events = Array.isArray(res.events) ? res.events : [];
+    const events  = Array.isArray(res.events) ? res.events : [];
     const pending = events.filter(ev => ev.status === 'pending');
-
-    // Find ones we haven't seen before
-    const newOnes = pending.filter(ev => !_knownBookingIds.has(ev.id));
-
-    // Mark all current pending as known
+    const newFromCal = pending.filter(ev => !_knownBookingIds.has(ev.id));
     pending.forEach(ev => _knownBookingIds.add(ev.id));
 
-    if(newOnes.length > 0){
-      showBookingAlert(newOnes);
-      // Refresh mini-calendar on dashboard if visible
+    // BACKUP: also check logBooking sheet in case calendar creation failed
+    let newFromLog = [];
+    try{
+      const logRes = await gasCall('getBookingLogs',{});
+      const logs   = Array.isArray(logRes.logs) ? logRes.logs : [];
+      // Only show logs from last 24 hours that aren't already in calendar
+      const cutoff = Date.now() - 24*60*60*1000;
+      newFromLog = logs.filter(function(log){
+        const id = 'log-' + (log.ref||log.id||'');
+        if(_knownBookingIds.has(id)) return false;
+        const ts = new Date(log.submittedAt||0).getTime();
+        if(ts < cutoff) return false;
+        // Check if this booking already appeared as a calendar event
+        const alreadyInCal = pending.some(function(ev){
+          return ev.title && log.fbName && ev.title.toLowerCase().includes((log.fbName||'').toLowerCase().split(' ')[0]);
+        });
+        if(!alreadyInCal){ _knownBookingIds.add(id); return true; }
+        _knownBookingIds.add(id);
+        return false;
+      });
+    }catch(e){ /* logBooking sheet not set up yet — silent */ }
+
+    const allNew = newFromCal.concat(newFromLog.map(function(log){
+      return { id:'log-'+log.ref, title:'[PENDING] '+log.package+' — '+log.fbName+' (₱300 DP)', status:'pending', _fromLog:true };
+    }));
+
+    if(allNew.length > 0){
+      showBookingAlert(allNew);
       DASH_CAL_EVENTS = events;
       renderDashMiniCal();
       renderDashPendingList();
