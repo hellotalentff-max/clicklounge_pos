@@ -2789,10 +2789,11 @@ function renderCalendar(){
   const lbl = document.getElementById('cal-month-label');
   if(lbl) lbl.textContent = MONTH_NAMES[mo] + ' ' + yr;
 
-  // Monday-first offset
-  const firstJsDay  = new Date(yr, mo, 1).getDay();
+  // Monday-first offset — Manila time (UTC+8 = 4am UTC)
+  const _phFirst    = new Date(Date.UTC(yr, mo, 1, 4, 0, 0));
+  const firstJsDay  = _phFirst.getUTCDay();
   const firstOffset = (firstJsDay === 0) ? 6 : firstJsDay - 1;
-  const daysInMo    = new Date(yr, mo+1, 0).getDate();
+  const daysInMo    = new Date(Date.UTC(yr, mo+1, 0, 4, 0, 0)).getUTCDate();
 
   const today       = todayStr();
   const restDays    = getRestDays();
