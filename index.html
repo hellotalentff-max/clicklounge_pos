@@ -1974,60 +1974,106 @@ tr:hover td { background:var(--light); }
 
 <!-- BOOKINGS CALENDAR (admin only) -->
 <div id="page-calendar" class="page">
-  <div class="ph">
-    <div><h2>Bookings Calendar</h2><p id="cal-month-label">Loading…</p></div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <button class="btn btn-outline btn-sm" onclick="calNav(-1)">← Prev</button>
-      <button class="btn btn-teal btn-sm" onclick="calNavToday()">Today</button>
-      <button class="btn btn-outline btn-sm" onclick="calNav(1)">Next →</button>
-      <button class="btn btn-danger btn-sm" onclick="openBlockDialog()">🚫 Block Date/Time</button>
+
+  <!-- ── HEADER ── -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:0;">
+      <h2 style="font-size:20px;font-weight:700;color:var(--slate);">Bookings Calendar</h2>
+      <div id="cal-month-label" style="font-size:14px;font-weight:600;color:var(--teal);margin-top:2px;"></div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <button onclick="calNav(-1)" style="background:none;border:none;padding:8px 14px;cursor:pointer;font-size:16px;color:var(--slate);font-family:inherit;">‹</button>
+        <button onclick="calNavToday()" style="background:var(--slate);border:none;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;color:var(--cream);font-family:inherit;border-left:1px solid rgba(255,255,255,.1);border-right:1px solid rgba(255,255,255,.1);">Today</button>
+        <button onclick="calNav(1)" style="background:none;border:none;padding:8px 14px;cursor:pointer;font-size:16px;color:var(--slate);font-family:inherit;">›</button>
+      </div>
+      <button onclick="renderCalendar()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:var(--muted);font-family:inherit;" title="Refresh">↻</button>
+      <button onclick="openBlockDialog()" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">🚫 Block Date</button>
     </div>
   </div>
 
-  <!-- Legend -->
-  <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="width:12px;height:12px;border-radius:3px;background:#fff3cd;border:1px solid #ffc107;display:inline-block;"></span>Pending Payment</div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="width:12px;height:12px;border-radius:3px;background:#d4edda;border:1px solid #51897d;display:inline-block;"></span>Confirmed</div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="width:12px;height:12px;border-radius:3px;background:#f8d7da;border:1px solid #c0544a;display:inline-block;"></span>Cancelled</div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="width:12px;height:12px;border-radius:3px;background:var(--light2);border:1px solid var(--border);display:inline-block;"></span>Other</div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:11px;"><span style="width:12px;height:12px;border-radius:3px;background:#e8e8e8;border:1px solid #999;display:inline-block;"></span>Blocked</div>
+  <!-- ── STATS BAR ── -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 16px;border-top:3px solid #ffc107;">
+      <div style="font-size:28px;font-weight:800;color:#856404;line-height:1;" id="cal-stat-pending">—</div>
+      <div style="font-size:10px;font-weight:700;color:#856404;text-transform:uppercase;letter-spacing:.8px;margin-top:4px;">Pending</div>
+    </div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 16px;border-top:3px solid var(--teal);">
+      <div style="font-size:28px;font-weight:800;color:var(--teal);line-height:1;" id="cal-stat-confirmed">—</div>
+      <div style="font-size:10px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.8px;margin-top:4px;">Confirmed</div>
+    </div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 16px;border-top:3px solid var(--slate);">
+      <div style="font-size:28px;font-weight:800;color:var(--slate);line-height:1;" id="cal-stat-total">—</div>
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:4px;">Total Month</div>
+    </div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;padding:14px 16px;border-top:3px solid var(--gold);">
+      <div style="font-size:28px;font-weight:800;color:var(--gold);line-height:1;" id="cal-stat-today">—</div>
+      <div style="font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.8px;margin-top:4px;">Today</div>
+    </div>
   </div>
 
-  <!-- Calendar grid -->
-  <div class="card" style="padding:0;overflow:hidden;">
-    <!-- Day headers -->
+  <!-- ── LEGEND ── -->
+  <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);"><span style="width:8px;height:8px;border-radius:50%;background:#ffc107;display:inline-block;flex-shrink:0;"></span>Pending Payment</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);"><span style="width:8px;height:8px;border-radius:50%;background:var(--teal);display:inline-block;flex-shrink:0;"></span>Confirmed</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);"><span style="width:8px;height:8px;border-radius:50%;background:var(--danger);display:inline-block;flex-shrink:0;"></span>Cancelled</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);"><span style="width:8px;height:8px;border-radius:2px;background:repeating-linear-gradient(45deg,#ccc 0,#ccc 2px,transparent 2px,transparent 6px);display:inline-block;flex-shrink:0;"></span>Blocked</span>
+  </div>
+
+  <!-- ── CALENDAR GRID ── -->
+  <div style="background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 1px 8px rgba(47,79,79,.04);margin-bottom:20px;">
     <div style="display:grid;grid-template-columns:repeat(7,1fr);background:var(--slate);">
-      <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Mon</div>
-      <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Tue</div>
-      <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Wed</div>
-      <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Thu</div>
-      <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Fri</div>
-      <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Sat</div>
-      <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:rgba(232,239,238,0.3);text-transform:uppercase;letter-spacing:1px;">Sun</div>
+      <div style="padding:12px 4px;text-align:center;font-size:10px;font-weight:700;color:rgba(245,240,232,.7);text-transform:uppercase;letter-spacing:1.5px;">Mon</div>
+      <div style="padding:12px 4px;text-align:center;font-size:10px;font-weight:700;color:rgba(245,240,232,.7);text-transform:uppercase;letter-spacing:1.5px;">Tue</div>
+      <div style="padding:12px 4px;text-align:center;font-size:10px;font-weight:700;color:rgba(245,240,232,.7);text-transform:uppercase;letter-spacing:1.5px;">Wed</div>
+      <div style="padding:12px 4px;text-align:center;font-size:10px;font-weight:700;color:rgba(245,240,232,.7);text-transform:uppercase;letter-spacing:1.5px;">Thu</div>
+      <div style="padding:12px 4px;text-align:center;font-size:10px;font-weight:700;color:rgba(245,240,232,.7);text-transform:uppercase;letter-spacing:1.5px;">Fri</div>
+      <div style="padding:12px 4px;text-align:center;font-size:10px;font-weight:700;color:rgba(245,240,232,.7);text-transform:uppercase;letter-spacing:1.5px;">Sat</div>
+      <div style="padding:12px 4px;text-align:center;font-size:10px;font-weight:700;color:rgba(245,240,232,.25);text-transform:uppercase;letter-spacing:1.5px;">Sun</div>
     </div>
-    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--light2);grid-auto-rows:90px;"></div>
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:110px;"></div>
   </div>
 
-  <!-- Pending bookings list -->
-  <div class="card" style="margin-top:16px;">
-    <div class="ct">Pending Payments — Action Required</div>
-    <div id="pending-list"><div class="tm">Loading…</div></div>
-  </div>
-
-  <!-- Confirmed bookings list -->
-  <div class="card" style="margin-top:16px;">
-    <div class="ct">Confirmed Bookings</div>
-    <div id="confirmed-list"><div class="tm">Loading…</div></div>
-  </div>
-
-  <!-- Blocked dates/times -->
-  <div class="card" style="margin-top:16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div class="ct" style="margin:0;">🚫 Blocked Dates & Times</div>
-      <button class="btn btn-sm btn-outline" onclick="openBlockDialog()">+ Add Block</button>
+  <!-- ── DAY DETAIL PANEL (hidden, slides in on day click) ── -->
+  <div id="cal-day-panel" style="display:none;background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:20px;box-shadow:0 2px 12px rgba(47,79,79,.06);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <div style="font-size:14px;font-weight:700;color:var(--slate);" id="day-panel-title"></div>
+      <button onclick="document.getElementById('cal-day-panel').style.display='none'" style="margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;">✕</button>
     </div>
-    <div id="blocked-list"><div class="tm">No blocked dates or times.</div></div>
+    <div id="day-panel-content"></div>
   </div>
+
+  <!-- ── PENDING BOOKINGS ── -->
+  <div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <div style="width:3px;height:20px;background:#ffc107;border-radius:2px;flex-shrink:0;"></div>
+      <span style="font-size:14px;font-weight:700;color:var(--slate);">Action Required</span>
+      <span id="pending-badge" style="font-size:10px;background:rgba(255,193,7,0.12);color:#856404;padding:3px 10px;border-radius:10px;font-weight:700;"></span>
+      <div style="flex:1;"></div>
+    </div>
+    <div id="pending-list"><div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">✅ No pending bookings this month.</div></div>
+  </div>
+
+  <!-- ── CONFIRMED BOOKINGS ── -->
+  <div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <div style="width:3px;height:20px;background:var(--teal);border-radius:2px;flex-shrink:0;"></div>
+      <span style="font-size:14px;font-weight:700;color:var(--slate);">Confirmed Sessions</span>
+      <span id="confirmed-badge" style="font-size:10px;background:rgba(81,137,125,0.1);color:var(--teal);padding:3px 10px;border-radius:10px;font-weight:700;"></span>
+    </div>
+    <div id="confirmed-list"><div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">No confirmed bookings this month.</div></div>
+  </div>
+
+  <!-- ── BLOCKED ── -->
+  <div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <div style="width:3px;height:20px;background:#bbb;border-radius:2px;flex-shrink:0;"></div>
+      <span style="font-size:14px;font-weight:700;color:var(--slate);">Blocked Dates & Times</span>
+      <button onclick="openBlockDialog()" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:7px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;">+ Add Block</button>
+    </div>
+    <div id="blocked-list"><div style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">No blocked dates or times.</div></div>
+  </div>
+
 </div>
 
 </div><!-- /main -->
@@ -2789,7 +2835,6 @@ function renderCalendar(){
   const lbl = document.getElementById('cal-month-label');
   if(lbl) lbl.textContent = MONTH_NAMES[mo] + ' ' + yr;
 
-  // Monday-first offset
   const firstJsDay  = new Date(yr, mo, 1).getDay();
   const firstOffset = (firstJsDay === 0) ? 6 : firstJsDay - 1;
   const daysInMo    = new Date(yr, mo+1, 0).getDate();
@@ -2799,170 +2844,237 @@ function renderCalendar(){
   const closedDates = getClosedDates().map(function(c){ return c.date||c; });
   const acks        = (DB.acknowledgements||[]);
   const blocked     = (DB.blockedDates||[]);
-  // Merge calendar events (from Google Calendar poll) + acknowledgements
   const calEvents   = (DB._calEvents||[]);
 
-  var html = '';
+  // Month stats
+  const prefix   = yr+'-'+String(mo+1).padStart(2,'0');
+  const moAcks   = acks.filter(function(a){ return String(a.bookDate||'').startsWith(prefix); });
+  const moPend   = moAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s.includes('pending'); });
+  const moConf   = moAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); });
+  const todayAcks = acks.filter(function(a){ return String(a.bookDate||'').slice(0,10)===today; });
 
+  var sp = document.getElementById('cal-stat-pending');   if(sp) sp.textContent = moPend.length;
+  var sc = document.getElementById('cal-stat-confirmed'); if(sc) sc.textContent = moConf.length;
+  var st = document.getElementById('cal-stat-total');     if(st) st.textContent = moAcks.length;
+  var sd = document.getElementById('cal-stat-today');     if(sd) sd.textContent = todayAcks.length;
+
+  var pb = document.getElementById('pending-badge');   if(pb) pb.textContent = moPend.length+' need attention';
+  var cb = document.getElementById('confirmed-badge'); if(cb) cb.textContent = moConf.length+' this month';
+
+  var html = '';
   for(var i = 0; i < firstOffset; i++){
-    html += '<div style="height:100%;background:var(--light);border:1px solid var(--light2);"></div>';
+    html += '<div style="background:var(--light);border:1px solid var(--light2);"></div>';
   }
 
-  function bookingChip(name, color, border){
-    return '<div style="font-size:9px;background:'+color+';border:1px solid '+border+
-           ';border-radius:3px;padding:1px 4px;margin-top:2px;overflow:hidden;'+
-           'text-overflow:ellipsis;white-space:nowrap;">'+escHtml(name)+'</div>';
+  function bookingChip(name, bg, dot){
+    return '<div style="display:flex;align-items:center;gap:3px;padding:2px 5px;margin-top:2px;background:'+bg+';border-radius:4px;overflow:hidden;">'+
+      '<span style="width:5px;height:5px;border-radius:50%;background:'+dot+';flex-shrink:0;display:inline-block;"></span>'+
+      '<span style="font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">'+escHtml(name.split(' ')[0])+'</span>'+
+    '</div>';
   }
 
   for(var d = 1; d <= daysInMo; d++){
     var dateStr  = yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     var isToday  = dateStr === today;
+    var isPast   = dateStr < today;
     var jsDay    = new Date(dateStr+'T00:00:00').getDay();
+    var isSun    = jsDay === 0;
     var isRest   = restDays.includes(jsDay) || closedDates.includes(dateStr);
     var isBlocked= blocked.some(function(b){ return b.date===dateStr; });
 
-    // Acknowledgements for this day
-    var dayAcks  = acks.filter(function(a){ return String(a.bookDate||'').slice(0,10) === dateStr; });
-    var pend     = dayAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s==='pending'||s.includes('pending'); });
-    var conf     = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); });
-    var canc     = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('cancel'); });
+    var dayAcks = acks.filter(function(a){ return String(a.bookDate||'').slice(0,10) === dateStr; });
+    var pend    = dayAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s.includes('pending'); });
+    var conf    = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); });
+    var canc    = dayAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('cancel'); });
 
-    // Google Calendar events for this day — exclude those already receipted
-    var dayEvents = calEvents.filter(function(ev){
-      return String(ev.start||'').slice(0,10) === dateStr;
-    });
+    var dayEvents = calEvents.filter(function(ev){ return String(ev.start||'').slice(0,10) === dateStr; });
     var evPend = dayEvents.filter(function(ev){
       if(ev.status !== 'pending') return false;
-      // Exclude if an ack receipt already exists for this date with matching name
-      var evTitle    = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
-      var nameMatch  = evTitle.match(/—\s*(.+?)\s*[\(\|]/);
-      var clientName = (nameMatch ? nameMatch[1] : evTitle).trim().toLowerCase();
-      var receipted  = dayAcks.some(function(a){
-        var ackName = String(a.fbName||'').toLowerCase();
-        return ackName.includes(clientName.split(' ')[0]) || clientName.includes(ackName.split(' ')[0]);
+      var evTitle = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+      var nm = evTitle.match(/—\s*(.+?)\s*[\(\|]/);
+      var clientName = (nm ? nm[1] : evTitle).trim().toLowerCase();
+      var receipted = dayAcks.some(function(a){
+        var an = String(a.fbName||'').toLowerCase();
+        return an.includes(clientName.split(' ')[0]) || clientName.includes(an.split(' ')[0]);
       });
       return !receipted;
     });
     var evConf = dayEvents.filter(function(ev){ return ev.status==='confirmed'; });
 
-    var bg = 'var(--white)';
-    if(isRest)    bg = 'rgba(192,84,74,0.04)';
-    if(isBlocked) bg = '#e8e8e8';
-    if(isToday)   bg = 'rgba(81,137,125,0.1)';
+    var allCount = pend.length + conf.length + evPend.length;
 
-    var allCount = dayAcks.length + dayEvents.length;
+    // Cell background
+    var bg = 'var(--white)';
+    var borderStyle = '1px solid var(--light2)';
+    if(isPast && !isToday) bg = 'var(--light)';
+    if(isRest||isSun) bg = 'rgba(192,84,74,0.03)';
+    if(isBlocked) bg = 'rgba(180,180,180,0.12)';
+    if(isToday) { bg='rgba(81,137,125,0.08)'; borderStyle='1px solid rgba(81,137,125,0.3)'; }
+
+    var dayNumStyle = 'font-size:13px;font-weight:'+(isToday?'800':'400')+';color:'+
+      (isToday?'var(--teal)':isSun?'var(--danger)':isPast?'var(--muted)':'var(--text)')+
+      ';margin-bottom:3px;';
+
+    // Count badge
+    var badge = '';
+    if(allCount > 0){
+      badge = '<span style="float:right;font-size:9px;background:'+(pend.length+evPend.length>0?'#ffc107':'var(--teal)')+';color:'+(pend.length+evPend.length>0?'#000':'#fff')+';border-radius:8px;padding:0 4px;font-weight:700;line-height:14px;">'+allCount+'</span>';
+    }
+
     var chips = '';
-    if(isBlocked) chips += '<div style="font-size:9px;color:#666;background:#ddd;border-radius:2px;padding:1px 3px;">🚫</div>';
-    // Show ack receipts
-    pend.slice(0,2).forEach(function(a){ chips += bookingChip(a.fbName,'#fff3cd','#ffc107'); });
-    conf.slice(0,2).forEach(function(a){ chips += bookingChip(a.fbName,'#d4edda','#51897d'); });
-    canc.slice(0,1).forEach(function(a){ chips += bookingChip(a.fbName,'#f8d7da','#c0544a'); });
-    // Show Google Cal events not already in acks
+    if(isBlocked) chips += '<div style="font-size:9px;color:#888;margin-top:2px;">🚫 blocked</div>';
+    pend.slice(0,2).forEach(function(a){ chips += bookingChip(a.fbName,'rgba(255,243,205,0.8)','#ffc107'); });
+    conf.slice(0,2).forEach(function(a){ chips += bookingChip(a.fbName,'rgba(212,237,218,0.8)','#51897d'); });
+    canc.slice(0,1).forEach(function(a){ chips += bookingChip(a.fbName,'rgba(248,215,218,0.8)','#c0544a'); });
     evPend.slice(0,2).forEach(function(ev){
       var name = ev.title.replace(/\[PENDING\]/g,'').replace(/\[CONFIRMED\]/g,'').trim();
-      chips += bookingChip(name,'#fff3cd','#ffc107');
+      chips += bookingChip(name,'rgba(255,243,205,0.8)','#ffc107');
     });
     evConf.slice(0,1).forEach(function(ev){
       var name = ev.title.replace(/\[PENDING\]/g,'').replace(/\[CONFIRMED\]/g,'').trim();
-      chips += bookingChip(name,'#d4edda','#51897d');
+      chips += bookingChip(name,'rgba(212,237,218,0.8)','#51897d');
     });
-    if(allCount > 4) chips += '<div style="font-size:9px;color:var(--muted);margin-top:2px;">+'+(allCount-4)+' more</div>';
+    var hiddenCount = (pend.length+conf.length+evPend.length) - 4;
+    if(hiddenCount > 0) chips += '<div style="font-size:9px;color:var(--muted);margin-top:2px;font-style:italic;">+'+hiddenCount+' more</div>';
 
-    html += '<div style="height:100%;box-sizing:border-box;background:'+bg+';border:1px solid var(--light2);'+
-            'padding:5px;cursor:pointer;overflow:hidden;" onclick="calDayClick(\''+dateStr+'\')">'+
-            '<div style="font-size:11px;font-weight:'+(isToday?'700':'500')+';color:'+
-            (isToday?'var(--teal)':isRest?'var(--danger)':'var(--text)')+';margin-bottom:3px;">'+d+'</div>'+
+    html += '<div style="box-sizing:border-box;background:'+bg+';border:'+borderStyle+';padding:6px;cursor:pointer;overflow:hidden;transition:background .1s;" '+
+            'onclick="calDayClick(\''+dateStr+'\')" '+
+            'onmouseover="if(!this.classList.contains(\'today-cell\'))this.style.background=\'rgba(81,137,125,0.05)\'" '+
+            'onmouseout="this.style.background=\''+bg+'\'">'+
+            '<div style="'+dayNumStyle+'">'+badge+d+'</div>'+
             chips+'</div>';
   }
 
   el.innerHTML = html;
   renderCalendarLists(acks, yr, mo);
 
-  // Fetch fresh Google Calendar events
   if(hasUrl()){
     gasCall('getCalendarEvents',{year:yr, month:mo}).then(function(res){
       if(res.ok && Array.isArray(res.events)){
         DB._calEvents = res.events;
-        // Re-render if still on same month
         if(CAL_YEAR===yr && CAL_MONTH===mo) renderCalendar();
       }
     }).catch(function(){});
   }
 }
 
-function renderCalendarLists(acks, yr, mo){
-  const prefix    = yr+'-'+String(mo+1).padStart(2,'0');
-  const monthAcks = acks.filter(function(a){ return String(a.bookDate||'').startsWith(prefix); });
-  const pending   = monthAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s==='pending'||s.includes('pending'); });
-  const confirmed = monthAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); });
 
-  // Google Cal pending events — exclude those already receipted (ack exists for same date + similar name)
-  const calEvents  = (DB._calEvents||[]).filter(function(ev){ return String(ev.start||'').startsWith(prefix); });
-  const calPending = calEvents.filter(function(ev){
+function renderCalendarLists(acks, yr, mo){
+  var prefix    = yr+'-'+String(mo+1).padStart(2,'0');
+  var monthAcks = acks.filter(function(a){ return String(a.bookDate||'').startsWith(prefix); });
+  var today     = todayStr();
+  var pending   = monthAcks.filter(function(a){ var s=String(a.status||'').toLowerCase(); return !s||s==='pending'||s.includes('pending'); }).sort(function(a,b){ return String(a.bookDate).localeCompare(String(b.bookDate)); });
+  var confirmed = monthAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); }).sort(function(a,b){ return String(a.bookDate).localeCompare(String(b.bookDate)); });
+  var calEvents  = (DB._calEvents||[]).filter(function(ev){ return String(ev.start||'').startsWith(prefix); });
+  var calPending = calEvents.filter(function(ev){
     var evDate = String(ev.start||'').slice(0,10);
     var evTitle = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
-    // Extract client name from "Service — Client (₱300 DP)" or use full title
-    var nameMatch   = evTitle.match(/—\s*(.+?)\s*[\(\|]/);
-    var clientName  = (nameMatch ? nameMatch[1] : evTitle).trim().toLowerCase();
-    // Skip if an ack receipt exists for this date
-    var alreadyReceipted = monthAcks.some(function(a){
-      if(String(a.bookDate||'').slice(0,10) !== evDate) return false;
-      // Match by name (partial, case-insensitive)
-      var ackName = String(a.fbName||'').toLowerCase();
-      return ackName.includes(clientName.split(' ')[0]) || clientName.includes(ackName.split(' ')[0]);
+    var nm = evTitle.match(/—\s*(.+?)\s*[\(\|]/);
+    var cn = (nm?nm[1]:evTitle).trim().toLowerCase();
+    var receipted = monthAcks.some(function(a){
+      if(String(a.bookDate||'').slice(0,10)!==evDate) return false;
+      var an=String(a.fbName||'').toLowerCase();
+      return an.includes(cn.split(' ')[0])||cn.includes(an.split(' ')[0]);
     });
-    return ev.status==='pending' && !alreadyReceipted;
+    return ev.status==='pending'&&!receipted;
   });
 
-  const pendEl = document.getElementById('pending-list');
-  const confEl = document.getElementById('confirmed-list');
+  var pendEl = document.getElementById('pending-list');
+  var confEl = document.getElementById('confirmed-list');
+  var pb     = document.getElementById('pending-badge');
+  var cb     = document.getElementById('confirmed-badge');
+  if(pb) pb.textContent = (pending.length+calPending.length)+' need attention';
+  if(cb) cb.textContent = confirmed.length+' this month';
 
+  // ── PENDING ──
   if(pendEl){
-    var pendHtml = '';
-    // Ack receipts pending
-    pending.forEach(function(a){ pendHtml += ackListRow(a,'pending'); });
-    // Google Cal pending events (booking requests not yet turned into receipts)
-    calPending.forEach(function(ev){
-      var name = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
-      var nameMatch = name.match(/—\s*(.+?)\s*\(/);
-      var clientName = nameMatch ? nameMatch[1].trim() : name;
-      var svcMatch   = name.match(/^(.+?)\s*—/);
-      var service    = svcMatch ? svcMatch[1].trim() : '';
-      var date = String(ev.start||'').slice(0,10);
-      var evId = ev.id||'';
-      // Extract email and time from event description
-      var emailMatch = (ev.description||'').match(/Email:\s*(\S+@\S+)/i);
-      var evEmail = emailMatch ? emailMatch[1].trim() : '';
-      var timeMatch  = (ev.description||'').match(/Time:\s*(.+)/i);
-      var evTime  = timeMatch ? timeMatch[1].trim() : '';
-      // Fallback: extract time from ISO start (convert to PHT)
-      if(!evTime && ev.start){
-        try{
-          var d = new Date(ev.start);
-          evTime = d.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});
-        }catch(e){}
-      }
-      pendHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);background:rgba(255,243,205,0.2);">'+
-        '<div style="width:8px;height:8px;border-radius:50%;background:#ffc107;flex-shrink:0;"></div>'+
-        '<div style="flex:1;">'+
-          '<div style="font-weight:600;font-size:13px;">'+escHtml(clientName)+'</div>'+
-          '<div style="font-size:11px;color:var(--muted);">'+
-            '📅 '+date+(evTime?' · 🕐 '+escHtml(evTime):'')+' · '+escHtml(service||'Booking request')+
-            (evEmail?' · ✉ '+escHtml(evEmail):'')+
+    var h = '';
+    pending.forEach(function(a){
+      var daysLeft = Math.ceil((new Date(String(a.bookDate).slice(0,10)+'T00:00:00')-new Date())/86400000);
+      var urg = daysLeft<=1?'color:var(--danger);font-weight:700;':daysLeft<=3?'color:var(--gold);font-weight:600;':'color:var(--muted);';
+      var dayTxt = daysLeft<0?'Past':daysLeft===0?'Today':daysLeft===1?'Tomorrow':daysLeft+' days';
+      h += '<div style="background:rgba(255,243,205,0.35);border:1.5px solid rgba(255,193,7,0.25);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'+
+        '<div style="display:flex;align-items:flex-start;gap:10px;">'+
+          '<div style="width:8px;height:8px;border-radius:50%;background:#ffc107;flex-shrink:0;margin-top:5px;"></div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">'+
+              '<span style="font-weight:700;font-size:14px;color:var(--slate);">'+escHtml(a.fbName||'')+'</span>'+
+              '<span style="font-size:10px;padding:2px 7px;background:rgba(255,193,7,0.15);color:#856404;border-radius:8px;font-weight:600;">Pending Payment</span>'+
+              (a.ackNum?'<span style="font-size:10px;color:var(--muted);">'+escHtml(a.ackNum)+'</span>':'')+
+            '</div>'+
+            '<div style="font-size:12px;color:var(--muted);line-height:1.7;">'+
+              '📦 '+escHtml(a.service||'—')+'<br>'+
+              '📅 '+escHtml(String(a.bookDate||''))+
+              (a.timeSlot?' · 🕐 '+escHtml(a.timeSlot):'')+
+              ' <span style="'+urg+'">· '+dayTxt+'</span><br>'+
+              '💰 ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+
+              (a.email?' · ✉ '+escHtml(a.email):'')+
+            '</div>'+
           '</div>'+
-        '</div>'+
-        '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
-          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">✉ Confirm & Email</button>'+
-          '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:4px 8px;" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="quickConfirmBooking(this)">⚡ Quick</button>'+
+          '<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">'+
+            '<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)" style="white-space:nowrap;">✓ Confirm</button>'+
+            '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)" style="font-size:10px;">🖨 Print</button>'+
+          '</div>'+
         '</div>'+
       '</div>';
     });
-    pendEl.innerHTML = pendHtml || '<div class="tm">No pending payments this month.</div>';
+    calPending.forEach(function(ev){
+      var name=ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+      var nm2=name.match(/—\s*(.+?)\s*\(/); var cn2=nm2?nm2[1].trim():name;
+      var svc2Match=name.match(/^(.+?)\s*—/); var svc2=svc2Match?svc2Match[1].trim():'';
+      var date2=String(ev.start||'').slice(0,10);
+      var evId2=ev.id||'';
+      var em2=(ev.description||'').match(/Email:\s*(\S+@\S+)/i);
+      var evEm2=em2?em2[1].trim():'';
+      var tm2=(ev.description||'').match(/Time:\s*(.+)/i);
+      var evTm2=tm2?tm2[1].trim():'';
+      if(!evTm2&&ev.start){try{var dd=new Date(ev.start);evTm2=dd.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});}catch(e2){}}
+      var dl2=Math.ceil((new Date(date2+'T00:00:00')-new Date())/86400000);
+      var dt2=dl2<0?'Past':dl2===0?'Today':dl2===1?'Tomorrow':dl2+' days';
+      h += '<div style="background:rgba(255,243,205,0.15);border:1.5px dashed rgba(255,193,7,0.35);border-radius:10px;padding:12px 14px;margin-bottom:10px;">'+
+        '<div style="display:flex;align-items:flex-start;gap:10px;">'+
+          '<div style="width:8px;height:8px;border-radius:50%;background:#ffc107;flex-shrink:0;margin-top:5px;"></div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">'+
+              '<span style="font-weight:700;font-size:14px;color:var(--slate);">'+escHtml(cn2)+'</span>'+
+              '<span style="font-size:10px;padding:2px 7px;background:rgba(255,193,7,0.1);color:#856404;border-radius:8px;">Booking Request</span>'+
+            '</div>'+
+            '<div style="font-size:12px;color:var(--muted);line-height:1.7;">'+
+              '📦 '+escHtml(svc2||'—')+'<br>'+
+              '📅 '+date2+(evTm2?' · 🕐 '+escHtml(evTm2):'')+' <span style="color:'+(dl2<=1?'var(--danger)':dl2<=3?'var(--gold)':'var(--muted)')+';font-weight:600;">· '+dt2+'</span>'+
+              (evEm2?'<br>✉ '+escHtml(evEm2):'')+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">'+
+            '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(cn2)+'" data-date="'+date2+'" data-svc="'+encodeURIComponent(svc2)+'" data-email="'+encodeURIComponent(evEm2)+'" data-time="'+encodeURIComponent(evTm2)+'" data-evid="'+encodeURIComponent(evId2)+'" onclick="openNewAckFromCalEvent(this)" style="font-size:10px;white-space:nowrap;">✉ Confirm & Email</button>'+
+            (evEm2?'<button class="btn btn-sm btn-outline" data-name="'+encodeURIComponent(cn2)+'" data-date="'+date2+'" data-svc="'+encodeURIComponent(svc2)+'" data-email="'+encodeURIComponent(evEm2)+'" data-time="'+encodeURIComponent(evTm2)+'" data-evid="'+encodeURIComponent(evId2)+'" onclick="quickConfirmBooking(this)" style="font-size:10px;">⚡ Quick</button>':'')+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    });
+    pendEl.innerHTML = h || '<div class="tm" style="padding:20px;">✅ No pending bookings this month.</div>';
   }
 
+  // ── CONFIRMED ──
   if(confEl){
-    const confHtml = confirmed.map(function(a){ return ackListRow(a,'confirmed'); }).join('');
-    confEl.innerHTML = confHtml || '<div class="tm">No confirmed bookings this month.</div>';
+    if(!confirmed.length){ confEl.innerHTML='<div class="tm" style="padding:20px;">No confirmed bookings this month.</div>'; }
+    else {
+      var ch = '<div style="display:grid;gap:8px;">';
+      confirmed.forEach(function(a){
+        var past = String(a.bookDate||'')<todayStr();
+        ch += '<div style="background:rgba(212,237,218,0.2);border:1px solid rgba(81,137,125,0.15);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;opacity:'+(past?'0.6':'1')+';"><div style="width:8px;height:8px;border-radius:50%;background:var(--teal);flex-shrink:0;"></div>'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="font-weight:600;font-size:13px;color:var(--slate);">'+escHtml(a.fbName||'')+'</div>'+
+            '<div style="font-size:11px;color:var(--muted);">'+escHtml(String(a.bookDate||''))+
+            (a.timeSlot?' · 🕐 '+escHtml(a.timeSlot):'')+' · '+escHtml(a.service||'—')+'</div>'+
+          '</div>'+
+          '<div style="font-size:11px;font-weight:600;color:var(--teal);white-space:nowrap;">₱'+fmt(+a.downpayment||0)+'</div>'+
+          '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)" style="font-size:10px;padding:4px 8px;">🖨</button>'+
+        '</div>';
+      });
+      ch += '</div>';
+      confEl.innerHTML = ch;
+    }
   }
 }
 
@@ -2995,24 +3107,106 @@ function calNavToday(){
 }
 
 function calDayClick(dateStr){
-  var acks = (DB.acknowledgements||[]).filter(function(a){ return a.bookDate===dateStr; });
-  if(!acks.length) return;
-  var html = '<h3 style="margin-bottom:12px;">📅 '+dateStr+'</h3>';
-  acks.forEach(function(a){
-    var isPending = !a.status || String(a.status||'').toLowerCase().includes('pending');
-    html += '<div style="background:var(--light);border-radius:8px;padding:12px 14px;margin-bottom:8px;">'+
-      '<div style="font-weight:600;">'+escHtml(a.fbName||'')+'</div>'+
-      '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Status: '+(a.status||'Pending')+'</div>'+
-      '<div style="display:flex;gap:6px;margin-top:8px;">'+
-        (isPending ? '<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)">✓ Confirm</button>' : '')+
-        '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)">🖨 Print</button>'+
-        '<button class="btn btn-sm btn-danger" data-aid="'+a.id+'" onclick="calDeleteAck(this)">✕ Delete</button>'+
+  var panel  = document.getElementById('cal-day-panel');
+  var title  = document.getElementById('day-panel-title');
+  var body   = document.getElementById('day-panel-content');
+  if(!panel || !title || !body) { return; }
+
+  var acks = (DB.acknowledgements||[]).filter(function(a){ return String(a.bookDate||'').slice(0,10)===dateStr; });
+  var evs  = (DB._calEvents||[]).filter(function(ev){ return String(ev.start||'').slice(0,10)===dateStr; });
+  var blocked = (DB.blockedDates||[]).filter(function(b){ return b.date===dateStr; });
+
+  // Format date nicely
+  var d = new Date(dateStr+'T00:00:00');
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var monNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var isToday = dateStr === todayStr();
+  title.innerHTML = dayNames[d.getDay()]+', '+monNames[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear()+
+    (isToday?' <span style="font-size:11px;background:var(--teal);color:#fff;padding:2px 8px;border-radius:8px;margin-left:6px;vertical-align:middle;">Today</span>':'');
+
+  if(!acks.length && !evs.length && !blocked.length){
+    body.innerHTML = '<div style="text-align:center;color:var(--muted);padding:16px;font-size:13px;">No bookings on this date.</div>';
+    panel.style.display = '';
+    panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+    return;
+  }
+
+  var h = '';
+
+  // Blocked indicator
+  if(blocked.length){
+    h += '<div style="background:rgba(180,180,180,0.15);border:1px solid #ccc;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12px;color:#666;">🚫 <strong>Blocked:</strong> '+escHtml(blocked[0].reason||'Studio closed')+'</div>';
+  }
+
+  // Acknowledgement receipts — sorted by time
+  acks.slice().sort(function(a,b){ return String(a.timeSlot||'').localeCompare(String(b.timeSlot||'')); }).forEach(function(a){
+    var status = String(a.status||'').toLowerCase();
+    var isPending   = !status || status.includes('pending');
+    var isConfirmed = status.includes('confirm');
+    var isCancelled = status.includes('cancel');
+    var dot = isPending?'#ffc107':isConfirmed?'var(--teal)':'var(--danger)';
+    var label = isPending?'Pending':isConfirmed?'Confirmed':'Cancelled';
+    h += '<div style="background:var(--light);border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left:3px solid '+dot+';">'+
+      '<div style="display:flex;align-items:flex-start;gap:10px;">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">'+
+            '<span style="font-weight:700;font-size:14px;color:var(--slate);">'+escHtml(a.fbName||'')+'</span>'+
+            '<span style="font-size:10px;padding:2px 8px;background:'+dot+';color:#fff;border-radius:8px;font-weight:600;">'+label+'</span>'+
+            (a.ackNum?'<span style="font-size:10px;color:var(--muted);">'+escHtml(a.ackNum)+'</span>':'')+
+          '</div>'+
+          '<div style="font-size:12px;color:var(--muted);line-height:1.8;">'+
+            (a.timeSlot?'🕐 <strong>'+escHtml(a.timeSlot)+'</strong> · ':'')+escHtml(a.service||'—')+'<br>'+
+            '₱'+fmt(+a.downpayment||0)+' downpayment · '+escHtml(a.mop||'')+(a.email?' · ✉ '+escHtml(a.email):'')+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'+
+          (isPending?'<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)" style="font-size:11px;">✓ Confirm</button>':'')+
+          '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)" style="font-size:11px;">🖨 Print</button>'+
+        '</div>'+
       '</div>'+
     '</div>';
   });
-  html += '<div class="fe"><button class="btn btn-outline" onclick="closeModal()">Close</button></div>';
-  openModal(html);
+
+  // Google Calendar pending events not yet receipted
+  evs.filter(function(ev){ return ev.status==='pending'; }).forEach(function(ev){
+    var nm = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+    var nmMatch = nm.match(/—\s*(.+?)\s*[\(\|]/);
+    var cn = nmMatch?nmMatch[1].trim():nm;
+    var svcMatch = nm.match(/^(.+?)\s*—/);
+    var svc = svcMatch?svcMatch[1].trim():'';
+    var alreadyReceipated = acks.some(function(a){
+      var an = String(a.fbName||'').toLowerCase();
+      return an.includes(cn.toLowerCase().split(' ')[0]) || cn.toLowerCase().includes(an.split(' ')[0]);
+    });
+    if(alreadyReceipated) return;
+    var em = (ev.description||'').match(/Email:\s*(\S+@\S+)/i);
+    var evEm = em?em[1].trim():'';
+    var tm = (ev.description||'').match(/Time:\s*(.+)/i);
+    var evTm = tm?tm[1].trim():'';
+    if(!evTm&&ev.start){try{var dd=new Date(ev.start);evTm=dd.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});}catch(e2){}}
+    h += '<div style="background:rgba(255,243,205,0.3);border:1.5px dashed #ffc107;border-radius:10px;padding:12px 14px;margin-bottom:8px;">'+
+      '<div style="display:flex;align-items:flex-start;gap:10px;">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">'+
+            '<span style="font-weight:700;font-size:14px;color:var(--slate);">'+escHtml(cn)+'</span>'+
+            '<span style="font-size:10px;padding:2px 8px;background:#ffc107;color:#3d2000;border-radius:8px;font-weight:600;">Booking Request</span>'+
+          '</div>'+
+          '<div style="font-size:12px;color:var(--muted);line-height:1.8;">'+
+            (evTm?'🕐 <strong>'+escHtml(evTm)+'</strong> · ':'')+escHtml(svc||'—')+
+            (evEm?'<br>✉ '+escHtml(evEm):'')+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'+
+          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(cn)+'" data-date="'+dateStr+'" data-svc="'+encodeURIComponent(svc)+'" data-email="'+encodeURIComponent(evEm)+'" data-time="'+encodeURIComponent(evTm)+'" data-evid="'+encodeURIComponent(ev.id||'')+'" onclick="openNewAckFromCalEvent(this)" style="font-size:10px;white-space:nowrap;">✉ Confirm & Email</button>'+
+          (evEm?'<button class="btn btn-sm btn-outline" data-name="'+encodeURIComponent(cn)+'" data-date="'+dateStr+'" data-svc="'+encodeURIComponent(svc)+'" data-email="'+encodeURIComponent(evEm)+'" data-time="'+encodeURIComponent(evTm)+'" data-evid="'+encodeURIComponent(ev.id||'')+'" onclick="quickConfirmBooking(this)" style="font-size:10px;">⚡ Quick</button>':'')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  });
+
+  body.innerHTML = h;
+  panel.style.display = '';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 function calConfirmAck(btn){ var id=btn.dataset.aid; confirmAck(id); closeModal(); }
@@ -8155,29 +8349,22 @@ function dismissBookingAlert(){
 })();
 
 
-// Silent background sync — prevents overwriting recent saves
-var _syncInterval = null;
+var _lastSaveTime = 0;
 async function silentSync(){
   if(!hasUrl()) return;
   if(Date.now()-_lastSaveTime < 15000) return;
   var deletedIds = JSON.parse(localStorage.getItem('cl_tasks_deleted')||'[]');
   try{
     var r = await gasCall('getAll');
-    if(r && r.ok && Array.isArray(r.tasks)){
-      var newJson = JSON.stringify(r.tasks.map(function(t){return t.id+(t.stage||'')+(t.updatedAt||'');}).sort());
-      var oldJson = JSON.stringify(TASKS.map(function(t){return t.id+(t.stage||'')+(t.updatedAt||'');}).sort());
-      if(newJson !== oldJson){
-        TASKS = r.tasks.filter(function(t){return deletedIds.indexOf(t.id)===-1;});
-        saveTasks();
-      }
+    if(r&&r.ok&&Array.isArray(r.tasks)){
+      var nJ=JSON.stringify(r.tasks.map(function(t){return t.id+(t.stage||'')+(t.updatedAt||'');}).sort());
+      var oJ=JSON.stringify((TASKS||[]).map(function(t){return t.id+(t.stage||'')+(t.updatedAt||'');}).sort());
+      if(nJ!==oJ){ TASKS=r.tasks.filter(function(t){return deletedIds.indexOf(t.id)===-1;}); saveTasks&&saveTasks(); }
     }
   }catch(e){}
 }
 function startAutoSync(){
-  if(_syncInterval) clearInterval(_syncInterval);
-  _syncInterval = setInterval(function(){
-    if(hasUrl() && document.visibilityState==='visible') silentSync();
-  }, 30000);
+  setInterval(function(){ if(hasUrl()&&document.visibilityState==='visible') silentSync(); }, 30000);
 }
 
 loadLocal();
