@@ -2789,11 +2789,10 @@ function renderCalendar(){
   const lbl = document.getElementById('cal-month-label');
   if(lbl) lbl.textContent = MONTH_NAMES[mo] + ' ' + yr;
 
-  // Monday-first offset — Manila time (UTC+8 = 4am UTC)
-  const _phFirst    = new Date(Date.UTC(yr, mo, 1, 4, 0, 0));
-  const firstJsDay  = _phFirst.getUTCDay();
+  // Monday-first offset
+  const firstJsDay  = new Date(yr, mo, 1).getDay();
   const firstOffset = (firstJsDay === 0) ? 6 : firstJsDay - 1;
-  const daysInMo    = new Date(Date.UTC(yr, mo+1, 0, 4, 0, 0)).getUTCDate();
+  const daysInMo    = new Date(yr, mo+1, 0).getDate();
 
   const today       = todayStr();
   const restDays    = getRestDays();
@@ -2936,13 +2935,11 @@ function renderCalendarLists(acks, yr, mo){
       var evEmail = emailMatch ? emailMatch[1].trim() : '';
       var timeMatch  = (ev.description||'').match(/Time:\s*(.+)/i);
       var evTime  = timeMatch ? timeMatch[1].trim() : '';
-      // Fallback: extract time from ISO start
+      // Fallback: extract time from ISO start (convert to PHT)
       if(!evTime && ev.start){
         try{
           var d = new Date(ev.start);
-          var h = d.getHours(); var m = d.getMinutes();
-          var ap = h>=12?'PM':'AM'; h = h%12; if(h===0)h=12;
-          evTime = h+':'+String(m).padStart(2,'0')+' '+ap;
+          evTime = d.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});
         }catch(e){}
       }
       pendHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);background:rgba(255,243,205,0.2);">'+
@@ -2955,7 +2952,8 @@ function renderCalendarLists(acks, yr, mo){
           '</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
-          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">+ Create Receipt</button>'+
+          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">✉ Confirm & Email</button>'+
+          '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:4px 8px;" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="quickConfirmBooking(this)">⚡ Quick</button>'+
         '</div>'+
       '</div>';
     });
@@ -3020,6 +3018,48 @@ function calDayClick(dateStr){
 function calConfirmAck(btn){ var id=btn.dataset.aid; confirmAck(id); closeModal(); }
 function calPrintAck(btn)  { var id=btn.dataset.aid; printAck(id); }
 function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal(); }
+
+// Quick confirm — no modal, directly calls confirmBooking with event data
+async function quickConfirmBooking(btn){
+  var name  = decodeURIComponent(btn.dataset.name||'');
+  var date  = btn.dataset.date||'';
+  var svc   = decodeURIComponent(btn.dataset.svc||'');
+  var email = decodeURIComponent(btn.dataset.email||'');
+  var time  = decodeURIComponent(btn.dataset.time||'');
+  var evId  = decodeURIComponent(btn.dataset.evid||'');
+
+  if(!email){ notify('No email found — use Confirm & Email to enter it manually','error'); return; }
+  if(!confirm('Quick confirm booking for '+name+' on '+date+'?\n\nConfirmation email will be sent to: '+email)){ return; }
+
+  btn.disabled = true; btn.textContent = '...';
+  notify('Confirming...','info');
+  try{
+    var result = await gasCall('confirmBooking', {
+      eventId:evId, fbName:name, email:email, service:svc,
+      bookDate:date, timeSlot:time, mop:'GCash', downpayment:0
+    });
+    if(result.ok){
+      var ack = result.ack || {id:uid(),date:todayStr(),fbName:name,email:email,service:svc,bookDate:date,ackNum:result.ackNum||'',status:'Confirmed',timeSlot:time};
+      if(!DB.acknowledgements) DB.acknowledgements=[];
+      DB.acknowledgements.push(ack);
+      if(!DB.clients) DB.clients=[];
+      if(!DB.clients.find(function(c){return(c.fbName||'').toLowerCase()===name.toLowerCase();})){
+        var cl={id:uid(),fbName:name,email:email,type:'booked',added:todayStr()};
+        DB.clients.push(cl); push('saveClient',cl);
+      }
+      saveLocal();
+      notify('Booking confirmed! Email sent to '+email,'success');
+      logActivity('Quick Confirmed',(result.ackNum||'')+' — '+name,'success');
+      renderCalendar();
+    } else {
+      notify('Failed: '+(result.error||'Unknown'),'error');
+      btn.disabled=false; btn.textContent='Quick';
+    }
+  }catch(e){
+    notify('Error: '+e.message,'error');
+    btn.disabled=false; btn.textContent='Quick';
+  }
+}
 
 function openNewAckFromCalEvent(btn){
   var name  = decodeURIComponent(btn.dataset.name||'');
@@ -8034,44 +8074,26 @@ function getLocalBlockedSlotsForDate(dateStr){
 async function pollBookings(){
   if(!hasUrl() || !CURR_USER) return;
   try{
-    // PRIMARY: check Google Calendar [PENDING] events
+    const d = await gasCall('getAll');
+    // Check Bookings sheet — look for new PENDING rows
+    // We use the Acknowledgements sheet as proxy since Bookings
+    // sheet isn't in getAll — instead check calendar events
     const res = await gasCall('getCalendarEvents',{
       year:  mnlYear(),
       month: mnlMonth()
     });
-    const events  = Array.isArray(res.events) ? res.events : [];
+    const events = Array.isArray(res.events) ? res.events : [];
     const pending = events.filter(ev => ev.status === 'pending');
-    const newFromCal = pending.filter(ev => !_knownBookingIds.has(ev.id));
+
+    // Find ones we haven't seen before
+    const newOnes = pending.filter(ev => !_knownBookingIds.has(ev.id));
+
+    // Mark all current pending as known
     pending.forEach(ev => _knownBookingIds.add(ev.id));
 
-    // BACKUP: also check logBooking sheet in case calendar creation failed
-    let newFromLog = [];
-    try{
-      const logRes = await gasCall('getBookingLogs',{});
-      const logs   = Array.isArray(logRes.logs) ? logRes.logs : [];
-      // Only show logs from last 24 hours that aren't already in calendar
-      const cutoff = Date.now() - 24*60*60*1000;
-      newFromLog = logs.filter(function(log){
-        const id = 'log-' + (log.ref||log.id||'');
-        if(_knownBookingIds.has(id)) return false;
-        const ts = new Date(log.submittedAt||0).getTime();
-        if(ts < cutoff) return false;
-        // Check if this booking already appeared as a calendar event
-        const alreadyInCal = pending.some(function(ev){
-          return ev.title && log.fbName && ev.title.toLowerCase().includes((log.fbName||'').toLowerCase().split(' ')[0]);
-        });
-        if(!alreadyInCal){ _knownBookingIds.add(id); return true; }
-        _knownBookingIds.add(id);
-        return false;
-      });
-    }catch(e){ /* logBooking sheet not set up yet — silent */ }
-
-    const allNew = newFromCal.concat(newFromLog.map(function(log){
-      return { id:'log-'+log.ref, title:'[PENDING] '+log.package+' — '+log.fbName+' (₱300 DP)', status:'pending', _fromLog:true };
-    }));
-
-    if(allNew.length > 0){
-      showBookingAlert(allNew);
+    if(newOnes.length > 0){
+      showBookingAlert(newOnes);
+      // Refresh mini-calendar on dashboard if visible
       DASH_CAL_EVENTS = events;
       renderDashMiniCal();
       renderDashPendingList();
@@ -8132,7 +8154,34 @@ function dismissBookingAlert(){
   if(u){ localStorage.setItem('cl_url', u); location.replace(location.pathname); }
 })();
 
+
+// Silent background sync — prevents overwriting recent saves
+var _syncInterval = null;
+async function silentSync(){
+  if(!hasUrl()) return;
+  if(Date.now()-_lastSaveTime < 15000) return;
+  var deletedIds = JSON.parse(localStorage.getItem('cl_tasks_deleted')||'[]');
+  try{
+    var r = await gasCall('getAll');
+    if(r && r.ok && Array.isArray(r.tasks)){
+      var newJson = JSON.stringify(r.tasks.map(function(t){return t.id+(t.stage||'')+(t.updatedAt||'');}).sort());
+      var oldJson = JSON.stringify(TASKS.map(function(t){return t.id+(t.stage||'')+(t.updatedAt||'');}).sort());
+      if(newJson !== oldJson){
+        TASKS = r.tasks.filter(function(t){return deletedIds.indexOf(t.id)===-1;});
+        saveTasks();
+      }
+    }
+  }catch(e){}
+}
+function startAutoSync(){
+  if(_syncInterval) clearInterval(_syncInterval);
+  _syncInterval = setInterval(function(){
+    if(hasUrl() && document.visibilityState==='visible') silentSync();
+  }, 30000);
+}
+
 loadLocal();
+startAutoSync();
 populateLoginStaff();
 updateClientDatalist();
 // If no staff in DB, default to admin tab so you can log in and add staff
