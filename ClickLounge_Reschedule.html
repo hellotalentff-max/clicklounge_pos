@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>ClickLounge Studio — Reschedule Booking</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{--slate:#2f4f4f;--teal:#51897d;--gold:#d79068;--cream:#f5f0e8;--danger:#c0544a;--success:#3d8c6e;--light:#f4f7f6;--border:#dce5e3;--muted:#6b8c8c;--white:#fff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--slate);min-height:100vh;}
+.page{max-width:560px;margin:0 auto;padding:24px 20px;}
+.header{background:var(--slate);padding:24px;text-align:center;margin-bottom:0;}
+.header h1{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;color:var(--cream);margin-bottom:4px;}
+.header p{font-size:12px;color:rgba(245,240,232,0.5);}
+.card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;}
+.field{margin-bottom:14px;} .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.sinput{border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;font-family:inherit;font-size:14px;background:var(--white);width:100%;transition:border .15s;}
+.sinput:focus{outline:none;border-color:var(--teal);}
+.btn{padding:12px 24px;border-radius:10px;font-weight:600;font-size:14px;width:100%;border:none;cursor:pointer;font-family:inherit;transition:all .15s;margin-top:6px;}
+.btn-teal{background:var(--teal);color:#fff;} .btn-teal:hover{background:#3d6b61;}
+.btn-gold{background:var(--gold);color:#fff;} .btn-gold:hover{background:#c07b52;}
+.btn-outline{background:none;border:1.5px solid var(--border);color:var(--slate);}
+.alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:14px;}
+.alert-warning{background:#fff3cd;border:1px solid #ffc107;color:#856404;}
+.alert-danger{background:#fde8e8;border:1px solid #f5c6cb;color:#721c24;}
+.alert-success{background:#d4edda;border:1px solid #c3e6cb;color:#155724;}
+.alert-info{background:rgba(81,137,125,0.06);border:1px solid rgba(81,137,125,0.2);color:var(--teal);}
+.step{display:none;} .step.active{display:block;}
+.info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--light);font-size:13px;}
+.info-row:last-child{border:none;}
+.info-label{color:var(--muted);}
+.info-val{font-weight:600;}
+.slot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;}
+.slot-btn{padding:10px 8px;font-size:12px;font-weight:500;border:1.5px solid var(--border);border-radius:8px;background:var(--white);cursor:pointer;font-family:inherit;text-align:center;transition:all .15s;}
+.slot-btn:hover:not(.taken){border-color:var(--teal);color:var(--teal);}
+.slot-btn.taken{background:var(--light);color:var(--muted);cursor:not-allowed;text-decoration:line-through;opacity:0.5;}
+.slot-btn.selected{background:var(--teal);color:#fff;border-color:var(--teal);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:12px;}
+.cal-day{text-align:center;padding:8px 4px;font-size:12px;border-radius:6px;cursor:pointer;border:1.5px solid transparent;transition:all .15s;}
+.cal-day:hover:not(.disabled):not(.past){border-color:var(--teal);}
+.cal-day.selected{background:var(--teal);color:#fff;}
+.cal-day.today{font-weight:700;color:var(--gold);}
+.cal-day.disabled{color:var(--muted);opacity:0.4;cursor:not-allowed;}
+.cal-day.past{color:var(--muted);opacity:0.3;cursor:not-allowed;}
+.cal-hdr{text-align:center;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;padding:4px 0;}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.cal-nav button{background:none;border:1px solid var(--border);padding:6px 12px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📅 Reschedule Booking</h1>
+  <p>ClickLounge Studio · Self-Service Rescheduling</p>
+</div>
+
+<div class="page">
+
+  <!-- STEP 1: Lookup -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Find Your Booking</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Enter your acknowledgement receipt number or the email you used when booking.</div>
+      <div class="field"><label>Acknowledgement # or Email</label>
+        <input type="text" id="lookup-input" class="sinput" placeholder="e.g. AR010624SS or juan@email.com" autocomplete="off">
+      </div>
+      <div id="lookup-err" class="alert alert-danger" style="display:none;"></div>
+      <button class="btn btn-teal" onclick="lookupBooking()">Find My Booking →</button>
+    </div>
+    <div style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px;">Need help? Message us on <a href="https://facebook.com/clicklounge.studio" target="_blank" style="color:var(--teal);">Facebook</a></div>
+  </div>
+
+  <!-- STEP 2: Booking found + rules -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div style="font-size:16px;font-weight:700;margin-bottom:12px;">Your Booking</div>
+      <div class="info-row"><span class="info-label">Name</span><span class="info-val" id="s2-name"></span></div>
+      <div class="info-row"><span class="info-label">Package</span><span class="info-val" id="s2-pkg"></span></div>
+      <div class="info-row"><span class="info-label">Current Date</span><span class="info-val" id="s2-date"></span></div>
+      <div class="info-row"><span class="info-label">Days Until Session</span><span class="info-val" id="s2-days"></span></div>
+    </div>
+
+    <div id="s2-alert"></div>
+
+    <div id="s2-fee-section" style="display:none;" class="card">
+      <div class="alert alert-warning" style="margin-bottom:12px;">
+        <strong>⚠ ₱200 Rescheduling Fee Required</strong><br>
+        Your session is less than 5 days away. A rescheduling fee of ₱200 applies before you can move your booking.
+      </div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Pay via:</div>
+      <div style="font-size:13px;margin-bottom:4px;">💚 GCash: <strong>0919 662 8224</strong> (Ma*****e M.)</div>
+      <div style="font-size:13px;margin-bottom:12px;">🏦 BPI: <strong>2829140848</strong></div>
+      <div class="field"><label>Reference Number / Proof</label>
+        <input type="text" id="fee-ref" class="sinput" placeholder="GCash ref # or screenshot description">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:12px;">
+        <input type="checkbox" id="fee-confirm" style="accent-color:var(--teal);width:16px;height:16px;"> I have paid the ₱200 rescheduling fee
+      </label>
+      <button class="btn btn-gold" onclick="proceedWithFee()">Proceed to Choose New Date →</button>
+    </div>
+
+    <div id="s2-free-btn" style="display:none;">
+      <button class="btn btn-teal" onclick="goToDatePicker()">Choose New Date & Time →</button>
+    </div>
+
+    <button class="btn btn-outline" onclick="reset()" style="margin-top:8px;">← Back</button>
+  </div>
+
+  <!-- STEP 3: Date & Time Picker -->
+  <div class="step" id="step3">
+    <div class="card">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Choose New Date</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Select an available date (Mon–Sat)</div>
+
+      <div class="cal-nav">
+        <button onclick="calNav(-1)">‹</button>
+        <strong id="cal-month-label" style="font-size:14px;"></strong>
+        <button onclick="calNav(1)">›</button>
+      </div>
+      <div class="cal-grid" id="cal-days-hdr">
+        <div class="cal-hdr">Mon</div><div class="cal-hdr">Tue</div><div class="cal-hdr">Wed</div>
+        <div class="cal-hdr">Thu</div><div class="cal-hdr">Fri</div><div class="cal-hdr">Sat</div><div class="cal-hdr">Sun</div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    <div class="card" id="slot-card" style="display:none;">
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Available Times on <span id="slot-date-label"></span></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Select your preferred time slot</div>
+      <div id="slot-loading" style="text-align:center;color:var(--muted);padding:16px;font-size:13px;">Loading available slots…</div>
+      <div class="slot-grid" id="slot-grid"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="goStep(2)" style="flex:1;">← Back</button>
+      <button class="btn btn-teal" id="confirm-btn" style="flex:2;display:none;" onclick="confirmReschedule()">Confirm Reschedule →</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Done -->
+  <div class="step" id="step4">
+    <div class="card" style="text-align:center;padding:32px 20px;">
+      <div style="font-size:48px;margin-bottom:12px;">✅</div>
+      <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;margin-bottom:8px;">Booking Rescheduled!</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:16px;">Your session has been moved to <strong id="done-date"></strong> at <strong id="done-time"></strong>. A confirmation email has been sent to you.</div>
+      <div class="alert alert-info" style="text-align:left;font-size:12px;">
+        Please arrive 10–15 minutes early and bring your inspiration photos and outfits prepared. See you at ClickLounge Studio! 📷
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var GAS = 'https://script.google.com/macros/s/AKfycbx_Y5nH34Rq16JJ2AxBDr30ttmDFuic61OqoC0u3Wq0zogHEhfoV6qE7uiNagI43flVgw/exec';
+var ALL_SLOTS = ['10:00 AM','10:45 AM','11:30 AM','12:15 PM','1:00 PM','1:45 PM','2:30 PM','3:15 PM','4:00 PM','4:45 PM'];
+var _booking = null;
+var _feeOk   = false;
+var _selDate = '';
+var _selSlot = '';
+var _calYear, _calMonth;
+
+function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+
+function gasCall(action, payload){
+  return new Promise(function(resolve, reject){
+    var cb = '_rs_'+uid();
+    var t  = setTimeout(function(){ delete window[cb]; reject(new Error('Timeout')); }, 45000);
+    window[cb] = function(d){ clearTimeout(t); delete window[cb]; resolve(d); };
+    var data = btoa(unescape(encodeURIComponent(JSON.stringify({action:action, payload:payload||{}}))));
+    var s = document.createElement('script');
+    s.src = GAS+'?d='+encodeURIComponent(data)+'&callback='+cb;
+    s.onerror = function(){ clearTimeout(t); delete window[cb]; reject(new Error('Network error')); };
+    document.body.appendChild(s);
+    setTimeout(function(){try{document.body.removeChild(s);}catch(e){}}, 5000);
+  });
+}
+
+function goStep(n){
+  document.querySelectorAll('.step').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById('step'+n).classList.add('active');
+  window.scrollTo(0,0);
+}
+function reset(){ _booking=null; _selDate=''; _selSlot=''; goStep(1); }
+
+async function lookupBooking(){
+  var val = (document.getElementById('lookup-input').value||'').trim();
+  if(!val){ showErr('lookup-err','Please enter your acknowledgement number or email.'); return; }
+  hideEl('lookup-err');
+
+  var btn = document.querySelector('#step1 .btn');
+  btn.disabled = true; btn.textContent = 'Looking up…';
+
+  try{
+    var isEmail = val.includes('@');
+    var payload = isEmail ? {email:val} : {ackNum:val};
+    var r = await gasCall('checkReschedule', payload);
+    if(!r.ok){ showErr('lookup-err', r.error||'Booking not found.'); btn.disabled=false; btn.textContent='Find My Booking →'; return; }
+
+    _booking = r.booking;
+    _booking.daysUntil = r.daysUntil;
+    _booking.free = r.free;
+
+    document.getElementById('s2-name').textContent = r.booking.fbName;
+    document.getElementById('s2-pkg').textContent  = r.booking.service;
+    document.getElementById('s2-date').textContent = r.booking.bookDate;
+    document.getElementById('s2-days').textContent = r.daysUntil+' day'+(r.daysUntil!==1?'s':'');
+
+    var alertEl = document.getElementById('s2-alert');
+    if(r.free){
+      alertEl.innerHTML = '<div class="alert alert-success">✓ You can reschedule for <strong>free</strong> — your session is '+r.daysUntil+' days away (5+ days).</div>';
+      document.getElementById('s2-fee-section').style.display = 'none';
+      document.getElementById('s2-free-btn').style.display = '';
+    } else {
+      alertEl.innerHTML = '<div class="alert alert-warning">⚠ Your session is only <strong>'+r.daysUntil+' days</strong> away. A <strong>₱200 rescheduling fee</strong> applies.</div>';
+      document.getElementById('s2-fee-section').style.display = '';
+      document.getElementById('s2-free-btn').style.display = 'none';
+    }
+
+    goStep(2);
+  }catch(e){
+    showErr('lookup-err','Connection error: '+e.message);
+  }
+  btn.disabled=false; btn.textContent='Find My Booking →';
+}
+
+function proceedWithFee(){
+  var ref  = (document.getElementById('fee-ref').value||'').trim();
+  var conf = document.getElementById('fee-confirm').checked;
+  if(!ref){ alert('Please enter your payment reference number.'); return; }
+  if(!conf){ alert('Please confirm that you have paid the ₱200 rescheduling fee.'); return; }
+  _feeOk = true;
+  goToDatePicker();
+}
+
+function goToDatePicker(){
+  var now = new Date();
+  _calYear  = now.getFullYear();
+  _calMonth = now.getMonth();
+  renderCal();
+  goStep(3);
+}
+
+function calNav(dir){
+  _calMonth += dir;
+  if(_calMonth > 11){ _calMonth=0; _calYear++; }
+  if(_calMonth < 0) { _calMonth=11; _calYear--; }
+  renderCal();
+}
+
+function renderCal(){
+  var months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent = months[_calMonth]+' '+_calYear;
+  var today    = new Date(); today.setHours(0,0,0,0);
+  var minDate  = new Date(today.getTime() + 24*60*60*1000); // earliest = tomorrow
+  var grid     = document.getElementById('cal-grid');
+  var firstDay = new Date(_calYear, _calMonth, 1).getDay();
+  var offset   = (firstDay === 0 ? 6 : firstDay - 1); // Mon-first offset
+  var days     = new Date(_calYear, _calMonth+1, 0).getDate();
+
+  var html = '';
+  for(var i=0; i<offset; i++) html += '<div></div>';
+  for(var d=1; d<=days; d++){
+    var dt  = new Date(_calYear, _calMonth, d);
+    var isSun  = dt.getDay() === 0;
+    var isPast = dt < minDate;
+    var dateStr = _calYear+'-'+String(_calMonth+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var classes = 'cal-day';
+    if(isSun||isPast) classes += isPast?' past':' disabled';
+    var isToday = dt.toDateString() === today.toDateString();
+    if(isToday) classes += ' today';
+    if(dateStr === _selDate) classes += ' selected';
+    var onclick = (isSun||isPast) ? '' : 'onclick="selectDate(\''+dateStr+'\')"';
+    html += '<div class="'+classes+'" '+onclick+'>'+d+'</div>';
+  }
+  grid.innerHTML = html;
+}
+
+async function selectDate(dateStr){
+  _selDate = dateStr;
+  _selSlot = '';
+  document.getElementById('confirm-btn').style.display = 'none';
+  renderCal();
+
+  var card = document.getElementById('slot-card');
+  card.style.display = '';
+  document.getElementById('slot-date-label').textContent = dateStr;
+  document.getElementById('slot-loading').style.display = '';
+  document.getElementById('slot-grid').innerHTML = '';
+
+  try{
+    var r = await gasCall('getBookedSlots', {date:dateStr});
+    document.getElementById('slot-loading').style.display = 'none';
+    var taken = r.takenSlots||[];
+    var html = '';
+    ALL_SLOTS.forEach(function(slot){
+      var isTaken = taken.indexOf(slot) !== -1;
+      html += '<button class="slot-btn'+(isTaken?' taken':'')+'" '+(isTaken?'disabled':'onclick="selectSlot(\''+slot+'\')"')+'>'+slot+'</button>';
+    });
+    document.getElementById('slot-grid').innerHTML = html;
+  }catch(e){
+    document.getElementById('slot-loading').style.display = 'none';
+    document.getElementById('slot-grid').innerHTML = '<div style="color:var(--danger);font-size:12px;">Could not load slots. Please try again.</div>';
+  }
+}
+
+function selectSlot(slot){
+  _selSlot = slot;
+  document.querySelectorAll('.slot-btn').forEach(function(b){ b.classList.remove('selected'); });
+  document.querySelectorAll('.slot-btn').forEach(function(b){ if(b.textContent===slot) b.classList.add('selected'); });
+  document.getElementById('confirm-btn').style.display = '';
+}
+
+async function confirmReschedule(){
+  if(!_selDate||!_selSlot){ alert('Please select a date and time.'); return; }
+  var btn = document.getElementById('confirm-btn');
+  btn.disabled=true; btn.textContent='Processing…';
+
+  try{
+    var r = await gasCall('rescheduleBooking', {
+      ackNum:    _booking.ackNum,
+      fbName:    _booking.fbName,
+      email:     _booking.email,
+      service:   _booking.service,
+      newDate:   _selDate,
+      newSlot:   _selSlot,
+      feePaid:   _feeOk,
+      eventId:   _booking.eventId||''
+    });
+    if(r.ok){
+      document.getElementById('done-date').textContent = _selDate;
+      document.getElementById('done-time').textContent = _selSlot;
+      goStep(4);
+    } else {
+      alert('Error: '+r.error);
+      btn.disabled=false; btn.textContent='Confirm Reschedule →';
+    }
+  }catch(e){
+    alert('Connection error: '+e.message);
+    btn.disabled=false; btn.textContent='Confirm Reschedule →';
+  }
+}
+
+function showErr(id, msg){ var el=document.getElementById(id); el.textContent=msg; el.style.display=''; }
+function hideEl(id){ document.getElementById(id).style.display='none'; }
+</script>
+</body>
+</html>
