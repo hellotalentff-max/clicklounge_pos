@@ -3133,6 +3133,98 @@ function calDayClick(dateStr){
 
   var h = '';
 
+  // ── TIME SLOT AVAILABILITY GRID ──
+  var ALL_SLOTS_CAL = ['10:00 AM','10:45 AM','11:30 AM','12:15 PM','1:00 PM','1:45 PM','2:30 PM','3:15 PM','4:00 PM','4:45 PM','5:30 PM'];
+
+  // Build a map of slot → booking info
+  var slotMap = {};
+  acks.forEach(function(a){
+    var slot = a.timeSlot||'';
+    if(!slot) return;
+    var status = String(a.status||'').toLowerCase();
+    var isCancelled = status.includes('cancel');
+    if(!isCancelled){
+      slotMap[slot] = {
+        name: a.fbName||'',
+        service: a.service||'',
+        status: status.includes('confirm')?'confirmed':'pending',
+        source: 'receipt'
+      };
+    }
+  });
+
+  // Also map Google Calendar events
+  evs.forEach(function(ev){
+    if(ev.status==='cancelled') return;
+    var evTm2 = '';
+    var tmMatch = (ev.description||'').match(/Time:\s*(.+)/i);
+    if(tmMatch) evTm2 = tmMatch[1].trim();
+    if(!evTm2 && ev.start){
+      try{
+        var dd = new Date(ev.start);
+        evTm2 = dd.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});
+      }catch(e2){}
+    }
+    if(evTm2 && !slotMap[evTm2]){
+      var nm = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+      var nmM = nm.match(/—\s*(.+?)\s*[\(\|]/);
+      var cn2 = nmM?nmM[1].trim():nm;
+      var svcM = nm.match(/^(.+?)\s*—/);
+      slotMap[evTm2] = {
+        name: cn2,
+        service: svcM?svcM[1].trim():'',
+        status: ev.status==='confirmed'?'confirmed':'pending',
+        source: 'calendar'
+      };
+    }
+  });
+
+  // Is the day fully blocked?
+  var fullBlocked = blocked.some(function(b){ return !b.slots||!b.slots.length; });
+
+  h += '<div style="margin-bottom:16px;">';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;">Time Slot Availability</div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;">';
+
+  ALL_SLOTS_CAL.forEach(function(slot){
+    var booking = slotMap[slot];
+    var isBlocked2 = fullBlocked || blocked.some(function(b){ return b.slots&&b.slots.includes(slot); });
+
+    if(isBlocked2){
+      h += '<div style="padding:8px 10px;border-radius:8px;background:rgba(180,180,180,0.15);border:1px solid #ccc;font-size:11px;">'+
+        '<div style="font-weight:600;color:#999;">'+slot+'</div>'+
+        '<div style="font-size:10px;color:#aaa;margin-top:2px;">🚫 Blocked</div>'+
+      '</div>';
+    } else if(booking){
+      var col = booking.status==='confirmed'?'rgba(81,137,125,0.08)':'rgba(255,243,205,0.5)';
+      var bdr = booking.status==='confirmed'?'rgba(81,137,125,0.3)':'rgba(255,193,7,0.5)';
+      var txt = booking.status==='confirmed'?'var(--teal)':'#856404';
+      var dot = booking.status==='confirmed'?'🟢':'🟡';
+      h += '<div style="padding:8px 10px;border-radius:8px;background:'+col+';border:1.5px solid '+bdr+';font-size:11px;">'+
+        '<div style="font-weight:700;color:var(--slate);">'+slot+'</div>'+
+        '<div style="font-size:10px;font-weight:600;color:'+txt+';margin-top:2px;">'+dot+' '+escHtml(booking.name.split(' ')[0])+'</div>'+
+        '<div style="font-size:9px;color:var(--muted);margin-top:1px;">'+escHtml(booking.service.slice(0,18)||(booking.service||''))+'</div>'+
+      '</div>';
+    } else {
+      h += '<div style="padding:8px 10px;border-radius:8px;background:rgba(61,140,110,0.04);border:1.5px solid rgba(61,140,110,0.15);font-size:11px;">'+
+        '<div style="font-weight:600;color:var(--muted);">'+slot+'</div>'+
+        '<div style="font-size:10px;color:var(--success);margin-top:2px;">✓ Available</div>'+
+      '</div>';
+    }
+  });
+
+  h += '</div>';
+
+  // Legend
+  h += '<div style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap;">'+
+    '<span style="font-size:10px;color:var(--muted);">🟡 Pending payment</span>'+
+    '<span style="font-size:10px;color:var(--muted);">🟢 Confirmed</span>'+
+    '<span style="font-size:10px;color:var(--muted);">✓ Available</span>'+
+    '<span style="font-size:10px;color:var(--muted);">🚫 Blocked</span>'+
+  '</div>';
+
+  h += '</div><hr style="border:none;border-top:1px solid var(--light2);margin:12px 0;">';
+
   // Blocked indicator
   if(blocked.length){
     h += '<div style="background:rgba(180,180,180,0.15);border:1px solid #ccc;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12px;color:#666;">🚫 <strong>Blocked:</strong> '+escHtml(blocked[0].reason||'Studio closed')+'</div>';
