@@ -1230,6 +1230,7 @@ tr:hover td { background:var(--light); }
   <div class="ph">
     <div><h2>Client Records</h2><p>CRM — history, activity and direct messaging</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-outline" onclick="runSyncClients()" title="Scan all sheets and auto-fill missing client records">🔄 Sync Missing Clients</button>
       <button class="btn btn-sm btn-outline" onclick="openImportClients()">📥 Import CSV</button>
       <button class="btn btn-gold" onclick="openCRMCompose()">✉ Send Campaign</button>
     </div>
@@ -1609,6 +1610,7 @@ tr:hover td { background:var(--light); }
     <button class="rep-cat-btn" id="rcat-clients" onclick="setRepCat('clients')">👥 Clients</button>
     <button class="rep-cat-btn" id="rcat-packages" onclick="setRepCat('packages')">📦 Packages</button>
     <button class="rep-cat-btn" id="rcat-operations" onclick="setRepCat('operations')">⚙ Operations</button>
+    <button class="rep-cat-btn" id="rcat-bookings" onclick="setRepCat('bookings')">📅 Bookings</button>
   </div>
 
   <!-- Period Selector (shared) -->
@@ -1806,6 +1808,37 @@ tr:hover td { background:var(--light); }
         <div class="ct" style="margin:0;">🔄 Fund Transfers & Refunds</div>
       </div>
       <div id="ops-ft-table"></div>
+    </div>
+  </div>
+
+  <!-- ── BOOKINGS ANALYTICS ── -->
+  <div id="rep-cat-bookings" class="rep-cat" style="display:none;">
+    <div class="rep-section-grid">
+      <div class="rep-card-stat" id="bk-total"><div class="rs-label">Total Bookings</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="bk-confirmed"><div class="rs-label">Confirmed</div><div class="rs-val rs-teal">—</div></div>
+      <div class="rep-card-stat" id="bk-pending"><div class="rs-label">Pending Payment</div><div class="rs-val rs-gold">—</div></div>
+      <div class="rep-card-stat" id="bk-cancelled"><div class="rs-label">Cancelled</div><div class="rs-val rs-danger">—</div></div>
+    </div>
+
+    <!-- Booking requests by time slot -->
+    <div class="card">
+      <div class="ct">🕐 Booking Requests by Time Slot</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Which time slots are most in demand this period</div>
+      <div id="rep-slot-chart"></div>
+    </div>
+
+    <!-- Submission time distribution -->
+    <div class="card">
+      <div class="ct">⏰ When Clients Submit Booking Requests</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Hour-of-day distribution of booking form submissions from <a href="https://hellotalentff-max.github.io/clicklounge_booking/" target="_blank" style="color:var(--teal);">the booking link</a></div>
+      <div id="rep-submit-chart"></div>
+    </div>
+
+    <!-- Day of week distribution -->
+    <div class="card">
+      <div class="ct">📅 Booking Requests by Day of Week</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Which days of the week clients most often book sessions</div>
+      <div id="rep-dow-chart"></div>
     </div>
   </div>
 
@@ -2062,6 +2095,16 @@ tr:hover td { background:var(--light); }
       <span id="confirmed-badge" style="font-size:10px;background:rgba(81,137,125,0.1);color:var(--teal);padding:3px 10px;border-radius:10px;font-weight:700;"></span>
     </div>
     <div id="confirmed-list"><div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">No confirmed bookings this month.</div></div>
+  </div>
+
+  <!-- ── TIME DISTRIBUTION ── -->
+  <div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <div style="width:3px;height:20px;background:var(--gold);border-radius:2px;flex-shrink:0;"></div>
+      <span style="font-size:14px;font-weight:700;color:var(--slate);">Booking Requests by Time Slot</span>
+      <span style="font-size:11px;color:var(--muted);">— most popular this month</span>
+    </div>
+    <div id="time-dist-chart"></div>
   </div>
 
   <!-- ── BLOCKED ── -->
@@ -3076,6 +3119,86 @@ function renderCalendarLists(acks, yr, mo){
       confEl.innerHTML = ch;
     }
   }
+
+  // ── TIME DISTRIBUTION CHART ──
+  renderTimeDistribution(monthAcks, calEvents.filter(function(ev){ return !ev.status || ev.status==='pending'||ev.status==='confirmed'; }));
+}
+
+function renderTimeDistribution(monthAcks, calEvs){
+  var el = document.getElementById('time-dist-chart');
+  if(!el) return;
+
+  var ALL_SLOTS_DIST = ['10:00 AM','10:45 AM','11:30 AM','12:15 PM','1:00 PM','1:45 PM','2:30 PM','3:15 PM','4:00 PM','4:45 PM','5:30 PM'];
+
+  // Count bookings per slot from acknowledgements
+  var counts = {};
+  ALL_SLOTS_DIST.forEach(function(s){ counts[s] = {pending:0, confirmed:0, total:0}; });
+
+  monthAcks.forEach(function(a){
+    var slot = String(a.timeSlot||'').trim();
+    if(!slot) return;
+    if(!counts[slot]) counts[slot] = {pending:0, confirmed:0, total:0};
+    var status = String(a.status||'').toLowerCase();
+    var isCancelled = status.includes('cancel');
+    if(isCancelled) return;
+    if(status.includes('confirm')) counts[slot].confirmed++;
+    else counts[slot].pending++;
+    counts[slot].total++;
+  });
+
+  // Also count from calendar events
+  calEvs.forEach(function(ev){
+    var evTime = '';
+    var tmMatch = (ev.description||'').match(/Time:\s*(.+)/i);
+    if(tmMatch) evTime = tmMatch[1].trim();
+    if(!evTime && ev.start){
+      try{
+        var dd = new Date(ev.start);
+        evTime = dd.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});
+      }catch(e){}
+    }
+    if(!evTime) return;
+    if(!counts[evTime]) counts[evTime] = {pending:0, confirmed:0, total:0};
+    counts[evTime].pending++;
+    counts[evTime].total++;
+  });
+
+  var maxCount = Math.max.apply(null, ALL_SLOTS_DIST.map(function(s){ return counts[s]?counts[s].total:0; }));
+  if(maxCount === 0){ el.innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:12px;">No bookings data this month.</div>'; return; }
+
+  var h = '<div style="display:grid;gap:6px;">';
+  ALL_SLOTS_DIST.forEach(function(slot){
+    var c = counts[slot]||{pending:0,confirmed:0,total:0};
+    var pct = maxCount > 0 ? Math.round((c.total/maxCount)*100) : 0;
+    var confPct = c.total > 0 ? Math.round((c.confirmed/c.total)*100) : 0;
+    var pendPct = 100 - confPct;
+    var isTop = c.total === maxCount && maxCount > 0;
+
+    h += '<div style="display:flex;align-items:center;gap:10px;">'+
+      '<div style="font-size:11px;font-weight:600;color:var(--muted);min-width:70px;text-align:right;flex-shrink:0;">'+slot+'</div>'+
+      '<div style="flex:1;position:relative;">'+
+        '<div style="height:22px;border-radius:4px;background:var(--light);overflow:hidden;position:relative;">'+
+          (pct > 0 ?
+            '<div style="position:absolute;left:0;top:0;height:100%;width:'+pct+'%;display:flex;overflow:hidden;border-radius:4px;">'+
+              (c.confirmed > 0 ? '<div style="height:100%;width:'+confPct+'%;background:var(--teal);"></div>' : '')+
+              (c.pending   > 0 ? '<div style="height:100%;width:'+pendPct+'%;background:#ffc107;"></div>' : '')+
+            '</div>' : '')+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:6px;min-width:80px;flex-shrink:0;">'+
+        '<span style="font-size:12px;font-weight:700;color:'+(isTop?'var(--gold)':'var(--slate)')+';">'+c.total+'</span>'+
+        '<span style="font-size:10px;color:var(--muted);">booking'+(c.total!==1?'s':'')+'</span>'+
+        (isTop&&c.total>0?'<span style="font-size:10px;background:rgba(215,144,104,0.12);color:var(--gold);padding:1px 6px;border-radius:8px;font-weight:700;">★ Top</span>':'')+
+      '</div>'+
+    '</div>';
+  });
+  h += '</div>';
+  h += '<div style="display:flex;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--light2);">'+
+    '<span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);display:inline-block;"></span>Confirmed</span>'+
+    '<span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#ffc107;display:inline-block;"></span>Pending payment</span>'+
+  '</div>';
+
+  el.innerHTML = h;
 }
 
 function ackListRow(a, type){
@@ -5212,6 +5335,36 @@ async function submitInvoice(){
   DB.transactions.push(txn); saveLocal(); notify('Invoice saved: '+invNum);
   logActivity('Invoice Submitted', invNum+' — '+clientName+' — ₱'+fmt(total), 'success');
   await push('saveTransaction',txn);
+
+  // Auto-upsert client to Clients sheet with all available data
+  (function(){
+    var name = clientName.trim();
+    if(!name) return;
+    // Look up existing client record
+    var cl = (DB.clients||[]).find(function(c){ return (c.fbName||'').toLowerCase()===name.toLowerCase(); }) || {};
+    // Enrich from today's registration
+    var reg = (DB.registrations||[]).slice().reverse().find(function(r){ return (r.fbName||'').toLowerCase()===name.toLowerCase(); });
+    // Enrich from acknowledgement receipts
+    var ack = (DB.acknowledgements||[]).slice().reverse().find(function(a){ return (a.fbName||'').toLowerCase()===name.toLowerCase(); });
+    var merged = {
+      id:             cl.id || uid(),
+      fbName:         name,
+      email:          cl.email || (reg&&reg.email) || (ack&&ack.email) || '',
+      phone:          cl.phone || (reg&&reg.phone) || '',
+      birthday:       cl.birthday || (reg&&reg.birthday) || '',
+      type:           cl.type || (reg&&reg.arrType) || 'walkin',
+      socialConsent:  cl.socialConsent || (reg&&reg.socialConsent) || '',
+      referredBy:     cl.referredBy || '',
+      notes:          cl.notes || '',
+      staffNotes:     cl.staffNotes || '',
+      added:          cl.added || todayStr()
+    };
+    // Only update local DB if not already there
+    var existIdx = (DB.clients||[]).findIndex(function(c){ return (c.fbName||'').toLowerCase()===name.toLowerCase(); });
+    if(existIdx >= 0){ Object.assign(DB.clients[existIdx], merged); }
+    else { if(!DB.clients) DB.clients=[]; DB.clients.push(merged); }
+    push('saveClient', merged);
+  })();
   INV=[];
   ['inv-num','dp-amt','v-amt','bal-mop'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('inv-client').value='';
@@ -5453,6 +5606,29 @@ function printInvoice(id){
 //  IMPORT CLIENTS FROM CSV
 // ================================================================
 function triggerImportFile(){ var el=document.getElementById('cl-import-file'); if(el) el.click(); }
+
+async function runSyncClients(){
+  if(!hasUrl()){ notify('Not connected to server','error'); return; }
+  notify('Scanning all sheets for missing clients…','info');
+  try{
+    var r = await gasCall('syncClients',{});
+    if(r.ok){
+      notify('✓ Clients synced — '+r.added+' added, '+r.updated+' updated','success');
+      // Refresh local client list
+      var r2 = await gasCall('getAll',{});
+      if(r2.ok){
+        if(Array.isArray(r2.clients)) DB.clients = r2.clients;
+        saveLocal();
+        renderClients();
+        updateClientDatalist();
+      }
+    } else {
+      notify('Sync failed: '+(r.error||'Unknown'),'error');
+    }
+  }catch(e){
+    notify('Error: '+e.message,'error');
+  }
+}
 
 function openImportClients(){
   var html =
@@ -6913,7 +7089,7 @@ function setRepMode(mode){
 
 function setRepCat(cat){
   CUR_REP_CAT = cat;
-  ['financial','clients','packages','operations'].forEach(c=>{
+  ['financial','clients','packages','operations','bookings'].forEach(c=>{
     const el  = document.getElementById('rep-cat-'+c);
     const btn = document.getElementById('rcat-'+c);
     if(el)  el.style.display = c===cat ? '' : 'none';
@@ -6938,6 +7114,8 @@ function openPrintCenter(){
     {id:'pc-registrations', label:'Registration List',        desc:'All check-ins with time and SM consent',           cat:'clients',   checked:false},
     {id:'pc-arrival',       label:'Arrival Type Summary',     desc:'Walk-in vs booked breakdown',                      cat:'clients',   checked:false},
     {id:'pc-heatmap',       label:'Time Heatmap',             desc:'Peak session hours in PHT',                        cat:'clients',   checked:false},
+    {id:'pc-slot-dist',     label:'Booking Slot Distribution',desc:'Most popular time slots booked this month',        cat:'packages',  checked:true },
+    {id:'pc-submit-time',   label:'Booking Submission Times', desc:'What time of day clients submit booking requests',  cat:'clients',   checked:true },
     {id:'pc-tasks',         label:'Task Summary',             desc:'Delivered, pending, EOD count',                    cat:'operations',checked:false},
     {id:'pc-transfers',     label:'Fund Transfers & Refunds', desc:'Cash to bank and client refunds',                  cat:'operations',checked:false},
   ];
@@ -7297,12 +7475,188 @@ function _buildReports(prefixes, label){
   renderClientsReport(regs, txnMap, ackMap, label, prefixes);
   renderPackagesReport(txns, regs, txnMap, ackMap, label);
   renderOperationsReport(txns, eods, allFT, gifts, label);
+  renderBookingsReport(acks, DB.bookings||[], prefixes, label);
   notify('Reports generated for '+label,'success');
 }
 
 // ════════════════════════════════
-// FINANCIAL
+// BOOKINGS ANALYTICS
 // ════════════════════════════════
+function renderBookingsReport(acks, bookings, prefixes, label){
+  var ALL_SLOTS_REP = ['10:00 AM','10:45 AM','11:30 AM','12:15 PM','1:00 PM','1:45 PM','2:30 PM','3:15 PM','4:00 PM','4:45 PM','5:30 PM'];
+  var HOUR_LABELS   = ['12am','1am','2am','3am','4am','5am','6am','7am','8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm','10pm','11pm'];
+  var DOW_LABELS    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  // Filter acks to period
+  var periodAcks = acks.filter(function(a){
+    return prefixes.some(function(p){ return String(a.bookDate||'').startsWith(p); });
+  });
+
+  // Filter bookings (Bookings sheet) to period by submitted date
+  var periodBk = bookings.filter(function(b){
+    var d = String(b.submitted||b.date||'').slice(0,10);
+    return prefixes.some(function(p){ return d.startsWith(p); });
+  });
+
+  // Stats
+  var total     = periodAcks.length;
+  var confirmed = periodAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); }).length;
+  var cancelled = periodAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('cancel'); }).length;
+  var pending   = total - confirmed - cancelled;
+
+  var bkTotal = document.getElementById('bk-total');
+  var bkConf  = document.getElementById('bk-confirmed');
+  var bkPend  = document.getElementById('bk-pending');
+  var bkCanc  = document.getElementById('bk-cancelled');
+  if(bkTotal) bkTotal.innerHTML = '<div class="rs-label">Total Bookings</div><div class="rs-val">'+total+'</div>';
+  if(bkConf)  bkConf.innerHTML  = '<div class="rs-label">Confirmed</div><div class="rs-val rs-teal">'+confirmed+'</div>';
+  if(bkPend)  bkPend.innerHTML  = '<div class="rs-label">Pending Payment</div><div class="rs-val rs-gold">'+pending+'</div>';
+  if(bkCanc)  bkCanc.innerHTML  = '<div class="rs-label">Cancelled</div><div class="rs-val rs-danger">'+cancelled+'</div>';
+
+  // ── CHART 1: Time slot distribution ──
+  var slotCounts = {};
+  ALL_SLOTS_REP.forEach(function(s){ slotCounts[s]={confirmed:0,pending:0,total:0}; });
+  periodAcks.forEach(function(a){
+    var slot = String(a.timeSlot||'').trim();
+    if(!slot) return;
+    if(!slotCounts[slot]) slotCounts[slot]={confirmed:0,pending:0,total:0};
+    var st = String(a.status||'').toLowerCase();
+    if(st.includes('cancel')) return;
+    if(st.includes('confirm')) slotCounts[slot].confirmed++;
+    else slotCounts[slot].pending++;
+    slotCounts[slot].total++;
+  });
+  var maxSlot = Math.max.apply(null, ALL_SLOTS_REP.map(function(s){ return slotCounts[s]?slotCounts[s].total:0; }));
+  var slotEl = document.getElementById('rep-slot-chart');
+  if(slotEl){
+    if(maxSlot===0){ slotEl.innerHTML='<div class="tm">No booking slot data for this period.</div>'; }
+    else {
+      var sh = '<div style="display:grid;gap:6px;">';
+      ALL_SLOTS_REP.forEach(function(slot){
+        var c = slotCounts[slot]||{confirmed:0,pending:0,total:0};
+        var pct = Math.round((c.total/maxSlot)*100);
+        var isTop = c.total===maxSlot&&c.total>0;
+        sh += '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:11px;font-weight:600;color:var(--muted);min-width:72px;text-align:right;flex-shrink:0;">'+slot+'</div>'+
+          '<div style="flex:1;height:22px;border-radius:4px;background:var(--light);overflow:hidden;position:relative;">'+
+            (pct>0?'<div style="position:absolute;left:0;top:0;height:100%;width:'+pct+'%;display:flex;overflow:hidden;border-radius:4px;">'+
+              (c.confirmed>0?'<div style="height:100%;flex:'+c.confirmed+';background:var(--teal);"></div>':'')+
+              (c.pending>0?'<div style="height:100%;flex:'+c.pending+';background:#ffc107;"></div>':'')+
+            '</div>':'')+
+          '</div>'+
+          '<div style="min-width:90px;display:flex;align-items:center;gap:5px;flex-shrink:0;">'+
+            '<span style="font-size:13px;font-weight:700;color:'+(isTop?'var(--gold)':'var(--slate)')+';">'+c.total+'</span>'+
+            '<span style="font-size:10px;color:var(--muted);">booking'+(c.total!==1?'s':'')+'</span>'+
+            (isTop&&c.total>0?'<span style="font-size:9px;background:rgba(215,144,104,0.12);color:var(--gold);padding:1px 5px;border-radius:6px;font-weight:700;">★</span>':'')+
+          '</div>'+
+        '</div>';
+      });
+      sh += '</div>';
+      sh += '<div style="display:flex;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--light2);">'+
+        '<span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);display:inline-block;"></span>Confirmed</span>'+
+        '<span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#ffc107;display:inline-block;"></span>Pending payment</span>'+
+      '</div>';
+      slotEl.innerHTML = sh;
+    }
+  }
+
+  // ── CHART 2: Submission hour distribution (from Bookings sheet) ──
+  var hourCounts = new Array(24).fill(0);
+  var hasSubmitData = false;
+  periodBk.forEach(function(b){
+    var sub = b.submitted;
+    if(!sub) return;
+    var dt = sub instanceof Date ? sub : new Date(String(sub));
+    if(isNaN(dt.getTime())) return;
+    // Convert to Manila time
+    var manilaHour = (dt.getUTCHours() + 8) % 24;
+    hourCounts[manilaHour]++;
+    hasSubmitData = true;
+  });
+
+  var subEl = document.getElementById('rep-submit-chart');
+  if(subEl){
+    if(!hasSubmitData){ subEl.innerHTML='<div class="tm">No submission time data. Make sure Code.gs is updated and redeployed.</div>'; }
+    else {
+      var maxHour = Math.max.apply(null, hourCounts);
+      // Group into 4-hour blocks for cleaner display
+      var blocks = [];
+      for(var h=0; h<24; h+=2){
+        blocks.push({
+          label: HOUR_LABELS[h]+' – '+HOUR_LABELS[(h+2)%24],
+          count: hourCounts[h]+(hourCounts[h+1]||0),
+          hours: [h, h+1]
+        });
+      }
+      var maxBlock = Math.max.apply(null, blocks.map(function(b){ return b.count; }));
+      var topIdx = blocks.reduce(function(best,b,i){ return b.count>blocks[best].count?i:best; }, 0);
+
+      var subH = '<div style="display:grid;gap:6px;">';
+      blocks.forEach(function(blk, i){
+        var pct = maxBlock>0 ? Math.round((blk.count/maxBlock)*100) : 0;
+        var isTop = i===topIdx && blk.count>0;
+        var isPeak = (blk.hours[0]>=18&&blk.hours[0]<=23)||(blk.hours[0]>=6&&blk.hours[0]<=9);
+        subH += '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:10px;font-weight:600;color:var(--muted);min-width:90px;text-align:right;flex-shrink:0;white-space:nowrap;">'+blk.label+'</div>'+
+          '<div style="flex:1;height:20px;border-radius:4px;background:var(--light);overflow:hidden;">'+
+            (pct>0?'<div style="height:100%;width:'+pct+'%;border-radius:4px;background:'+(isTop?'var(--gold)':isPeak?'var(--teal)':'var(--slate)')+'25;"></div>':'')+
+            (pct>0?'<div style="height:100%;width:'+pct+'%;border-radius:4px;background:'+(isTop?'var(--gold)':isPeak?'var(--teal)':'rgba(47,79,79,.25)')+';margin-top:-20px;"></div>':'')+
+          '</div>'+
+          '<div style="min-width:60px;display:flex;align-items:center;gap:5px;flex-shrink:0;">'+
+            '<span style="font-size:12px;font-weight:700;color:'+(isTop?'var(--gold)':'var(--slate)')+';">'+blk.count+'</span>'+
+            (isTop?'<span style="font-size:9px;background:rgba(215,144,104,0.12);color:var(--gold);padding:1px 5px;border-radius:6px;font-weight:700;">Peak</span>':'')+
+          '</div>'+
+        '</div>';
+      });
+      subH += '</div>';
+
+      // Insight
+      var peakBlock = blocks[topIdx];
+      subH += '<div style="margin-top:12px;padding:10px 14px;background:rgba(81,137,125,0.06);border-radius:8px;font-size:12px;color:var(--teal);">'+
+        '💡 Most bookings are submitted between <strong>'+peakBlock.label+'</strong> ('+peakBlock.count+' submission'+(peakBlock.count!==1?'s':'')+'). Consider running promos during this window.'+
+      '</div>';
+
+      subEl.innerHTML = subH;
+    }
+  }
+
+  // ── CHART 3: Day of week ──
+  var dowCounts = [0,0,0,0,0,0,0]; // Mon=0 … Sun=6
+  periodBk.forEach(function(b){
+    var sub = b.submitted;
+    if(!sub) return;
+    var dt = sub instanceof Date ? sub : new Date(String(sub));
+    if(isNaN(dt.getTime())) return;
+    var dow = (dt.getDay()+6)%7; // JS Sun=0 → Mon=0
+    dowCounts[dow]++;
+  });
+  var dowEl = document.getElementById('rep-dow-chart');
+  if(dowEl){
+    var maxDow = Math.max.apply(null, dowCounts);
+    if(maxDow===0){ dowEl.innerHTML='<div class="tm">No submission data for this period.</div>'; }
+    else {
+      var dowH = '<div style="display:flex;gap:8px;align-items:flex-end;justify-content:center;height:100px;margin-bottom:8px;">';
+      DOW_LABELS.forEach(function(lbl,i){
+        var pct  = Math.round((dowCounts[i]/maxDow)*100);
+        var isTop = dowCounts[i]===maxDow&&dowCounts[i]>0;
+        var isSun = i===6;
+        dowH += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">'+
+          '<div style="font-size:10px;font-weight:700;color:'+(isTop?'var(--gold)':'var(--slate)')+';">'+dowCounts[i]+'</div>'+
+          '<div style="width:100%;border-radius:4px 4px 0 0;background:'+(isSun?'rgba(192,84,74,0.2)':isTop?'var(--gold)':'var(--teal)')+';height:'+Math.max(pct,4)+'px;transition:height .3s;"></div>'+
+          '<div style="font-size:10px;color:'+(isSun?'var(--danger)':'var(--muted)')+';font-weight:600;">'+lbl+'</div>'+
+        '</div>';
+      });
+      dowH += '</div>';
+
+      // Insight
+      var topDowIdx = dowCounts.reduce(function(best,c,i){ return c>dowCounts[best]?i:best; }, 0);
+      dowH += '<div style="font-size:12px;padding:10px 14px;background:rgba(81,137,125,0.06);border-radius:8px;color:var(--teal);">'+
+        '💡 Clients most often book on <strong>'+DOW_LABELS[topDowIdx]+'</strong>. Schedule promos or reminders the night before.'+
+      '</div>';
+      dowEl.innerHTML = dowH;
+    }
+  }
+}
 function renderFinancialReport(txns, allExp, allFT, eods, label){
   const totalRev  = txns.reduce((s,t)=>s+(+t.total||0),0);
   const totalExp  = allExp.reduce((s,e)=>s+(+e.amt||0),0);
