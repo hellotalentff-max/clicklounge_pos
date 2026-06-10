@@ -4,8 +4,11 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>TimeCommand — Click Lounge Studio</title>
+<!-- Poppins loads async — page renders instantly with Arial, Poppins swaps in when ready -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"></noscript>
 <style>
 :root {
   --bg:       #f0f5f4;
@@ -33,12 +36,12 @@
   --teal2:    #51897d;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Poppins',Arial,sans-serif;background:var(--bg);color:var(--cream);min-height:100vh;overflow-x:hidden;}
+body{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--cream);min-height:100vh;overflow-x:hidden;}
 
 /* ── TYPOGRAPHY ── */
-.serif{font-family:'Poppins',Arial,sans-serif;font-weight:700;}
+.serif{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;}
 .mono{font-family:'Poppins',Arial,monospace;letter-spacing:2px;}
-h1,h2,h3{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:400;}
+h1,h2,h3{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-weight:400;}
 
 /* ── KIOSK SCREEN ── */
 #kioskScreen{display:flex;flex-direction:column;min-height:100vh;}
@@ -60,7 +63,7 @@ h1,h2,h3{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:400;
 }
 .brand-text{line-height:1;}
 .brand-name{
-  font-family:'Poppins',Arial,sans-serif;font-weight:700;
+  font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;
   font-size:17px;font-weight:600;
   color:var(--cream);letter-spacing:0.5px;
 }
@@ -77,7 +80,7 @@ h1,h2,h3{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:400;
   border-radius:var(--radius-sm);
   padding:8px 14px;
   font-size:12px;
-  font-family:'Poppins',Arial,sans-serif;
+  font-family:'Poppins','Helvetica Neue',Arial,sans-serif;
   cursor:pointer;transition:all 0.2s;letter-spacing:1px;
 }
 .admin-trigger:hover{color:var(--muted);border-color:var(--muted2);}
@@ -116,7 +119,7 @@ h1,h2,h3{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:400;
   width:60px;height:60px;border-radius:50%;
   margin:0 auto 14px;
   display:flex;align-items:center;justify-content:center;
-  font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:22px;font-weight:600;
+  font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:22px;font-weight:600;
   border:2px solid var(--border);
 }
 .kiosk-emp-name{font-size:15px;font-weight:600;color:var(--cream);margin-bottom:3px;}
@@ -138,27 +141,27 @@ h1,h2,h3{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:400;
   text-align:center;
   box-shadow:0 8px 32px rgba(47,79,79,0.12);
 }
-.modal-avatar{width:72px;height:72px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:26px;font-weight:600;border:2px solid var(--gold-border);}
-.modal-emp-name{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;}
+.modal-avatar{width:72px;height:72px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:26px;font-weight:600;border:2px solid var(--gold-border);}
+.modal-emp-name{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;}
 .modal-emp-role{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px;}
 .modal-action-label{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
 .modal-time{font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:48px;font-weight:600;color:var(--gold);letter-spacing:4px;margin-bottom:4px;}
 .modal-date-sm{font-size:12px;color:var(--muted);margin-bottom:24px;}
 .modal-shift-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 18px;font-size:12px;color:var(--muted);margin-bottom:28px;}
 .modal-shift-card span{color:var(--cream);font-weight:500;}
-.btn-clock{width:100%;padding:17px;border-radius:50px;font-size:15px;font-weight:600;border:none;cursor:pointer;font-family:'Poppins',Arial,sans-serif;letter-spacing:1.5px;text-transform:uppercase;transition:all 0.2s;margin-bottom:12px;}
+.btn-clock{width:100%;padding:17px;border-radius:50px;font-size:15px;font-weight:600;border:none;cursor:pointer;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;letter-spacing:1.5px;text-transform:uppercase;transition:all 0.2s;margin-bottom:12px;}
 .btn-clock.in{background:linear-gradient(135deg,#51897d,#2f4f4f);color:#fff;box-shadow:0 4px 20px rgba(47,79,79,0.25);}
 .btn-clock.in:hover{transform:scale(1.02);box-shadow:0 8px 32px rgba(90,173,126,0.45);}
 .btn-clock.out{background:linear-gradient(135deg,var(--gold),#c07040);color:#fff;box-shadow:0 4px 20px rgba(215,144,104,0.3);}
 .btn-clock.out:hover{transform:scale(1.02);}
-.btn-link{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:'Poppins',Arial,sans-serif;padding:6px;transition:color 0.15s;}
+.btn-link{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;padding:6px;transition:color 0.15s;}
 .btn-link:hover{color:var(--cream);}
 
 /* ── FLASH ── */
 #successFlash{display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:16px;background:rgba(47,79,79,0.95);}
 #successFlash.show{display:flex;}
 .flash-icon{font-size:72px;}
-.flash-name{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:34px;color:#fff;}
+.flash-name{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:34px;color:#fff;}
 .flash-msg{font-size:16px;color:rgba(255,255,255,0.85);}
 
 /* ── ADMIN PIN ── */
@@ -166,7 +169,7 @@ h1,h2,h3{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:400;
 #adminPinOverlay.open{display:flex;}
 .pin-box{background:var(--surface);border:1px solid var(--gold-border);border-radius:20px;padding:48px 40px;width:360px;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,0.6);}
 .pin-eyebrow{font-size:10px;letter-spacing:4px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;}
-.pin-title{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;}
+.pin-title{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;}
 .pin-sub{font-size:12px;color:var(--muted);margin-bottom:28px;}
 .pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:28px;}
 .pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted2);transition:all 0.2s;}
@@ -183,7 +186,7 @@ h1,h2,h3{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:400;
 .admin-header{background:var(--teal);border-bottom:1px solid rgba(0,0,0,0.1);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;}
 .admin-clock{font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:20px;font-weight:600;color:var(--gold);letter-spacing:2px;}
 .admin-date-sm{font-size:11px;color:rgba(244,247,246,0.6);text-align:right;margin-top:2px;}
-.btn{padding:8px 18px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);transition:all 0.15s;font-family:'Poppins',Arial,sans-serif;background:transparent;color:var(--muted);letter-spacing:0.5px;}
+.btn{padding:8px 18px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);transition:all 0.15s;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;background:transparent;color:var(--muted);letter-spacing:0.5px;}
 .btn:hover{color:var(--cream);border-color:var(--muted2);}
 .btn-gold{background:rgba(215,144,104,0.1);border-color:rgba(215,144,104,0.3);color:var(--gold);}
 .btn-gold:hover{background:rgba(201,168,76,0.25);}
@@ -204,7 +207,7 @@ nav{background:var(--surface);border-bottom:2px solid var(--border);padding:0 32
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;}
 .card-eyebrow{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
 .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
-.section-title{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:22px;font-weight:400;}
+.section-title{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:22px;font-weight:400;}
 
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;}
@@ -220,7 +223,7 @@ nav{background:var(--surface);border-bottom:2px solid var(--border);padding:0 32
 .emp-row{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border);}
 .emp-row:last-child{border-bottom:none;}
 .emp-info{display:flex;align-items:center;gap:13px;}
-.emp-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:600;font-size:15px;flex-shrink:0;border:1px solid var(--border);}
+.emp-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-weight:600;font-size:15px;flex-shrink:0;border:1px solid var(--border);}
 .emp-name{font-size:14px;font-weight:600;color:var(--cream);}
 .emp-sub{font-size:11px;color:var(--muted);margin-top:1px;}
 .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;}
@@ -232,11 +235,11 @@ nav{background:var(--surface);border-bottom:2px solid var(--border);padding:0 32
 .form-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:700;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
 .form-overlay.open{display:flex;}
 .form-box{background:var(--surface);border:1px solid var(--gold-border);border-radius:20px;padding:36px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,0.6);}
-.form-title{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:22px;margin-bottom:24px;color:var(--cream);}
+.form-title{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:22px;margin-bottom:24px;color:var(--cream);}
 .form-section{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--gold-border);}
 .fg{margin-bottom:16px;}
 .fl{font-size:11px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block;}
-.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px;color:var(--cream);font-size:13px;font-family:'Poppins',Arial,sans-serif;outline:none;transition:border-color 0.15s;}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px;color:var(--cream);font-size:13px;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;outline:none;transition:border-color 0.15s;}
 .fi:focus{border-color:var(--gold-border);}
 .fi::placeholder{color:var(--muted2);}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
@@ -1247,7 +1250,7 @@ function generatePDFReport(){
     const bt=bonuses.filter(b=>b.empId===e.id&&b.date>=s&&b.date<=e2).reduce((a,b2)=>a+b2.amount,0);
     rows+=`<tr><td>${e.name}</td><td>${e.role}</td><td>${days}</td><td>${decHrs(tot)}</td><td>₱${reg.toFixed(2)}</td><td>₱${ot.toFixed(2)}</td><td>₱${bt.toFixed(2)}</td><td><strong>₱${(reg+ot+bt).toFixed(2)}</strong></td></tr>`;
   });
-  const html=`<!DOCTYPE html><html><head><title>Pay Period Report — CLS</title><style>@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;500;600&display=swap');body{font-family:'Poppins',Arial,sans-serif;padding:36px;color:#111;font-size:13px;background:#fff;}h1{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;color:#0c0c0c;}h1 span{color:#c9a84c;}.sub{color:#666;margin-bottom:28px;font-size:12px;}.logo{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#c9a84c;margin-bottom:6px;}table{width:100%;border-collapse:collapse;}th{background:#0c0c0c;color:#f0e8d8;padding:10px 12px;text-align:left;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;}td{padding:10px 12px;border-bottom:1px solid #eee;}tr:nth-child(even) td{background:#faf9f7;}.footer{margin-top:32px;font-size:11px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:16px;}</style></head><body><div class="logo">Click Lounge Studio</div><h1>TimeCommand <span>·</span> Payroll Report</h1><div class="sub">Period: ${s} to ${e2} &nbsp;·&nbsp; Generated: ${new Date().toLocaleString('en-PH',{timeZone:'Asia/Manila'})} PHT</div><table><thead><tr><th>Employee</th><th>Role</th><th>Days</th><th>Hours</th><th>Regular</th><th>OT Pay</th><th>Bonus</th><th>Gross Pay</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Generated by TimeCommand for Click Lounge Studio · Confidential</div></body></html>`;
+  const html=`<!DOCTYPE html><html><head><title>Pay Period Report — CLS</title><style>body{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;padding:36px;color:#111;font-size:13px;background:#fff;}h1{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;color:#0c0c0c;}h1 span{color:#c9a84c;}.sub{color:#666;margin-bottom:28px;font-size:12px;}.logo{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#c9a84c;margin-bottom:6px;}table{width:100%;border-collapse:collapse;}th{background:#0c0c0c;color:#f0e8d8;padding:10px 12px;text-align:left;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;}td{padding:10px 12px;border-bottom:1px solid #eee;}tr:nth-child(even) td{background:#faf9f7;}.footer{margin-top:32px;font-size:11px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:16px;}</style></head><body><div class="logo">Click Lounge Studio</div><h1>TimeCommand <span>·</span> Payroll Report</h1><div class="sub">Period: ${s} to ${e2} &nbsp;·&nbsp; Generated: ${new Date().toLocaleString('en-PH',{timeZone:'Asia/Manila'})} PHT</div><table><thead><tr><th>Employee</th><th>Role</th><th>Days</th><th>Hours</th><th>Regular</th><th>OT Pay</th><th>Bonus</th><th>Gross Pay</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Generated by TimeCommand for Click Lounge Studio · Confidential</div></body></html>`;
   const w=window.open('','_blank'); w.document.write(html); w.document.close();
   setTimeout(()=>w.print(),500);
 
@@ -1330,10 +1333,10 @@ function emailPayrollReport(){
 
     const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <title>Payroll — ${e.name}</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:'Poppins',Arial,sans-serif;background:#f0f5f4;color:#1e3333;padding:0;}
+  body{font-family:'Poppins','Helvetica Neue',Arial,sans-serif;background:#f0f5f4;color:#1e3333;padding:0;}
   .wrap{max-width:700px;margin:0 auto;background:#fff;border-radius:0 0 16px 16px;overflow:hidden;}
   .header{background:#2f4f4f;padding:28px 36px;color:#f4f7f6;}
   .header h1{font-size:20px;font-weight:700;margin-bottom:2px;}
@@ -1433,7 +1436,7 @@ function emailPayrollReport(){
       const mailtoUrl=`mailto:${encodeURIComponent(e.email||'')}?subject=${mailSubject}&body=${encodeURIComponent(plainBody)}`;
 
       w.document.body.insertAdjacentHTML('beforeend',`
-      <div id="_emailToolbar" style="position:fixed;bottom:0;left:0;right:0;background:#2f4f4f;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-family:Poppins,Arial,sans-serif;z-index:9999;gap:10px;flex-wrap:wrap;">
+      <div id="_emailToolbar" style="position:fixed;bottom:0;left:0;right:0;background:#2f4f4f;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;z-index:9999;gap:10px;flex-wrap:wrap;">
         <span style="color:rgba(244,247,246,0.7);font-size:12px;">📧 Send this report to <strong style="color:#f4f7f6;">${e.name}</strong></span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button onclick="(function(){
@@ -1448,10 +1451,10 @@ function emailPayrollReport(){
             b.textContent=ok?'✅ Copied! Paste into Gmail':'⚠ Select All + Copy manually';
             b.style.background=ok?'#51897d':'#c0544a';
             setTimeout(()=>{b.textContent='📋 Copy Report';b.style.background='rgba(255,255,255,0.15)';},3000);
-          })()" id="_copyBtn" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Poppins,Arial,sans-serif;">📋 Copy Report</button>
-          <a href="${gmailUrl}" target="_blank" style="background:#d79068;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:Poppins,Arial,sans-serif;">✉ Open Gmail</a>
-          <a href="${mailtoUrl}" target="_blank" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:Poppins,Arial,sans-serif;">📨 Mail App</a>
-          <button onclick="window.print()" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Poppins,Arial,sans-serif;">🖨 Print PDF</button>
+          })()" id="_copyBtn" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;">📋 Copy Report</button>
+          <a href="${gmailUrl}" target="_blank" style="background:#d79068;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;">✉ Open Gmail</a>
+          <a href="${mailtoUrl}" target="_blank" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;">📨 Mail App</a>
+          <button onclick="window.print()" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;">🖨 Print PDF</button>
         </div>
         <div id="_copyHint" style="width:100%;font-size:11px;color:rgba(244,247,246,0.5);display:none;">After copying, open Gmail → Compose → Paste (Ctrl+V or ⌘V). The full styled report will paste with formatting intact.</div>
       </div>
@@ -1837,7 +1840,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
       // Show full-screen confirmation UI
       document.body.innerHTML=`
-      <div style="font-family:'Poppins',Arial,sans-serif;background:#f0f5f4;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+      <div style="font-family:'Poppins','Helvetica Neue',Arial,sans-serif;background:#f0f5f4;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
         <div style="background:#fff;border-radius:20px;box-shadow:0 8px 40px rgba(47,79,79,0.12);max-width:480px;width:100%;overflow:hidden;">
           <div style="background:#2f4f4f;padding:28px;text-align:center;">
             <div style="font-size:48px;margin-bottom:10px;">${alreadyConfirmed?'✅':'📋'}</div>
@@ -1864,12 +1867,12 @@ document.addEventListener('DOMContentLoaded',()=>{
                     <div onclick="document.querySelectorAll('.pm-btn').forEach(b=>b.style.borderColor='rgba(47,79,79,0.1)');this.style.borderColor='#51897d';document.getElementById('conf-method').value='bank';" class="pm-btn" style="border:2px solid rgba(47,79,79,0.1);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;transition:all .15s;"><div style="font-size:22px;">🏦</div><div style="font-size:12px;font-weight:600;margin-top:4px;">Bank Transfer</div></div>
                   </div>
                   <input type="hidden" id="conf-method" value="">
-                  <input type="text" id="conf-ref" placeholder="Reference # (GCash/Bank — optional)" style="width:100%;padding:10px 14px;border:1.5px solid rgba(47,79,79,0.15);border-radius:8px;font-family:Poppins,Arial,sans-serif;font-size:13px;margin-bottom:12px;outline:none;">
+                  <input type="text" id="conf-ref" placeholder="Reference # (GCash/Bank — optional)" style="width:100%;padding:10px 14px;border:1.5px solid rgba(47,79,79,0.15);border-radius:8px;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;font-size:13px;margin-bottom:12px;outline:none;">
                   <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;">
                     <input type="checkbox" id="conf-ack" style="accent-color:#51897d;width:16px;height:16px;margin-top:2px;flex-shrink:0;">
                     <label for="conf-ack" style="font-size:13px;color:#1e3333;cursor:pointer;">I, <strong>${emp.name}</strong>, confirm that I have received my salary of <strong>${confirmAmt?'₱'+parseFloat(confirmAmt).toFixed(2):''}</strong> for the period stated above.</label>
                   </div>
-                  <button onclick="submitEmailConfirm('${confirmEmpId}','${confirmToken}','${confirmPeriod||''}','${confirmAmt||''}')" style="width:100%;background:linear-gradient(135deg,#51897d,#2f4f4f);color:#fff;border:none;padding:16px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:Poppins,Arial,sans-serif;letter-spacing:.5px;">✅ Confirm Receipt</button>
+                  <button onclick="submitEmailConfirm('${confirmEmpId}','${confirmToken}','${confirmPeriod||''}','${confirmAmt||''}')" style="width:100%;background:linear-gradient(135deg,#51897d,#2f4f4f);color:#fff;border:none;padding:16px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Poppins','Helvetica Neue',Arial,sans-serif;letter-spacing:.5px;">✅ Confirm Receipt</button>
                 </div>`
             }
           </div>
@@ -1881,7 +1884,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       window.history.replaceState({},'',window.location.pathname);
     } else {
       // Employee not found — show error
-      document.body.innerHTML=`<div style="font-family:Poppins,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0f5f4;"><div style="background:#fff;border-radius:16px;padding:40px;text-align:center;max-width:400px;"><div style="font-size:48px;">❌</div><h2 style="margin:12px 0 8px;color:#1e3333;">Invalid Link</h2><p style="color:#6b8c8c;font-size:13px;">This confirmation link is invalid or has expired. Please contact your manager.</p></div></div>`;
+      document.body.innerHTML=`<div style="font-family:'Poppins','Helvetica Neue',Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0f5f4;"><div style="background:#fff;border-radius:16px;padding:40px;text-align:center;max-width:400px;"><div style="font-size:48px;">❌</div><h2 style="margin:12px 0 8px;color:#1e3333;">Invalid Link</h2><p style="color:#6b8c8c;font-size:13px;">This confirmation link is invalid or has expired. Please contact your manager.</p></div></div>`;
     }
   }
 });
@@ -1924,7 +1927,7 @@ function submitEmailConfirm(empId,token,period,amount){
 
   // Show success screen
   document.body.innerHTML=`
-  <div style="font-family:Poppins,Arial,sans-serif;background:linear-gradient(135deg,#51897d,#2f4f4f);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+  <div style="font-family:'Poppins','Helvetica Neue',Arial,sans-serif;background:linear-gradient(135deg,#51897d,#2f4f4f);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
     <div style="background:#fff;border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,0.2);max-width:440px;width:100%;padding:40px;text-align:center;">
       <div style="font-size:64px;margin-bottom:16px;">✅</div>
       <h1 style="font-size:22px;font-weight:700;color:#1e3333;margin-bottom:8px;">Payment Confirmed!</h1>
