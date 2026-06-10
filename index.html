@@ -1228,25 +1228,47 @@ tr:hover td { background:var(--light); }
 <!-- CLIENTS -->
 <div id="page-clients" class="page">
   <div class="ph">
-    <div><h2>Client Records</h2><p>CRM — history, activity and direct messaging</p></div>
+    <div><h2>ClickCard &amp; Client Hub</h2><p>Loyalty points, CRM records and client history</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-sm btn-outline" onclick="runSyncClients()" title="Scan all sheets and auto-fill missing client records">🔄 Sync Missing Clients</button>
-      <button class="btn btn-sm btn-outline" onclick="openImportClients()">📥 Import CSV</button>
-      <button class="btn btn-gold" onclick="openCRMCompose()">✉ Send Campaign</button>
+      <button class="btn btn-sm btn-outline" onclick="runSyncClients()" title="Scan all sheets and auto-fill missing client records">🔄 Sync</button>
+      <button class="btn btn-sm btn-outline" onclick="openImportClients()">📥 Import</button>
+      <button class="btn btn-sm btn-outline" onclick="recalcAllPoints()">🏅 Recalc Points</button>
+      <button class="btn btn-gold" onclick="openCRMCompose()">✉ Campaign</button>
     </div>
   </div>
+
+  <!-- Tier summary bar -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;" id="cl-tier-bar"></div>
 
   <!-- Search + Filter row -->
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
     <input class="sinput" style="flex:1;min-width:200px;" type="text" id="cl-search" placeholder="Search by name, email, phone…" oninput="renderClients()">
-    <select class="sinput" style="width:150px;" id="cl-filter" onchange="renderClients()">
+    <select class="sinput" style="width:160px;" id="cl-filter" onchange="renderClients()">
       <option value="all">All Clients</option>
-      <option value="walkin">Walk-in only</option>
-      <option value="booked">Booked only</option>
-      <option value="smc-yes">SM Consent ✅</option>
-      <option value="smc-no">SM No Consent 🚫</option>
-      <option value="at-risk">At Risk (60d+)</option>
-      <option value="birthday-month">🎂 Birthday This Month</option>
+      <optgroup label="— Tier —">
+        <option value="tier-gold">👑 Gold VIP</option>
+        <option value="tier-silver">💎 Silver</option>
+        <option value="tier-bronze">⭐ Bronze</option>
+        <option value="tier-starter">🌱 Starter</option>
+        <option value="tier-member">🎫 Member</option>
+      </optgroup>
+      <optgroup label="— Type —">
+        <option value="walkin">Walk-in only</option>
+        <option value="booked">Booked only</option>
+      </optgroup>
+      <optgroup label="— Status —">
+        <option value="smc-yes">SM Consent ✅</option>
+        <option value="smc-no">SM No Consent 🚫</option>
+        <option value="at-risk">At Risk (60d+)</option>
+        <option value="birthday-month">🎂 Birthday This Month</option>
+      </optgroup>
+    </select>
+    <select class="sinput" style="width:140px;" id="cl-sort" onchange="renderClients()">
+      <option value="alpha">A → Z</option>
+      <option value="points">Most Points</option>
+      <option value="sessions">Most Sessions</option>
+      <option value="spent">Most Spent</option>
+      <option value="recent">Recent First</option>
     </select>
     <div id="cl-count" style="font-size:12px;color:var(--muted);white-space:nowrap;"></div>
   </div>
@@ -1254,8 +1276,6 @@ tr:hover td { background:var(--light); }
 
   <!-- Client cards grid -->
   <div id="cl-table"></div>
-
-  <!-- Client Profile Modal (full detail) rendered inside modal overlay -->
 </div>
 
 
@@ -6288,91 +6308,308 @@ function renderSettings(){
 // ================================================================
 //  RENDER CLIENTS
 // ================================================================
+// ── TIER CONFIG ──
+var TIERS = [
+  { name:'Gold VIP', emoji:'👑', min:500, color:'#b8860b', bg:'rgba(255,215,0,0.08)', border:'rgba(184,134,11,0.3)' },
+  { name:'Silver',   emoji:'💎', min:200, color:'#5b63d9', bg:'rgba(91,99,217,0.06)', border:'rgba(91,99,217,0.2)' },
+  { name:'Bronze',   emoji:'⭐', min:100, color:'var(--gold)', bg:'rgba(215,144,104,0.06)', border:'rgba(215,144,104,0.2)' },
+  { name:'Starter',  emoji:'🌱', min:50,  color:'var(--teal)', bg:'rgba(81,137,125,0.05)', border:'rgba(81,137,125,0.15)' },
+  { name:'Member',   emoji:'🎫', min:0,   color:'var(--muted)', bg:'var(--light)', border:'var(--border)' }
+];
+function getTier(pts){
+  pts = parseInt(pts)||0;
+  for(var i=0;i<TIERS.length;i++){ if(pts>=TIERS[i].min) return TIERS[i]; }
+  return TIERS[TIERS.length-1];
+}
+function getClientPoints(c, txns, pointsActivity){
+  // Spend points from transactions (1 per ₱100)
+  var spendPts = (txns||[]).filter(function(t){
+    return (t.clientName||'').toLowerCase()===(c.fbName||'').toLowerCase() &&
+           !String(t.invoiceNum||'').startsWith('[VOID]');
+  }).reduce(function(s,t){ return s+Math.floor((+t.total||0)/100); }, 0);
+  // Bonus/redemption from Points Activity sheet
+  var bonusPts = (pointsActivity||[]).filter(function(a){
+    return (a.fbName||'').toLowerCase()===(c.fbName||'').toLowerCase();
+  }).reduce(function(s,a){ return s+(parseInt(a.points)||0); }, 0);
+  // Override if stored in client record
+  var stored = parseInt(c.points);
+  if(!isNaN(stored) && stored > 0) return stored;
+  return spendPts + bonusPts;
+}
+function getNextTier(pts){
+  pts = parseInt(pts)||0;
+  var current = getTier(pts);
+  var idx = TIERS.findIndex(function(t){ return t.name===current.name; });
+  if(idx > 0) return TIERS[idx-1];
+  return null;
+}
+
 function renderClients(){
-  const q      = (document.getElementById('cl-search')?.value||'').toLowerCase();
-  const filter = document.getElementById('cl-filter')?.value || 'all';
-  let clients  = (DB.clients||[]).slice();
+  var q       = (document.getElementById('cl-search')?.value||'').toLowerCase();
+  var filter  = document.getElementById('cl-filter')?.value || 'all';
+  var sortBy  = document.getElementById('cl-sort')?.value || 'alpha';
+  var txns    = DB.transactions||[];
+  var regs    = DB.registrations||[];
+  var pa      = DB.pointsActivity||[];
+  var clients = (DB.clients||[]).slice();
+
+  // Compute points + tier for each
+  clients = clients.map(function(c){
+    var pts = getClientPoints(c, txns, pa);
+    return Object.assign({}, c, { _pts:pts, _tier:getTier(pts) });
+  });
 
   // Search
-  if(q) clients = clients.filter(c=>
-    (c.fbName||'').toLowerCase().includes(q)||
-    (c.email||'').toLowerCase().includes(q)||
-    (c.phone||'').toLowerCase().includes(q)||
-    (c.referredBy||'').toLowerCase().includes(q)
-  );
+  if(q) clients = clients.filter(function(c){
+    return (c.fbName||'').toLowerCase().includes(q)||
+           (c.email||'').toLowerCase().includes(q)||
+           (c.phone||'').toLowerCase().includes(q)||
+           (c.referredBy||'').toLowerCase().includes(q);
+  });
 
   // Filters
-  if(filter==='walkin')  clients = clients.filter(c=>c.type==='walkin');
-  if(filter==='booked')  clients = clients.filter(c=>c.type==='booked');
-  if(filter==='smc-yes') clients = clients.filter(c=>c.socialConsent==='yes');
-  if(filter==='smc-no')  clients = clients.filter(c=>c.socialConsent==='no');
-  if(filter==='at-risk'){
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-60);
-    const cutoffStr = cutoff.toISOString().slice(0,10);
-    const allRegs = DB.registrations||[];
-    clients = clients.filter(function(c){
-      const lastVisit = allRegs.filter(r=>r.fbName===c.fbName).map(r=>r.date).sort().slice(-1)[0]||c.added||'';
-      return lastVisit && lastVisit < cutoffStr;
-    });
-  }
-  if(filter==='birthday-month'){
-    const thisMonth = String(new Date().getMonth()+1).padStart(2,'0');
-    clients = clients.filter(c=>c.birthday && String(c.birthday).slice(5,7)===thisMonth);
+  var cutoff60 = new Date(); cutoff60.setDate(cutoff60.getDate()-60);
+  var cutoffStr = cutoff60.toISOString().slice(0,10);
+  var thisMonth = String(new Date().getMonth()+1).padStart(2,'0');
+  var tierFilters = { 'tier-gold':'Gold VIP','tier-silver':'Silver','tier-bronze':'Bronze','tier-starter':'Starter','tier-member':'Member' };
+
+  if(tierFilters[filter]) clients = clients.filter(function(c){ return c._tier.name===tierFilters[filter]; });
+  else if(filter==='walkin')  clients = clients.filter(function(c){ return c.type==='walkin'; });
+  else if(filter==='booked')  clients = clients.filter(function(c){ return c.type==='booked'; });
+  else if(filter==='smc-yes') clients = clients.filter(function(c){ return c.socialConsent==='yes'; });
+  else if(filter==='smc-no')  clients = clients.filter(function(c){ return c.socialConsent==='no'; });
+  else if(filter==='at-risk') clients = clients.filter(function(c){
+    var lv = regs.filter(function(r){ return r.fbName===c.fbName; }).map(function(r){ return r.date; }).sort().slice(-1)[0]||c.added||'';
+    return lv && lv < cutoffStr;
+  });
+  else if(filter==='birthday-month') clients = clients.filter(function(c){ return c.birthday && String(c.birthday).slice(5,7)===thisMonth; });
+
+  // Sort
+  if(sortBy==='alpha')    clients.sort(function(a,b){ return (a.fbName||'').localeCompare(b.fbName||''); });
+  if(sortBy==='points')   clients.sort(function(a,b){ return b._pts - a._pts; });
+  if(sortBy==='sessions') clients.sort(function(a,b){ return regs.filter(function(r){ return r.fbName===b.fbName;}).length - regs.filter(function(r){ return r.fbName===a.fbName;}).length; });
+  if(sortBy==='spent')    clients.sort(function(a,b){ return txns.filter(function(t){ return t.clientName===b.fbName;}).reduce(function(s,t){return s+(+t.total||0);},0) - txns.filter(function(t){ return t.clientName===a.fbName;}).reduce(function(s,t){return s+(+t.total||0);},0); });
+  if(sortBy==='recent')   clients.sort(function(a,b){ return (b.added||'').localeCompare(a.added||''); });
+
+  // Tier summary bar
+  var tierBar = document.getElementById('cl-tier-bar');
+  if(tierBar){
+    var all = (DB.clients||[]).map(function(c){ return getClientPoints(c,txns,pa); });
+    var tierCounts = {};
+    TIERS.forEach(function(t){ tierCounts[t.name]=0; });
+    all.forEach(function(pts){ tierCounts[getTier(pts).name]++; });
+    tierBar.innerHTML = TIERS.map(function(t){
+      return '<div style="background:var(--white);border:1.5px solid '+t.border+';border-radius:10px;padding:10px 12px;text-align:center;cursor:pointer;" onclick="document.getElementById(\'cl-filter\').value=\'tier-'+t.name.toLowerCase().replace(' ','').replace('vip','')+'\';renderClients()">'+
+        '<div style="font-size:18px;">'+t.emoji+'</div>'+
+        '<div style="font-size:18px;font-weight:800;color:'+t.color+';">'+tierCounts[t.name]+'</div>'+
+        '<div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">'+t.name+'</div>'+
+      '</div>';
+    }).join('');
   }
 
-  clients.sort((a,b)=>(a.fbName||'').localeCompare(b.fbName||''));
-
-  const el = document.getElementById('cl-table');
-  const cc = document.getElementById('cl-count');
-  if(cc) cc.textContent = clients.length + ' client' + (clients.length!==1?'s':'');
+  var el = document.getElementById('cl-table');
+  var cc = document.getElementById('cl-count');
+  if(cc) cc.textContent = clients.length+' client'+(clients.length!==1?'s':'');
   if(!el) return;
-
   if(!clients.length){ el.innerHTML='<div class="tm">No clients found.</div>'; return; }
 
-  const txns = DB.transactions||[];
-  const regs = DB.registrations||[];
-  const fbks = DB.feedback||[];
+  el.innerHTML = '<div class="cl-grid">'+clients.map(function(c){
+    var name    = c.fbName||'';
+    var ini     = name.split(' ').map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase();
+    var tier    = c._tier;
+    var pts     = c._pts;
+    var nextT   = getNextTier(pts);
+    var sessions= regs.filter(function(r){ return r.fbName===name; }).length;
+    var cTxns   = txns.filter(function(t){ return t.clientName===name && !String(t.invoiceNum||'').startsWith('[VOID]'); });
+    var spent   = cTxns.reduce(function(s,t){ return s+(+t.total||0); }, 0);
+    var lastVisit=regs.filter(function(r){ return r.fbName===name; }).map(function(r){ return r.date; }).sort().slice(-1)[0]||c.added||'';
+    var smc     = c.socialConsent;
+    var isBday  = c.birthday && String(c.birthday).slice(5,7)===thisMonth;
+    var pctNext = nextT ? Math.min(100, Math.round(((pts-tier.min)/(nextT.min-tier.min))*100)) : 100;
 
-  el.innerHTML = '<div class="cl-grid">' +
-    clients.map(function(c){
-      const name    = c.fbName||'';
-      const ini     = name.split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      const sessions= regs.filter(r=>r.fbName===name).length;
-      const cTxns   = txns.filter(t=>t.clientName===name&&!String(t.invoiceNum||'').startsWith('[VOID]'));
-      const spent   = cTxns.reduce((s,t)=>s+(+t.total||0),0);
-      const lastVisit= regs.filter(r=>r.fbName===name).map(r=>r.date).sort().slice(-1)[0]||c.added||'';
-      const hasFb   = fbks.some(f=>f.fbName===name||f.clientName===name);
-      const smc     = c.socialConsent;
-      return '<div class="cl-card" onclick="openClientProfile('+JSON.stringify(JSON.stringify(name))+')">'+
-        '<div class="cl-card-header">'+
-          '<div class="cl-avatar">'+ini+'</div>'+
-          '<div style="flex:1;min-width:0;">'+
-            '<div class="cl-name">'+escHtml(name)+'</div>'+
-            '<div class="cl-email">'+(c.email||'No email on file')+'</div>'+
+    return '<div class="cl-card" onclick="openClientProfile(\''+encodeURIComponent(name)+'\')">'+
+      '<div class="cl-card-header">'+
+        '<div class="cl-avatar" style="background:'+tier.color+';color:#fff;">'+ini+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div class="cl-name">'+escHtml(name)+(isBday?' 🎂':'')+
+            '<span style="margin-left:6px;font-size:11px;background:'+tier.bg+';color:'+tier.color+';border:1px solid '+tier.border+';padding:2px 8px;border-radius:10px;font-weight:600;vertical-align:middle;">'+tier.emoji+' '+tier.name+'</span>'+
           '</div>'+
-          '<button class="btn btn-sm btn-outline" style="flex-shrink:0;padding:4px 10px;font-size:11px;" '+
-            'data-cname="'+encodeURIComponent(name)+'" '+
-            'onclick="event.stopPropagation();openEditClient(this.dataset.cname)">✏ Edit</button>'+
+          '<div class="cl-email">'+(c.email||'No email on file')+'</div>'+
         '</div>'+
-        '<div class="cl-stats">'+
-          '<div class="cl-stat"><div class="cl-stat-val">'+sessions+'</div><div class="cl-stat-lbl">Visits</div></div>'+
-          '<div class="cl-stat"><div class="cl-stat-val">'+cTxns.length+'</div><div class="cl-stat-lbl">Invoices</div></div>'+
-          '<div class="cl-stat"><div class="cl-stat-val" style="font-size:12px;">'+(spent>0?'&#8369;'+fmt(spent):'&#8369;0')+'</div><div class="cl-stat-lbl">Spent</div></div>'+
+        '<button class="btn btn-sm btn-outline" style="flex-shrink:0;padding:4px 10px;font-size:11px;" '+
+          'data-cname="'+encodeURIComponent(name)+'" '+
+          'onclick="event.stopPropagation();openEditClient(this.dataset.cname)">✏</button>'+
+      '</div>'+
+      // Points bar
+      '<div style="margin:8px 0;">'+
+        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">'+
+          '<span style="font-weight:700;color:'+tier.color+';">🏅 '+pts+' pts</span>'+
+          (nextT?'<span style="color:var(--muted);">'+nextT.emoji+' '+nextT.name+' at '+nextT.min+'</span>':'<span style="color:'+tier.color+';">Max tier reached!</span>')+
         '</div>'+
-        (c.phone||c.birthday?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:11px;color:var(--muted);">'+
-          (c.phone?'<span>&#128241; '+escHtml(c.phone)+'</span>':'')+
-          (c.birthday?'<span>&#127874; '+fmtBirthday(c.birthday)+'</span>':'')+
-          (c.referredBy?'<span>&#129309; Ref: '+escHtml(c.referredBy)+'</span>':'')+
-        '</div>':'')+
-        '<div class="cl-tags">'+
-          '<span class="cl-tag '+(smc==='yes'?'b-gold':'b-teal')+'">'+c.type+'</span>'+
-          (smc==='yes'?'<span class="cl-tag" style="background:rgba(61,140,110,0.1);color:var(--success);">&#9989; SM Consent</span>':'')+
-          (smc==='no'?'<span class="cl-tag" style="background:rgba(192,84,74,0.08);color:var(--danger);">&#128683; Private</span>':'')+
-          (hasFb?'<span class="cl-tag" style="background:rgba(81,137,125,0.08);color:var(--teal);">&#128172; Feedback</span>':'')+
-          (lastVisit?'<span class="cl-tag" style="background:var(--light);color:var(--muted);">Last: '+lastVisit+'</span>':'')+
+        '<div style="height:4px;background:var(--light2);border-radius:2px;overflow:hidden;">'+
+          '<div style="height:100%;width:'+pctNext+'%;background:'+tier.color+';border-radius:2px;transition:width .4s;"></div>'+
         '</div>'+
-      '</div>';
-    }).join('')+'</div>';
+      '</div>'+
+      '<div class="cl-stats">'+
+        '<div class="cl-stat"><div class="cl-stat-val">'+sessions+'</div><div class="cl-stat-lbl">Visits</div></div>'+
+        '<div class="cl-stat"><div class="cl-stat-val">'+cTxns.length+'</div><div class="cl-stat-lbl">Invoices</div></div>'+
+        '<div class="cl-stat"><div class="cl-stat-val" style="font-size:12px;">'+(spent>0?'&#8369;'+fmt(spent):'&#8369;0')+'</div><div class="cl-stat-lbl">Spent</div></div>'+
+      '</div>'+
+      (c.phone||c.birthday?'<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">'+
+        (c.phone?'📱 '+escHtml(c.phone)+' ':'')+
+        (c.birthday?'🎂 '+fmtBirthday(c.birthday):'')+
+      '</div>':'')+
+      '<div style="display:flex;gap:6px;margin-top:8px;">'+
+        '<button class="btn btn-sm btn-teal" style="flex:1;font-size:11px;" '+
+          'data-cname="'+encodeURIComponent(name)+'" '+
+          'onclick="event.stopPropagation();openLogPoints(this.dataset.cname)">🏅 Log Points</button>'+
+        '<button class="btn btn-sm btn-outline" style="flex:1;font-size:11px;" '+
+          'data-cname="'+encodeURIComponent(name)+'" '+
+          'onclick="event.stopPropagation();openRedeemPoints(this.dataset.cname)">🎁 Redeem</button>'+
+      '</div>'+
+    '</div>';
+  }).join('')+'</div>';
+}
+
+
+
+async function recalcAllPoints(){
+  if(!hasUrl()){ notify('Not connected','error'); return; }
+  notify('Recalculating points for all clients…','info');
+  try{
+    var r = await gasCall('recalcAllClientPoints',{});
+    notify('Points recalculated ✓','success');
+    var r2 = await gasCall('getAll',{});
+    if(r2.ok){ if(r2.clients) DB.clients=r2.clients; if(r2.pointsActivity) DB.pointsActivity=r2.pointsActivity; saveLocal(); renderClients(); }
+  }catch(e){ notify('Error: '+e.message,'error'); }
+}
+
+function openLogPoints(encodedName){
+  var name = decodeURIComponent(encodedName);
+  var c    = (DB.clients||[]).find(function(x){ return x.fbName===name; });
+  var pts  = c ? getClientPoints(c, DB.transactions||[], DB.pointsActivity||[]) : 0;
+  var tier = getTier(pts);
+  var ACTIONS = [
+    { label:'📱 Kiosk Check-In',        pts:3  },
+    { label:'📸 Social Media Consent',  pts:10 },
+    { label:'⭐ Feedback Submitted',     pts:20 },
+    { label:'🤝 Referral (friend booked)',pts:30},
+    { label:'🐦 Early Bird Booking',     pts:15 },
+    { label:'🎂 Birthday Month Visit',   pts:10 },
+    { label:'🎁 Redemption (deduct)',    pts:null},
+    { label:'✏ Manual Adjustment',      pts:null}
+  ];
+  var actionOpts = ACTIONS.map(function(a,i){
+    return '<option value="'+i+'">'+(a.pts!==null?a.label+' (+'+a.pts+'pts)':a.label)+'</option>';
+  }).join('');
+  var html =
+    '<h3 style="margin-bottom:4px;">🏅 Log Points</h3>'+
+    '<div style="display:flex;align-items:center;gap:10px;background:'+tier.bg+';border:1px solid '+tier.border+';border-radius:10px;padding:12px 14px;margin-bottom:16px;">'+
+      '<div style="width:38px;height:38px;border-radius:50%;background:'+tier.color+';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">'+name.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase()+'</div>'+
+      '<div><div style="font-weight:700;font-size:14px;">'+escHtml(name)+'</div>'+
+      '<div style="font-size:12px;color:var(--muted);">'+tier.emoji+' '+tier.name+' · '+pts+' pts</div></div>'+
+    '</div>'+
+    '<div class="field"><label>Action</label>'+
+      '<select id="lp-action" class="sinput" onchange="lpActionChange()">'+actionOpts+'</select></div>'+
+    '<div class="field"><label>Points</label>'+
+      '<input type="number" id="lp-pts" class="sinput" value="3" min="-9999" max="9999" placeholder="Enter points (negative to deduct)"></div>'+
+    '<div class="field"><label>Notes (optional)</label>'+
+      '<input type="text" id="lp-notes" class="sinput" placeholder="e.g. Session date, invoice #"></div>'+
+    '<div class="fe">'+
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>'+
+      '<button class="btn btn-teal" onclick="submitLogPoints(\''+encodeURIComponent(name)+'\')">🏅 Log Points</button>'+
+    '</div>';
+  openModal(html);
+  // Pre-fill points for first action
+  setTimeout(function(){
+    var ACTIONS2=[{pts:3},{pts:10},{pts:20},{pts:30},{pts:15},{pts:10},{pts:null},{pts:null}];
+    document.getElementById('lp-pts').value = ACTIONS2[0].pts || '';
+  }, 50);
+}
+
+function lpActionChange(){
+  var ACTIONS=[{pts:3},{pts:10},{pts:20},{pts:30},{pts:15},{pts:10},{pts:null},{pts:null}];
+  var idx = parseInt(document.getElementById('lp-action').value)||0;
+  var ptsEl = document.getElementById('lp-pts');
+  if(ptsEl && ACTIONS[idx].pts !== null) ptsEl.value = ACTIONS[idx].pts;
+}
+
+async function submitLogPoints(encodedName){
+  var name   = decodeURIComponent(encodedName);
+  var ACTS   = ['📱 Kiosk Check-In','📸 Social Media Consent','⭐ Feedback Submitted','🤝 Referral','🐦 Early Bird Booking','🎂 Birthday Month Visit','🎁 Redemption','✏ Manual Adjustment'];
+  var actIdx = parseInt(document.getElementById('lp-action')?.value)||0;
+  var pts    = parseInt(document.getElementById('lp-pts')?.value)||0;
+  var notes  = (document.getElementById('lp-notes')?.value||'').trim();
+  if(!pts){ notify('Enter point value','error'); return; }
+  // Redemptions must be negative
+  if(actIdx===6 && pts>0) pts = -pts;
+
+  closeModal();
+  notify('Logging points…','info');
+  try{
+    var r = await gasCall('logPoints',{
+      fbName:name, action:ACTS[actIdx], points:pts, notes:notes, staff:CURR_USER
+    });
+    if(r.ok){
+      // Update local pointsActivity
+      if(!DB.pointsActivity) DB.pointsActivity=[];
+      DB.pointsActivity.push({id:uid(),date:todayStr(),fbName:name,action:ACTS[actIdx],points:pts,notes:notes,staff:CURR_USER});
+      // Update local client points
+      var cl = (DB.clients||[]).find(function(c){ return (c.fbName||'').toLowerCase()===name.toLowerCase(); });
+      if(cl) cl.points = r.newTotal;
+      saveLocal();
+      renderClients();
+      notify('✓ '+pts+(pts>0?'+':'')+' pts logged for '+name+' · Now: '+r.newTotal+' pts ('+r.tier+')','success');
+    } else { notify('Error: '+(r.error||'Unknown'),'error'); }
+  }catch(e){ notify('Error: '+e.message,'error'); }
+}
+
+function openRedeemPoints(encodedName){
+  var name = decodeURIComponent(encodedName);
+  var c    = (DB.clients||[]).find(function(x){ return x.fbName===name; });
+  var pts  = c ? getClientPoints(c, DB.transactions||[], DB.pointsActivity||[]) : 0;
+  var tier = getTier(pts);
+  var REWARDS = [
+    { label:'🌱 Free soft copy add-on',    req:50,  deduct:50  },
+    { label:'⭐ ₱100 off next session',    req:100, deduct:100 },
+    { label:'💎 ₱300 off + free print',   req:200, deduct:200 },
+    { label:'👑 ₱500 off + free framing', req:500, deduct:500 }
+  ];
+  var rewardHtml = REWARDS.map(function(r){
+    var canRedeem = pts >= r.req;
+    return '<div style="padding:10px 14px;border-radius:8px;border:1.5px solid '+(canRedeem?'rgba(81,137,125,0.3)':'var(--border)')+';background:'+(canRedeem?'rgba(81,137,125,0.04)':'var(--light)')+';margin-bottom:6px;display:flex;align-items:center;gap:10px;">'+
+      '<div style="flex:1;font-size:13px;font-weight:'+(canRedeem?'600':'400')+';color:'+(canRedeem?'var(--slate)':'var(--muted)')+';">'+r.label+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);">'+r.req+' pts</div>'+
+      (canRedeem?'<button class="btn btn-sm btn-teal" onclick="submitRedeem(\''+encodeURIComponent(name)+'\','+r.deduct+',\''+r.label+'\')">Redeem</button>':'<span style="font-size:11px;color:var(--muted);">Need '+(r.req-pts)+' more pts</span>')+
+    '</div>';
+  }).join('');
+
+  openModal(
+    '<h3 style="margin-bottom:4px;">🎁 Redeem Points</h3>'+
+    '<div style="font-size:13px;color:var(--muted);margin-bottom:14px;">'+escHtml(name)+' · '+tier.emoji+' '+tier.name+' · <strong>'+pts+' pts</strong></div>'+
+    rewardHtml+
+    '<div class="fe" style="margin-top:12px;"><button class="btn btn-outline" onclick="closeModal()">Close</button></div>'
+  );
+}
+
+async function submitRedeem(encodedName, deductPts, rewardLabel){
+  var name = decodeURIComponent(encodedName);
+  closeModal();
+  notify('Processing redemption…','info');
+  try{
+    var r = await gasCall('logPoints',{
+      fbName:name, action:'🎁 Redemption: '+rewardLabel, points:-deductPts, notes:'Reward redeemed by '+CURR_USER, staff:CURR_USER
+    });
+    if(r.ok){
+      if(!DB.pointsActivity) DB.pointsActivity=[];
+      DB.pointsActivity.push({id:uid(),date:todayStr(),fbName:name,action:'🎁 Redemption: '+rewardLabel,points:-deductPts,notes:'',staff:CURR_USER});
+      var cl = (DB.clients||[]).find(function(c){ return (c.fbName||'').toLowerCase()===name.toLowerCase(); });
+      if(cl) cl.points = r.newTotal;
+      saveLocal();
+      renderClients();
+      notify('✓ Redeemed: '+rewardLabel+' · Remaining: '+r.newTotal+' pts','success');
+    } else { notify('Error: '+(r.error||'Unknown'),'error'); }
+  }catch(e){ notify('Error: '+e.message,'error'); }
 }
 
 // ================================================================
