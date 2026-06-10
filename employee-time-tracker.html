@@ -1,0 +1,1941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TimeCommand — Click Lounge Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #f0f5f4;
+  --surface:  #ffffff;
+  --surface2: #f4f7f6;
+  --surface3: #e8edec;
+  --gold:     #d79068;
+  --gold2:    #e8a882;
+  --gold-dim: rgba(215,144,104,0.12);
+  --gold-border: rgba(215,144,104,0.3);
+  --cream:    #1e3333;
+  --muted:    #6b8c8c;
+  --muted2:   #9eb8b8;
+  --green:    #51897d;
+  --green-dim:rgba(81,137,125,0.1);
+  --red:      #c0544a;
+  --red-dim:  rgba(192,84,74,0.1);
+  --amber:    #d79068;
+  --amber-dim:rgba(215,144,104,0.1);
+  --blue:     #5a8fd4;
+  --border:   rgba(47,79,79,0.1);
+  --radius:   14px;
+  --radius-sm:8px;
+  --teal:     #2f4f4f;
+  --teal2:    #51897d;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Poppins',Arial,sans-serif;background:var(--bg);color:var(--cream);min-height:100vh;overflow-x:hidden;}
+
+/* ── TYPOGRAPHY ── */
+.serif{font-family:'Poppins',Arial,sans-serif;font-weight:700;}
+.mono{font-family:'Poppins',Arial,monospace;letter-spacing:2px;}
+h1,h2,h3{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:400;}
+
+/* ── KIOSK SCREEN ── */
+#kioskScreen{display:flex;flex-direction:column;min-height:100vh;}
+
+.kiosk-header{
+  background:var(--teal);
+  border-bottom:1px solid rgba(0,0,0,0.1);
+  padding:0 32px;
+  display:flex;align-items:center;justify-content:space-between;
+  height:70px;
+}
+.brand-wrap{display:flex;align-items:center;gap:14px;}
+.brand-mark{
+  width:38px;height:38px;
+  background:rgba(255,255,255,0.2);
+  border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;color:#f4f7f6;font-weight:700;
+}
+.brand-text{line-height:1;}
+.brand-name{
+  font-family:'Poppins',Arial,sans-serif;font-weight:700;
+  font-size:17px;font-weight:600;
+  color:var(--cream);letter-spacing:0.5px;
+}
+.brand-sub{font-size:10px;color:rgba(244,247,246,0.6);letter-spacing:2px;text-transform:uppercase;}
+
+.header-clock-wrap{text-align:center;}
+.header-clock{font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:28px;font-weight:600;color:var(--gold);letter-spacing:3px;}
+.header-date{font-size:11px;color:rgba(244,247,246,0.6);margin-top:3px;letter-spacing:0.5px;}
+
+.admin-trigger{
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--muted2);
+  border-radius:var(--radius-sm);
+  padding:8px 14px;
+  font-size:12px;
+  font-family:'Poppins',Arial,sans-serif;
+  cursor:pointer;transition:all 0.2s;letter-spacing:1px;
+}
+.admin-trigger:hover{color:var(--muted);border-color:var(--muted2);}
+
+.kiosk-main{flex:1;padding:36px 32px;max-width:1200px;margin:0 auto;width:100%;}
+
+.kiosk-hero{text-align:center;margin-bottom:36px;}
+.kiosk-hero h2{font-size:28px;font-weight:400;color:var(--cream);margin-bottom:6px;}
+.kiosk-hero p{font-size:13px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+.gold-line{width:48px;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:14px auto;}
+
+.emp-kiosk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;}
+
+.emp-kiosk-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:28px 20px 22px;
+  cursor:pointer;
+  transition:all 0.22s;
+  text-align:center;
+  user-select:none;
+  position:relative;overflow:hidden;
+}
+.emp-kiosk-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(201,168,76,0.03),transparent);
+  opacity:0;transition:opacity 0.2s;
+}
+.emp-kiosk-card:hover{border-color:rgba(81,137,125,0.4);transform:translateY(-3px);box-shadow:0 8px 24px rgba(47,79,79,0.1);}
+.emp-kiosk-card:hover::before{opacity:1;}
+.emp-kiosk-card.is-in{border-color:rgba(90,173,126,0.3);background:rgba(90,173,126,0.04);}
+.emp-kiosk-card.is-in:hover{border-color:var(--green);box-shadow:0 12px 40px rgba(90,173,126,0.1);}
+
+.kiosk-avatar{
+  width:60px;height:60px;border-radius:50%;
+  margin:0 auto 14px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:22px;font-weight:600;
+  border:2px solid var(--border);
+}
+.kiosk-emp-name{font-size:15px;font-weight:600;color:var(--cream);margin-bottom:3px;}
+.kiosk-emp-role{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px;}
+.kiosk-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;}
+.pill-in{background:var(--green-dim);color:var(--green);border:1px solid rgba(90,173,126,0.25);}
+.pill-out{background:rgba(90,82,72,0.2);color:var(--muted);border:1px solid var(--border);}
+.pill-late{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(212,146,74,0.25);}
+.kiosk-hrs{font-size:11px;color:var(--muted);margin-top:8px;font-family:'Poppins',Arial,monospace;letter-spacing:2px;}
+
+/* ── CLOCK MODAL ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(8px);}
+.overlay.open{display:flex;}
+.modal-box{
+  background:var(--surface);
+  border:1px solid rgba(81,137,125,0.2);
+  border-radius:20px;padding:44px 40px;
+  width:420px;max-width:95vw;
+  text-align:center;
+  box-shadow:0 8px 32px rgba(47,79,79,0.12);
+}
+.modal-avatar{width:72px;height:72px;border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:26px;font-weight:600;border:2px solid var(--gold-border);}
+.modal-emp-name{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;}
+.modal-emp-role{font-size:11px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px;}
+.modal-action-label{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.modal-time{font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:48px;font-weight:600;color:var(--gold);letter-spacing:4px;margin-bottom:4px;}
+.modal-date-sm{font-size:12px;color:var(--muted);margin-bottom:24px;}
+.modal-shift-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 18px;font-size:12px;color:var(--muted);margin-bottom:28px;}
+.modal-shift-card span{color:var(--cream);font-weight:500;}
+.btn-clock{width:100%;padding:17px;border-radius:50px;font-size:15px;font-weight:600;border:none;cursor:pointer;font-family:'Poppins',Arial,sans-serif;letter-spacing:1.5px;text-transform:uppercase;transition:all 0.2s;margin-bottom:12px;}
+.btn-clock.in{background:linear-gradient(135deg,#51897d,#2f4f4f);color:#fff;box-shadow:0 4px 20px rgba(47,79,79,0.25);}
+.btn-clock.in:hover{transform:scale(1.02);box-shadow:0 8px 32px rgba(90,173,126,0.45);}
+.btn-clock.out{background:linear-gradient(135deg,var(--gold),#c07040);color:#fff;box-shadow:0 4px 20px rgba(215,144,104,0.3);}
+.btn-clock.out:hover{transform:scale(1.02);}
+.btn-link{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:'Poppins',Arial,sans-serif;padding:6px;transition:color 0.15s;}
+.btn-link:hover{color:var(--cream);}
+
+/* ── FLASH ── */
+#successFlash{display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:16px;background:rgba(47,79,79,0.95);}
+#successFlash.show{display:flex;}
+.flash-icon{font-size:72px;}
+.flash-name{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:34px;color:#fff;}
+.flash-msg{font-size:16px;color:rgba(255,255,255,0.85);}
+
+/* ── ADMIN PIN ── */
+#adminPinOverlay{display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.92);backdrop-filter:blur(10px);align-items:center;justify-content:center;}
+#adminPinOverlay.open{display:flex;}
+.pin-box{background:var(--surface);border:1px solid var(--gold-border);border-radius:20px;padding:48px 40px;width:360px;text-align:center;box-shadow:0 32px 80px rgba(0,0,0,0.6);}
+.pin-eyebrow{font-size:10px;letter-spacing:4px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;}
+.pin-title{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;}
+.pin-sub{font-size:12px;color:var(--muted);margin-bottom:28px;}
+.pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:28px;}
+.pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted2);transition:all 0.2s;}
+.pin-dot.filled{background:var(--gold);border-color:var(--gold);box-shadow:0 0 10px rgba(201,168,76,0.5);}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;}
+.pin-btn{background:var(--surface2);border:1px solid var(--border);color:var(--cream);font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:20px;font-weight:600;border-radius:12px;padding:15px;cursor:pointer;transition:all 0.15s;user-select:none;}
+.pin-btn:hover{background:var(--surface3);border-color:var(--gold-border);}
+.pin-btn:active{transform:scale(0.92);}
+.pin-btn.sm{font-size:13px;color:var(--muted);}
+.pin-error{color:var(--red);font-size:12px;min-height:18px;margin-top:6px;}
+
+/* ── ADMIN PANEL ── */
+#adminPanel{display:none;flex-direction:column;min-height:100vh;}
+.admin-header{background:var(--teal);border-bottom:1px solid rgba(0,0,0,0.1);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:100;}
+.admin-clock{font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:20px;font-weight:600;color:var(--gold);letter-spacing:2px;}
+.admin-date-sm{font-size:11px;color:rgba(244,247,246,0.6);text-align:right;margin-top:2px;}
+.btn{padding:8px 18px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);transition:all 0.15s;font-family:'Poppins',Arial,sans-serif;background:transparent;color:var(--muted);letter-spacing:0.5px;}
+.btn:hover{color:var(--cream);border-color:var(--muted2);}
+.btn-gold{background:rgba(215,144,104,0.1);border-color:rgba(215,144,104,0.3);color:var(--gold);}
+.btn-gold:hover{background:rgba(201,168,76,0.25);}
+.btn-primary{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:600;}
+.btn-primary:hover{background:#51897d;}
+.btn-danger{background:var(--red-dim);border-color:rgba(192,80,58,0.3);color:var(--red);}
+.btn-danger:hover{background:rgba(192,80,58,0.25);}
+
+nav{background:var(--surface);border-bottom:2px solid var(--border);padding:0 32px;display:flex;gap:2px;}
+.nav-tab{padding:16px 20px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;user-select:none;letter-spacing:1px;text-transform:uppercase;}
+.nav-tab:hover{color:var(--cream);}
+.nav-tab.active{color:var(--teal);border-bottom-color:var(--teal);font-weight:600;}
+
+.admin-main{flex:1;padding:32px;max-width:1280px;margin:0 auto;width:100%;}
+.page{display:none;}.page.active{display:block;}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;}
+.card-eyebrow{font-size:10px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:16px;}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+.section-title{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:22px;font-weight:400;}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;}
+.stat-label{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.stat-value{font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:28px;font-weight:600;color:var(--cream);}
+.stat-value.gold{color:var(--gold);}
+.stat-value.green{color:var(--green);}
+.stat-value.amber{color:var(--amber);}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:4px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media(max-width:768px){.grid-2{grid-template-columns:1fr;}}
+
+.emp-row{display:flex;align-items:center;justify-content:space-between;padding:16px 0;border-bottom:1px solid var(--border);}
+.emp-row:last-child{border-bottom:none;}
+.emp-info{display:flex;align-items:center;gap:13px;}
+.emp-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Poppins',Arial,sans-serif;font-weight:700;font-weight:600;font-size:15px;flex-shrink:0;border:1px solid var(--border);}
+.emp-name{font-size:14px;font-weight:600;color:var(--cream);}
+.emp-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;}
+.badge-in{background:var(--green-dim);color:var(--green);border:1px solid rgba(90,173,126,0.2);}
+.badge-out{background:rgba(90,82,72,0.15);color:var(--muted);border:1px solid var(--border);}
+.badge-late{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(212,146,74,0.2);}
+
+/* forms */
+.form-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:700;align-items:center;justify-content:center;backdrop-filter:blur(6px);}
+.form-overlay.open{display:flex;}
+.form-box{background:var(--surface);border:1px solid var(--gold-border);border-radius:20px;padding:36px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,0.6);}
+.form-title{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:22px;margin-bottom:24px;color:var(--cream);}
+.form-section{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--gold-border);}
+.fg{margin-bottom:16px;}
+.fl{font-size:11px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block;}
+.fi{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 14px;color:var(--cream);font-size:13px;font-family:'Poppins',Arial,sans-serif;outline:none;transition:border-color 0.15s;}
+.fi:focus{border-color:var(--gold-border);}
+.fi::placeholder{color:var(--muted2);}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:28px;}
+
+/* reports */
+.report-controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:flex-end;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--border);}
+td{padding:13px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.03);color:var(--cream);}
+tr:hover td{background:rgba(255,255,255,0.02);}
+
+/* bonus cards */
+.bonus-item{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border);}
+.bonus-item:last-child{border-bottom:none;}
+.bonus-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;background:var(--gold-dim);color:var(--gold);border:1px solid var(--gold-border);}
+
+/* alert items */
+.alert-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
+.alert-item:last-child{border-bottom:none;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+
+/* toast */
+#toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--surface2);border:1px solid var(--gold-border);border-radius:12px;padding:13px 24px;font-size:13px;font-weight:500;box-shadow:0 8px 32px rgba(0,0,0,0.5);transition:transform 0.3s ease;z-index:9999;white-space:nowrap;color:var(--gold);}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.success{border-color:rgba(90,173,126,0.4);color:var(--green);}
+#toast.error{border-color:rgba(192,80,58,0.4);color:var(--red);}
+#toast.info{border-color:var(--gold-border);color:var(--gold);}
+
+/* avatar palette */
+.av1{background:rgba(81,137,125,0.15);color:#2f4f4f;}
+.av2{background:rgba(215,144,104,0.15);color:#b86830;}
+.av3{background:rgba(47,79,79,0.12);color:#2f4f4f;}
+.av4{background:rgba(215,144,104,0.1);color:#c07040;}
+.av5{background:rgba(81,137,125,0.2);color:#3d7060;}
+.av6{background:rgba(215,144,104,0.2);color:#c07840;}
+.av7{background:rgba(47,79,79,0.15);color:#3d6060;}
+.av8{background:rgba(215,144,104,0.12);color:#a85828;}
+
+/* empty */
+.empty-state{text-align:center;padding:48px 0;color:var(--muted);font-size:13px;}
+
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px;}
+
+.history-entry{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
+.history-entry:last-child{border-bottom:none;}
+.history-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:4px;}
+</style>
+</head>
+<body>
+
+<!-- ══ KIOSK ══ -->
+<div id="kioskScreen">
+  <div class="kiosk-header">
+    <div class="brand-wrap">
+      <div class="brand-mark">⏱</div>
+      <div class="brand-text">
+        <div class="brand-name">TimeCommand</div>
+        <div class="brand-sub">Click Lounge Studio</div>
+      </div>
+    </div>
+    <div class="header-clock-wrap">
+      <div class="header-clock" id="kioskClock">00:00:00</div>
+      <div class="header-date" id="kioskDate"></div>
+    </div>
+    <button class="admin-trigger" onclick="openAdminPin()">⚙ Admin</button>
+  </div>
+
+  <div class="kiosk-main">
+    <div class="kiosk-hero">
+      <h2>Tap your name to clock in or out</h2>
+      <div class="gold-line"></div>
+      <p>No PIN required — select your profile below</p>
+    </div>
+    <div class="emp-kiosk-grid" id="kioskGrid"></div>
+  </div>
+</div>
+
+<!-- Clock Confirm Modal -->
+<div class="overlay" id="clockModal">
+  <div class="modal-box">
+    <div class="modal-avatar" id="modalAvatar"></div>
+    <div class="modal-emp-name" id="modalName"></div>
+    <div class="modal-emp-role" id="modalRole"></div>
+    <div class="modal-action-label" id="modalActionLabel"></div>
+    <div class="modal-time" id="modalLiveClock"></div>
+    <div class="modal-date-sm" id="modalLiveDate"></div>
+    <div class="modal-shift-card" id="modalShiftInfo"></div>
+    <button class="btn-clock" id="modalConfirmBtn" onclick="confirmClock()"></button>
+    <button class="btn-link" onclick="closeClockModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- Success Flash -->
+<div id="successFlash">
+  <div class="flash-icon" id="flashIcon"></div>
+  <div class="flash-name" id="flashName"></div>
+  <div class="flash-msg" id="flashMsg"></div>
+</div>
+
+<!-- ══ ADMIN PIN ══ -->
+<div id="adminPinOverlay">
+  <div class="pin-box">
+    <div class="pin-eyebrow">TimeCommand</div>
+    <div class="pin-title">Admin Access</div>
+    <div class="pin-sub">Enter your 4-digit PIN to continue</div>
+    <div class="pin-dots">
+      <div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn sm" onclick="pinClear()">CLR</button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn sm" onclick="pinBack()">⌫</button>
+    </div>
+    <div class="pin-error" id="pinError"></div>
+    <div style="margin-top:16px"><button class="btn-link" onclick="closeAdminPin()">Cancel</button></div>
+  </div>
+</div>
+
+<!-- ══ ADMIN PANEL ══ -->
+<div id="adminPanel">
+  <div class="admin-header">
+    <div class="brand-wrap">
+      <div class="brand-mark">⏱</div>
+      <div class="brand-text">
+        <div class="brand-name" style="font-size:15px">TimeCommand</div>
+        <div class="brand-sub">Admin Panel</div>
+      </div>
+    </div>
+    <div style="text-align:center">
+      <div class="admin-clock" id="adminClock">00:00:00</div>
+      <div class="admin-date-sm" id="adminDate"></div>
+    </div>
+    <button class="btn" onclick="exitAdmin()">← Back to Kiosk</button>
+  </div>
+
+  <nav>
+    <div class="nav-tab active" onclick="showAdminPage('dashboard')" id="tab-dashboard">Dashboard</div>
+    <div class="nav-tab" onclick="showAdminPage('employees')" id="tab-employees">Employees</div>
+    <div class="nav-tab" onclick="showAdminPage('attendance')" id="tab-attendance">Attendance</div>
+    <div class="nav-tab" onclick="showAdminPage('bonus')" id="tab-bonus">Bonus & Commission</div>
+    <div class="nav-tab" onclick="showAdminPage('reports')" id="tab-reports">Reports</div>
+  </nav>
+
+  <div class="admin-main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-row" id="statsRow"></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-eyebrow">Today's Attendance</div><div id="todayList"></div></div>
+        <div class="card"><div class="card-eyebrow">Alerts</div><div id="alertsList"></div></div>
+      </div>
+    </div>
+
+    <!-- EMPLOYEES -->
+    <div class="page" id="page-employees">
+      <div class="section-header">
+        <h2 class="section-title">Employee Profiles</h2>
+        <button class="btn btn-primary" onclick="openAddEmp()">+ Add Employee</button>
+      </div>
+      <div class="card"><div id="empManageList"></div></div>
+    </div>
+
+    <!-- BONUS & COMMISSION -->
+    <div class="page" id="page-attendance">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h2 style="font-size:18px;font-weight:700;color:var(--cream);">Attendance Log</h2>
+          <p style="font-size:12px;color:var(--muted);margin-top:2px;">View, add, and edit time entries</p>
+        </div>
+        <button class="btn btn-primary" onclick="openManualEntry()">+ Manual Entry</button>
+      </div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <select class="fi" id="att-emp" onchange="renderAttendance()" style="flex:1;min-width:160px;">
+          <option value="all">All Employees</option>
+        </select>
+        <input class="fi" type="date" id="att-from" onchange="renderAttendance()" style="width:150px;">
+        <span style="color:var(--muted);align-self:center;font-size:13px;">to</span>
+        <input class="fi" type="date" id="att-to" onchange="renderAttendance()" style="width:150px;">
+        <button class="btn" onclick="document.getElementById('att-from').value=todayPH();document.getElementById('att-to').value=todayPH();renderAttendance();" style="font-size:12px;padding:8px 14px;">Today</button>
+        <button class="btn" onclick="setAttWeek()" style="font-size:12px;padding:8px 14px;">This Week</button>
+      </div>
+
+      <div id="att-table"></div>
+    </div>
+
+    <div class="page" id="page-bonus">
+      <div class="section-header">
+        <h2 class="section-title">Bonus & Commission</h2>
+        <button class="btn btn-primary" onclick="openBonusModal()">+ Award Bonus</button>
+      </div>
+      <div class="grid-2" style="margin-bottom:20px">
+        <div class="card"><div class="card-eyebrow">Recent Awards</div><div id="bonusRecentList"></div></div>
+        <div class="card"><div class="card-eyebrow">Summary by Employee</div><div id="bonusSummary"></div></div>
+      </div>
+      <div class="card"><div class="card-eyebrow">Full Bonus History</div><div id="bonusFullList"></div></div>
+    </div>
+
+    <!-- REPORTS -->
+    <div class="page" id="page-reports">
+      <div class="section-header"><h2 class="section-title">Reports & Analytics</h2></div>
+      <div class="report-controls">
+        <div>
+          <label class="fl" style="margin-bottom:5px">Report Type</label>
+          <select class="fi" id="reportType" onchange="renderReport()" style="width:200px">
+            <option value="daily">Daily Summary</option>
+            <option value="weekly">Weekly Hours</option>
+            <option value="late">Late Arrivals</option>
+            <option value="overtime">Overtime</option>
+            <option value="payperiod">Pay Period</option>
+          </select>
+        </div>
+        <div id="singleDateWrap">
+          <label class="fl" style="margin-bottom:5px">Date</label>
+          <input type="date" class="fi" id="reportDate" style="width:160px" onchange="renderReport()"/>
+        </div>
+        <div id="dateRangeWrap" style="display:none;gap:8px;align-items:flex-end">
+          <div>
+            <label class="fl" style="margin-bottom:5px">From</label>
+            <input type="date" class="fi" id="reportFrom" style="width:145px" onchange="renderReport()"/>
+          </div>
+          <div>
+            <label class="fl" style="margin-bottom:5px">To</label>
+            <input type="date" class="fi" id="reportTo" style="width:145px" onchange="renderReport()"/>
+          </div>
+        </div>
+        <div>
+          <label class="fl" style="margin-bottom:5px">Employee</label>
+          <select class="fi" id="reportEmpFilter" style="width:180px" onchange="renderReport()">
+            <option value="all">All Employees</option>
+          </select>
+        </div>
+        <div style="align-self:flex-end;display:flex;gap:8px">
+          <button class="btn btn-gold" onclick="exportCSV()">⬇ CSV</button>
+          <button class="btn btn-primary" onclick="generatePDFReport()">📄 PDF</button>
+          <button class="btn btn-primary" style="background:var(--gold);border-color:var(--gold);" onclick="emailPayrollReport()">✉ Email</button>
+          <button class="btn" style="background:rgba(81,137,125,0.1);border-color:rgba(81,137,125,0.3);color:var(--teal);font-weight:600;" onclick="openPayConfirm()">✅ Confirm Pay</button>
+        </div>
+      </div>
+      <div class="card" id="reportOutput"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Employee Form Modal -->
+<div class="form-overlay" id="modalAddEmp">
+  <div class="form-box">
+    <div class="form-title" id="empModalTitle">Add Employee</div>
+    <div class="form-section">Personal Information</div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Full Name</label><input class="fi" id="empName" placeholder="Maria Santos"/></div>
+      <div class="fg"><label class="fl">Role / Position</label><input class="fi" id="empRole" placeholder="Cashier"/></div>
+    </div>
+    <div class="fg"><label class="fl">Email Address</label><input class="fi" type="email" id="empEmail" placeholder="maria@email.com"/></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Start Date</label><input class="fi" type="date" id="empStartDate"/></div>
+      <div class="fg"><label class="fl">Hourly Rate (₱)</label><input class="fi" type="number" id="empRate" placeholder="0"/></div>
+    </div>
+    <div class="form-section">Shift & Pay Settings</div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Shift Start</label><input class="fi" type="time" id="empShiftStart" value="10:00"/></div>
+      <div class="fg"><label class="fl">Shift End</label><input class="fi" type="time" id="empShiftEnd" value="18:00"/></div>
+    </div>
+    <div class="fg">
+      <label class="fl">Pay Period</label>
+      <select class="fi" id="empPayPeriod">
+        <option value="weekly">Weekly</option>
+        <option value="biweekly">Bi-weekly</option>
+        <option value="semimonthly">Semi-monthly (1st & 15th)</option>
+        <option value="monthly">Monthly</option>
+        <option value="custom">Custom (set in reports)</option>
+      </select>
+    </div>
+    <div class="form-section">History Note (optional)</div>
+    <div class="fg"><label class="fl">Initial Note</label><input class="fi" id="empNote" placeholder="e.g. Promoted from Part-time, Transferred from Laguna branch"/></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeFormModal('modalAddEmp')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEmployee()">Save Employee</button>
+    </div>
+  </div>
+</div>
+
+<!-- Employee Detail / History Modal -->
+<div class="form-overlay" id="modalEmpDetail">
+  <div class="form-box" style="width:600px">
+    <div class="form-title" id="detailEmpName"></div>
+    <div id="detailEmpMeta" style="font-size:12px;color:var(--muted);margin-bottom:20px;letter-spacing:1px;text-transform:uppercase;"></div>
+    <div class="form-section">Employment History</div>
+    <div id="detailHistory"></div>
+    <div class="form-section" style="margin-top:20px">Add History Note</div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Date</label><input class="fi" type="date" id="histDate"/></div>
+      <div class="fg"><label class="fl">Note</label><input class="fi" id="histNote" placeholder="e.g. Promoted to Senior Cashier"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeFormModal('modalEmpDetail')">Close</button>
+      <button class="btn btn-gold" onclick="addHistoryNote()">Add Note</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bonus Modal -->
+<div class="form-overlay" id="modalBonus">
+  <div class="form-box" style="width:480px">
+    <div class="form-title">Award Bonus / Commission</div>
+    <div class="fg"><label class="fl">Employee</label>
+      <select class="fi" id="bonusEmpId"></select>
+    </div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Type</label>
+        <select class="fi" id="bonusType">
+          <option value="bonus">Bonus</option>
+          <option value="commission">Commission</option>
+          <option value="incentive">Incentive</option>
+          <option value="allowance">Allowance</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Amount (₱)</label><input class="fi" type="number" id="bonusAmount" placeholder="0"/></div>
+    </div>
+    <div class="fg"><label class="fl">Achievement / Task Description</label><input class="fi" id="bonusTask" placeholder="e.g. Most bookings in November, Perfect attendance"/></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Date Awarded</label><input class="fi" type="date" id="bonusDate"/></div>
+      <div class="fg"><label class="fl">Reference / Notes</label><input class="fi" id="bonusNote" placeholder="Optional"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeFormModal('modalBonus')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBonus()">Award</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Confirmation Modal -->
+<div class="form-overlay" id="modalPayConfirm">
+  <div class="form-box" style="width:520px;max-width:95vw;">
+    <div class="form-title">✅ Confirm Salary Payment</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:-16px;margin-bottom:20px;">Record that employee has received their pay for this period.</div>
+
+    <div class="fg">
+      <label class="fl">Employee</label>
+      <select class="fi" id="pc-emp"></select>
+    </div>
+
+    <div class="fr">
+      <div class="fg">
+        <label class="fl">Pay Period From</label>
+        <input class="fi" type="date" id="pc-from"/>
+      </div>
+      <div class="fg">
+        <label class="fl">Pay Period To</label>
+        <input class="fi" type="date" id="pc-to"/>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="fl">Gross Amount Paid (₱)</label>
+      <input class="fi" type="number" id="pc-amount" placeholder="0.00" step="0.01"/>
+    </div>
+
+    <div class="fg">
+      <label class="fl">Payment Method</label>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px;">
+        <label id="pm-cash-lbl" style="border:2px solid var(--border);border-radius:10px;padding:14px 10px;cursor:pointer;text-align:center;transition:all .15s;" onclick="selectPayMethod('cash')">
+          <input type="radio" name="paymethod" value="cash" id="pm-cash" style="display:none;">
+          <div style="font-size:22px;margin-bottom:4px;">💵</div>
+          <div style="font-size:13px;font-weight:600;color:var(--cream);">Cash</div>
+        </label>
+        <label id="pm-gcash-lbl" style="border:2px solid var(--border);border-radius:10px;padding:14px 10px;cursor:pointer;text-align:center;transition:all .15s;" onclick="selectPayMethod('gcash')">
+          <input type="radio" name="paymethod" value="gcash" id="pm-gcash" style="display:none;">
+          <div style="font-size:22px;margin-bottom:4px;">📱</div>
+          <div style="font-size:13px;font-weight:600;color:var(--cream);">GCash</div>
+        </label>
+        <label id="pm-bank-lbl" style="border:2px solid var(--border);border-radius:10px;padding:14px 10px;cursor:pointer;text-align:center;transition:all .15s;" onclick="selectPayMethod('bank')">
+          <input type="radio" name="paymethod" value="bank" id="pm-bank" style="display:none;">
+          <div style="font-size:22px;margin-bottom:4px;">🏦</div>
+          <div style="font-size:13px;font-weight:600;color:var(--cream);">Bank Transfer</div>
+        </label>
+      </div>
+    </div>
+
+    <div class="fg" id="pc-ref-wrap" style="display:none;">
+      <label class="fl">Reference Number</label>
+      <input class="fi" id="pc-ref" placeholder="GCash ref # or bank transaction ID"/>
+    </div>
+
+    <div class="fg">
+      <label class="fl">Notes (optional)</label>
+      <input class="fi" id="pc-notes" placeholder="e.g. Includes Nov bonus, partial advance deducted"/>
+    </div>
+
+    <!-- Employee acknowledgement -->
+    <div style="background:rgba(81,137,125,0.06);border:1.5px solid rgba(81,137,125,0.15);border-radius:10px;padding:16px;margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:600;color:var(--teal);margin-bottom:10px;">📝 Employee Acknowledgement</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">By selecting "Mark as Received", you confirm that <strong id="pc-emp-name">the employee</strong> has received the amount stated above via the selected payment method.</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+        <input type="checkbox" id="pc-ack" style="accent-color:var(--teal);width:16px;height:16px;" onchange="document.getElementById('pc-submit-btn').disabled=!this.checked;document.getElementById('pc-submit-btn').style.opacity=this.checked?'1':'0.5';">
+        <span>I confirm payment has been received</span>
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeFormModal('modalPayConfirm')">Cancel</button>
+      <button class="btn btn-primary" id="pc-submit-btn" onclick="submitPayConfirm()" disabled style="opacity:0.5;">✅ Mark as Received</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual Time Entry Modal -->
+<div class="form-overlay" id="modalManualEntry">
+  <div class="form-box" style="width:500px;max-width:95vw;">
+    <div class="form-title">✏ Manual Time Entry</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:-16px;margin-bottom:20px;">Add or correct a clock-in/clock-out for any date.</div>
+
+    <div class="fg">
+      <label class="fl">Employee</label>
+      <select class="fi" id="me-emp" onchange="meUpdateShift()"></select>
+    </div>
+    <div id="me-shift-hint" style="font-size:11px;color:var(--muted);margin-top:-8px;margin-bottom:12px;padding-left:2px;"></div>
+
+    <div class="fr">
+      <div class="fg">
+        <label class="fl">Date</label>
+        <input class="fi" type="date" id="me-date" onchange="meFillExisting()"/>
+      </div>
+    </div>
+
+    <!-- Existing entries for that day -->
+    <div id="me-existing" style="display:none;background:rgba(81,137,125,0.05);border:1px solid rgba(81,137,125,0.15);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;"></div>
+
+    <div class="fr">
+      <div class="fg">
+        <label class="fl">Clock In Time</label>
+        <input class="fi" type="time" id="me-in" step="60"/>
+      </div>
+      <div class="fg">
+        <label class="fl">Clock Out Time</label>
+        <input class="fi" type="time" id="me-out" step="60"/>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;">Leave blank if still working</div>
+      </div>
+    </div>
+
+    <!-- OT preview -->
+    <div id="me-preview" style="display:none;background:rgba(81,137,125,0.05);border:1px solid rgba(81,137,125,0.2);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;"></div>
+
+    <div class="fg">
+      <label class="fl">Note (optional)</label>
+      <input class="fi" id="me-note" placeholder="e.g. Forgot to clock in, makeup session, etc."/>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeFormModal('modalManualEntry')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitManualEntry()">💾 Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════
+// CONFIG
+// ══════════════════════════════════
+const ADMIN_PIN = '5378';
+const AV = ['av1','av2','av3','av4','av5','av6','av7','av8'];
+const avFor = i => AV[i % AV.length];
+
+// ══════════════════════════════════
+// STORAGE
+// ══════════════════════════════════
+function initData(){
+  if(!ls('tc_employees')){
+    ss('tc_employees', JSON.stringify([
+      { id:'e1', name:'Maria Santos',   role:'Cashier',         email:'maria@cls.com',  startDate:'2024-01-15', shiftStart:'10:00', shiftEnd:'18:00', rate:80,  payPeriod:'semimonthly', color:'av1', active:true, history:[{date:'2024-01-15',note:'Joined as Cashier'}] },
+      { id:'e2', name:'Juan dela Cruz', role:'Supervisor',      email:'juan@cls.com',   startDate:'2023-06-01', shiftStart:'10:00', shiftEnd:'18:00', rate:120, payPeriod:'semimonthly', color:'av2', active:true, history:[{date:'2023-06-01',note:'Joined as Sales Associate'},{date:'2024-03-01',note:'Promoted to Supervisor'}] },
+      { id:'e3', name:'Ana Reyes',      role:'Sales Associate', email:'ana@cls.com',     startDate:'2024-09-10', shiftStart:'10:00', shiftEnd:'18:00', rate:80,  payPeriod:'weekly',      color:'av3', active:true, history:[{date:'2024-09-10',note:'Joined as Sales Associate'}] },
+    ]));
+  }
+  if(!ls('tc_logs'))    ss('tc_logs',   JSON.stringify([]));
+  if(!ls('tc_bonuses')) ss('tc_bonuses',JSON.stringify([]));
+}
+const ls = k => localStorage.getItem(k);
+const ss = (k,v) => localStorage.setItem(k,v);
+const getEmps   = () => JSON.parse(ls('tc_employees')||'[]');
+const getLogs   = () => JSON.parse(ls('tc_logs')||'[]');
+const getBonuses= () => JSON.parse(ls('tc_bonuses')||'[]');
+const saveEmps  = v => ss('tc_employees',JSON.stringify(v));
+const saveLogs  = v => ss('tc_logs',JSON.stringify(v));
+const saveBonuses=v => ss('tc_bonuses',JSON.stringify(v));
+
+// ══════════════════════════════════
+// PH TIME HELPERS
+// ══════════════════════════════════
+function phNow(){ return new Date(); } // Browser should already be PHT if device is set to PH; we force the locale display
+function todayPH(){
+  return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'}); // YYYY-MM-DD
+}
+function timePH(){
+  return new Date().toLocaleTimeString('en-GB',{timeZone:'Asia/Manila',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function dateLongPH(){
+  return new Date().toLocaleDateString('en-PH',{timeZone:'Asia/Manila',weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+function timeDiff(a,b){ // hh:mm:ss → decimal hours
+  const p=s=>s?s.split(':').map(Number):[0,0,0];
+  const [ah,am,as_]=p(a), [bh,bm,bs]=p(b);
+  return ((bh*3600+bm*60+bs)-(ah*3600+am*60+as_))/3600;
+}
+function decHrs(h){
+  return h>0 ? h.toFixed(2) : '0.00';
+}
+function isLate(emp,clockInTime){
+  if(!clockInTime) return false;
+  const [sh,sm]=emp.shiftStart.split(':').map(Number);
+  const [ch,cm]=clockInTime.split(':').map(Number);
+  return (ch*60+cm)>(sh*60+sm+5);
+}
+function stdHrs(emp){
+  const [sh,sm]=emp.shiftStart.split(':').map(Number);
+  const [eh,em]=emp.shiftEnd.split(':').map(Number);
+  return ((eh*60+em)-(sh*60+sm))/60;
+}
+function hoursWorkedDay(empId, dateStr){
+  const logs=getLogs().filter(l=>l.date===dateStr&&l.empId===empId);
+  let tot=0, inT=null;
+  logs.forEach(l=>{ if(l.type==='in')inT=l.time; if(l.type==='out'&&inT){tot+=timeDiff(inT,l.time);inT=null;} });
+  if(inT && dateStr===todayPH()) tot+=timeDiff(inT,timePH());
+  return tot;
+}
+function getActiveSessions(){
+  const logs=getLogs(), today=todayPH(), map={};
+  logs.filter(l=>l.date===today).forEach(l=>{ if(l.type==='in')map[l.empId]=l.time; if(l.type==='out')delete map[l.empId]; });
+  return map;
+}
+
+// ══════════════════════════════════
+// CLOCKS
+// ══════════════════════════════════
+function startClocks(){
+  function tick(){
+    const t=timePH(), d=dateLongPH();
+    ['kioskClock','adminClock'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent=t; });
+    ['kioskDate','adminDate'].forEach(id=>{ const el=document.getElementById(id); if(el)el.textContent=d; });
+    const ml=document.getElementById('modalLiveClock'); if(ml)ml.textContent=t;
+    const md=document.getElementById('modalLiveDate'); if(md)md.textContent=d;
+  }
+  tick(); setInterval(tick,1000);
+}
+
+// ══════════════════════════════════
+// KIOSK
+// ══════════════════════════════════
+function renderKiosk(){
+  const emps=getEmps().filter(e=>e.active);
+  const active=getActiveSessions();
+  let html='';
+  emps.forEach((e,i)=>{
+    const isin=!!active[e.id];
+    const hrs=hoursWorkedDay(e.id,todayPH());
+    const inLog=getLogs().find(l=>l.date===todayPH()&&l.empId===e.id&&l.type==='in');
+    const late=inLog&&isLate(e,inLog.time);
+    let pill = isin&&late ? `<span class="kiosk-pill pill-late">⚠ late</span>`
+             : isin       ? `<span class="kiosk-pill pill-in">● clocked in</span>`
+                          : `<span class="kiosk-pill pill-out">○ not clocked in</span>`;
+    const hrsNote=hrs>0?`<div class="kiosk-hrs">${decHrs(hrs)} hrs today</div>`:'';
+    html+=`<div class="emp-kiosk-card ${isin?'is-in':''}" onclick="openClockModal('${e.id}')">
+      <div class="kiosk-avatar ${e.color||avFor(i)}">${e.name[0]}</div>
+      <div class="kiosk-emp-name">${e.name}</div>
+      <div class="kiosk-emp-role">${e.role}</div>
+      ${pill}${hrsNote}
+    </div>`;
+  });
+  document.getElementById('kioskGrid').innerHTML=html||'<div style="text-align:center;color:var(--muted);padding:48px;grid-column:1/-1">No employees registered. Ask admin to add profiles.</div>';
+}
+
+let pendingEmpId=null;
+function openClockModal(empId){
+  const emps=getEmps(); const emp=emps.find(e=>e.id===empId); if(!emp)return;
+  const active=getActiveSessions(); const isin=!!active[empId];
+  pendingEmpId=empId;
+  const av=document.getElementById('modalAvatar');
+  av.className='modal-avatar '+(emp.color||'av1'); av.textContent=emp.name[0];
+  document.getElementById('modalName').textContent=emp.name;
+  document.getElementById('modalRole').textContent=emp.role;
+  document.getElementById('modalActionLabel').textContent=isin?'Clocking Out At':'Clocking In At';
+  document.getElementById('modalShiftInfo').innerHTML=`Shift: <span>${emp.shiftStart} – ${emp.shiftEnd}</span> &nbsp;·&nbsp; `+(isin?`Today: <span>${decHrs(hoursWorkedDay(empId,todayPH()))} hrs</span>`:`Expected: <span>${emp.shiftStart}</span>`);
+  const btn=document.getElementById('modalConfirmBtn');
+  btn.textContent=isin?'Confirm Clock Out':'Confirm Clock In';
+  btn.className='btn-clock '+(isin?'out':'in');
+  document.getElementById('clockModal').classList.add('open');
+}
+function closeClockModal(){ document.getElementById('clockModal').classList.remove('open'); pendingEmpId=null; }
+function confirmClock(){
+  if(!pendingEmpId)return;
+  const emp=getEmps().find(e=>e.id===pendingEmpId); if(!emp)return;
+  const active=getActiveSessions(); const isin=!!active[pendingEmpId];
+  const logs=getLogs();
+  logs.push({id:Date.now()+'',empId:pendingEmpId,date:todayPH(),time:timePH(),type:isin?'out':'in'});
+  saveLogs(logs); closeClockModal();
+  const flash=document.getElementById('successFlash');
+  const hrs=hoursWorkedDay(pendingEmpId,todayPH());
+  document.getElementById('flashIcon').textContent=isin?'👋':'✅';
+  document.getElementById('flashName').textContent=emp.name;
+  document.getElementById('flashMsg').textContent=isin?`Clocked out · ${decHrs(hrs)} hrs today`:(isLate(emp,timePH())?`Clocked in at ${timePH().slice(0,5)} · ⚠ Late`:`Clocked in · On time ✓`);
+  const bg=isin?'rgba(37,99,235,0.9)':isLate(emp,timePH())?'rgba(212,146,74,0.9)':'rgba(90,173,126,0.9)';
+  flash.style.background=bg; flash.className='show';
+  setTimeout(()=>{flash.className='';renderKiosk();},2200);
+  pendingEmpId=null;
+}
+
+// ══════════════════════════════════
+// ADMIN PIN
+// ══════════════════════════════════
+let pinInput='';
+function openAdminPin(){ pinInput='';updatePinDots();document.getElementById('pinError').textContent='';document.getElementById('adminPinOverlay').classList.add('open'); }
+function closeAdminPin(){ document.getElementById('adminPinOverlay').classList.remove('open');pinInput=''; }
+function pinPress(d){ if(pinInput.length>=4)return; pinInput+=d; updatePinDots(); if(pinInput.length===4)setTimeout(checkPin,150); }
+function pinBack(){ pinInput=pinInput.slice(0,-1); updatePinDots(); }
+function pinClear(){ pinInput=''; updatePinDots(); }
+function updatePinDots(){ for(let i=0;i<4;i++)document.getElementById('pd'+i).classList.toggle('filled',i<pinInput.length); }
+function checkPin(){
+  if(pinInput===ADMIN_PIN){ closeAdminPin(); openAdminPanel(); }
+  else{ document.getElementById('pinError').textContent='Incorrect PIN. Try again.'; pinInput=''; updatePinDots(); setTimeout(()=>document.getElementById('pinError').textContent='',2000); }
+}
+
+// ══════════════════════════════════
+// ADMIN PANEL
+// ══════════════════════════════════
+function openAdminPanel(){
+  document.getElementById('kioskScreen').style.display='none';
+  document.getElementById('adminPanel').style.display='flex';
+  const t=todayPH();
+  document.getElementById('reportDate').value=t;
+  document.getElementById('reportFrom').value=t;
+  document.getElementById('reportTo').value=t;
+  populateReportFilter(); renderDashboard(); renderEmpManage(); renderBonusPage(); renderReport();
+}
+function exitAdmin(){
+  document.getElementById('adminPanel').style.display='none';
+  document.getElementById('kioskScreen').style.display='flex';
+  renderKiosk();
+}
+function showAdminPage(p){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.getElementById('tab-'+p).classList.add('active');
+  if(p==='dashboard') renderDashboard();
+  if(p==='employees') renderEmpManage();
+  if(p==='bonus') renderBonusPage();
+  if(p==='reports'){ populateReportFilter(); renderReport(); }
+  if(p==='attendance'){ populateAttFilter(); const t=todayPH(); document.getElementById('att-from').value=t; document.getElementById('att-to').value=t; renderAttendance(); }
+}
+
+// ── DASHBOARD ──
+function renderDashboard(){
+  const emps=getEmps().filter(e=>e.active);
+  const active=getActiveSessions(); const today=todayPH();
+  const logs=getLogs().filter(l=>l.date===today);
+  const cin=Object.keys(active).length;
+  const cout=emps.filter(e=>!active[e.id]&&logs.some(l=>l.empId===e.id)).length;
+  const lateC=emps.filter(e=>{ const l=logs.find(x=>x.empId===e.id&&x.type==='in'); return l&&isLate(e,l.time); }).length;
+  let totH=0; emps.forEach(e=>totH+=hoursWorkedDay(e.id,today));
+  document.getElementById('statsRow').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Clocked In</div><div class="stat-value green">${cin}</div><div class="stat-sub">Currently working</div></div>
+    <div class="stat-card"><div class="stat-label">Clocked Out</div><div class="stat-value">${cout}</div><div class="stat-sub">Done for today</div></div>
+    <div class="stat-card"><div class="stat-label">Late Today</div><div class="stat-value amber">${lateC}</div><div class="stat-sub">Arrivals</div></div>
+    <div class="stat-card"><div class="stat-label">Total Hours</div><div class="stat-value gold">${decHrs(totH)}</div><div class="stat-sub">All staff today</div></div>`;
+
+  let tl='';
+  emps.forEach((e,i)=>{
+    const inLog=logs.find(l=>l.empId===e.id&&l.type==='in');
+    const outLog=[...logs].reverse().find(l=>l.empId===e.id&&l.type==='out');
+    const hrs=hoursWorkedDay(e.id,today);
+    let badge='',status='';
+    if(active[e.id]){ const late=isLate(e,active[e.id]); badge=late?'<span class="badge badge-late">Late In</span>':'<span class="badge badge-in">● In</span>'; status=`Since ${active[e.id].slice(0,5)}`; }
+    else if(outLog){ badge='<span class="badge badge-out">Out</span>'; status=`Left ${outLog.time.slice(0,5)}`; }
+    else{ badge='<span class="badge badge-out">Absent</span>'; status='No record'; }
+    tl+=`<div class="emp-row"><div class="emp-info"><div class="emp-av ${e.color||avFor(i)}">${e.name[0]}</div><div><div class="emp-name">${e.name}</div><div class="emp-sub">${e.role} · ${decHrs(hrs)} hrs</div></div></div><div style="text-align:right">${badge}<div style="font-size:11px;color:var(--muted);margin-top:3px">${status}</div></div></div>`;
+  });
+  document.getElementById('todayList').innerHTML=tl||'<div class="empty-state">No employees.</div>';
+
+  let al='';
+  emps.forEach(e=>{
+    const il=logs.find(l=>l.empId===e.id&&l.type==='in');
+    if(il&&isLate(e,il.time)){ const m=Math.round(timeDiff(e.shiftStart+':00',il.time)*60); al+=`<div class="alert-item"><div class="alert-icon">🕐</div><div><div style="font-size:13px"><strong>${e.name}</strong> arrived ${m} min late</div><div style="font-size:11px;color:var(--muted)">Expected ${e.shiftStart} · Arrived ${il.time.slice(0,5)}</div></div></div>`; }
+    const hrs=hoursWorkedDay(e.id,today);
+    if(hrs>stdHrs(e)&&hrs>0){ const ot=hrs-stdHrs(e); al+=`<div class="alert-item"><div class="alert-icon">⏰</div><div><div style="font-size:13px"><strong>${e.name}</strong> in overtime</div><div style="font-size:11px;color:var(--muted)">${decHrs(ot)} hrs over standard</div></div></div>`; }
+  });
+  document.getElementById('alertsList').innerHTML=al||'<div class="empty-state">No alerts today ✓</div>';
+}
+
+// ── EMPLOYEES ──
+let editingEmpId=null, detailEmpId=null;
+function renderEmpManage(){
+  const emps=getEmps();
+  let h='';
+  emps.forEach((e,i)=>{
+    const since=e.startDate?new Date(e.startDate).toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'}):'—';
+    h+=`<div class="emp-row">
+      <div class="emp-info"><div class="emp-av ${e.color||avFor(i)}">${e.name[0]}</div>
+      <div><div class="emp-name">${e.name}</div>
+      <div class="emp-sub">${e.role} · ₱${e.rate}/hr · ${e.shiftStart}–${e.shiftEnd} · Since ${since}</div>
+      <div class="emp-sub">${e.email||''}</div></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn" style="font-size:11px" onclick="openEmpDetail('${e.id}')">History</button>
+        <button class="btn" style="font-size:11px" onclick="editEmp('${e.id}')">Edit</button>
+        <button class="btn btn-danger" style="font-size:11px" onclick="removeEmp('${e.id}')">Remove</button>
+      </div></div>`;
+  });
+  document.getElementById('empManageList').innerHTML=h||'<div class="empty-state">No employees. Add one above.</div>';
+}
+function openAddEmp(){
+  editingEmpId=null;
+  document.getElementById('empModalTitle').textContent='Add Employee';
+  ['empName','empRole','empEmail','empNote'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('empShiftStart').value='10:00';
+  document.getElementById('empShiftEnd').value='18:00';
+  document.getElementById('empRate').value='';
+  document.getElementById('empStartDate').value=todayPH();
+  document.getElementById('empPayPeriod').value='semimonthly';
+  document.getElementById('modalAddEmp').classList.add('open');
+}
+function editEmp(id){
+  const e=getEmps().find(x=>x.id===id); if(!e)return;
+  editingEmpId=id;
+  document.getElementById('empModalTitle').textContent='Edit Employee';
+  document.getElementById('empName').value=e.name;
+  document.getElementById('empRole').value=e.role;
+  document.getElementById('empEmail').value=e.email||'';
+  document.getElementById('empShiftStart').value=e.shiftStart;
+  document.getElementById('empShiftEnd').value=e.shiftEnd;
+  document.getElementById('empRate').value=e.rate;
+  document.getElementById('empStartDate').value=e.startDate||'';
+  document.getElementById('empPayPeriod').value=e.payPeriod;
+  document.getElementById('empNote').value='';
+  document.getElementById('modalAddEmp').classList.add('open');
+}
+function saveEmployee(){
+  const name=document.getElementById('empName').value.trim();
+  if(!name){showToast('Name is required','error');return;}
+  const emps=getEmps();
+  const rec={name,role:document.getElementById('empRole').value.trim(),email:document.getElementById('empEmail').value.trim(),shiftStart:document.getElementById('empShiftStart').value,shiftEnd:document.getElementById('empShiftEnd').value,rate:parseFloat(document.getElementById('empRate').value)||0,startDate:document.getElementById('empStartDate').value,payPeriod:document.getElementById('empPayPeriod').value};
+  const note=document.getElementById('empNote').value.trim();
+  if(editingEmpId){
+    const idx=emps.findIndex(e=>e.id===editingEmpId);
+    if(idx>-1){
+      emps[idx]={...emps[idx],...rec};
+      if(note) emps[idx].history=[...(emps[idx].history||[]),{date:todayPH(),note}];
+    }
+  } else {
+    const hist=[{date:rec.startDate||todayPH(),note:`Joined as ${rec.role}`}];
+    if(note) hist.push({date:rec.startDate||todayPH(),note});
+    emps.push({id:'e'+Date.now(),...rec,color:AV[emps.length%8],active:true,history:hist});
+  }
+  saveEmps(emps); closeFormModal('modalAddEmp'); renderEmpManage();
+  showToast(editingEmpId?'Employee updated':'Employee added','success');
+}
+function removeEmp(id){
+  if(!confirm('Remove this employee? Logs will remain.'))return;
+  saveEmps(getEmps().filter(e=>e.id!==id)); renderEmpManage(); showToast('Employee removed','info');
+}
+function openEmpDetail(id){
+  detailEmpId=id;
+  const e=getEmps().find(x=>x.id===id); if(!e)return;
+  document.getElementById('detailEmpName').textContent=e.name;
+  document.getElementById('detailEmpMeta').textContent=`${e.role} · Joined ${e.startDate||'—'} · ${e.email||'no email'}`;
+  document.getElementById('histDate').value=todayPH();
+  document.getElementById('histNote').value='';
+  renderDetailHistory(e);
+  document.getElementById('modalEmpDetail').classList.add('open');
+}
+function renderDetailHistory(e){
+  const hist=(e.history||[]).slice().reverse();
+  const payments=(e.paymentRecords||[]).slice().reverse();
+  let h=hist.map(h=>{
+    const isPay=h.note&&h.note.startsWith('✅ Salary received');
+    const isEmail=h.note&&h.note.startsWith('📧 Payroll');
+    const dotColor=isPay?'var(--teal)':isEmail?'var(--gold)':'var(--gold)';
+    return `<div class="history-entry">
+      <div class="history-dot" style="background:${dotColor};margin-top:5px"></div>
+      <div style="flex:1;">
+        <div style="font-size:13px;line-height:1.5;">${h.note}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${h.date}</div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('detailHistory').innerHTML=h||'<div class="empty-state">No history yet.</div>';
+}
+function addHistoryNote(){
+  if(!detailEmpId)return;
+  const note=document.getElementById('histNote').value.trim();
+  const date=document.getElementById('histDate').value||todayPH();
+  if(!note){showToast('Note is required','error');return;}
+  const emps=getEmps(); const idx=emps.findIndex(e=>e.id===detailEmpId);
+  if(idx>-1){ emps[idx].history=[...(emps[idx].history||[]),{date,note}]; saveEmps(emps); renderDetailHistory(emps[idx]); showToast('Note added','success'); document.getElementById('histNote').value=''; }
+}
+
+// ── BONUS ──
+function populateBonusEmpSelect(){
+  const sel=document.getElementById('bonusEmpId');
+  sel.innerHTML=''; getEmps().forEach(e=>{sel.innerHTML+=`<option value="${e.id}">${e.name}</option>`;});
+}
+function openBonusModal(){
+  populateBonusEmpSelect();
+  document.getElementById('bonusAmount').value='';
+  document.getElementById('bonusTask').value='';
+  document.getElementById('bonusNote').value='';
+  document.getElementById('bonusDate').value=todayPH();
+  document.getElementById('bonusType').value='bonus';
+  document.getElementById('modalBonus').classList.add('open');
+}
+function saveBonus(){
+  const empId=document.getElementById('bonusEmpId').value;
+  const amount=parseFloat(document.getElementById('bonusAmount').value)||0;
+  const task=document.getElementById('bonusTask').value.trim();
+  if(!task){showToast('Achievement description is required','error');return;}
+  if(amount<=0){showToast('Amount must be greater than 0','error');return;}
+  const bonuses=getBonuses();
+  bonuses.push({id:'b'+Date.now(),empId,type:document.getElementById('bonusType').value,amount,task,note:document.getElementById('bonusNote').value.trim(),date:document.getElementById('bonusDate').value});
+  saveBonuses(bonuses); closeFormModal('modalBonus'); renderBonusPage();
+  showToast('Bonus awarded!','success');
+}
+function renderBonusPage(){
+  const bonuses=getBonuses().slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const emps=getEmps(); const empMap={}; emps.forEach(e=>empMap[e.id]=e);
+  // recent
+  const recent=bonuses.slice(0,6);
+  let rh=recent.map(b=>{const e=empMap[b.empId]||{}; return `<div class="bonus-item"><div><div class="emp-name" style="font-size:13px">${e.name||'—'}</div><div class="emp-sub">${b.task}</div><div class="emp-sub">${b.date}</div></div><div style="text-align:right"><span class="bonus-tag">${b.type}</span><div style="font-size:15px;font-weight:600;color:var(--gold);margin-top:4px;font-family:'Poppins',Arial,monospace;letter-spacing:2px">₱${b.amount.toFixed(2)}</div></div></div>`;}).join('');
+  document.getElementById('bonusRecentList').innerHTML=rh||'<div class="empty-state">No bonuses yet.</div>';
+  // summary
+  const sumMap={};
+  bonuses.forEach(b=>{ if(!sumMap[b.empId])sumMap[b.empId]={total:0,count:0}; sumMap[b.empId].total+=b.amount; sumMap[b.empId].count++; });
+  let sh=Object.entries(sumMap).map(([id,v])=>{ const e=empMap[id]||{}; return `<div class="emp-row"><div class="emp-info"><div class="emp-av ${e.color||'av1'}">${(e.name||'?')[0]}</div><div><div class="emp-name">${e.name||'—'}</div><div class="emp-sub">${v.count} award${v.count!==1?'s':''}</div></div></div><div style="font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:15px;color:var(--gold)">₱${v.total.toFixed(2)}</div></div>`; }).join('');
+  document.getElementById('bonusSummary').innerHTML=sh||'<div class="empty-state">No data.</div>';
+  // full
+  let fh=bonuses.map(b=>{ const e=empMap[b.empId]||{}; return `<div class="bonus-item"><div><div class="emp-name" style="font-size:13px">${e.name||'—'} <span class="bonus-tag" style="margin-left:6px">${b.type}</span></div><div class="emp-sub">${b.task}${b.note?' · '+b.note:''}</div><div class="emp-sub">${b.date}</div></div><div style="font-family:'Poppins',Arial,monospace;letter-spacing:2px;font-size:15px;color:var(--gold);white-space:nowrap">₱${b.amount.toFixed(2)} <button class="btn btn-danger" style="font-size:10px;padding:3px 8px;margin-left:8px" onclick="deleteBonus('${b.id}')">✕</button></div></div>`; }).join('');
+  document.getElementById('bonusFullList').innerHTML=fh||'<div class="empty-state">No bonus records.</div>';
+}
+function deleteBonus(id){
+  if(!confirm('Delete this bonus record?'))return;
+  saveBonuses(getBonuses().filter(b=>b.id!==id)); renderBonusPage(); showToast('Deleted','info');
+}
+
+// ── REPORTS ──
+function populateReportFilter(){
+  const sel=document.getElementById('reportEmpFilter');
+  sel.innerHTML='<option value="all">All Employees</option>';
+  getEmps().forEach(e=>sel.innerHTML+=`<option value="${e.id}">${e.name}</option>`);
+}
+
+document.addEventListener('change',function(e){
+  if(e.target.id==='reportType'){
+    const isPP=e.target.value==='payperiod';
+    document.getElementById('singleDateWrap').style.display=isPP?'none':'block';
+    document.getElementById('dateRangeWrap').style.display=isPP?'flex':'none';
+    renderReport();
+  }
+});
+
+function getReportDates(){
+  const type=document.getElementById('reportType').value;
+  if(type==='payperiod'){
+    return {from:document.getElementById('reportFrom').value||todayPH(), to:document.getElementById('reportTo').value||todayPH()};
+  }
+  const d=document.getElementById('reportDate').value||todayPH();
+  return {from:d,to:d,single:d};
+}
+
+function buildDailySummary(dateStr,empId){
+  const emps=getEmps().filter(e=>empId==='all'||e.id===empId);
+  const logs=getLogs().filter(l=>l.date===dateStr);
+  return emps.map(e=>{
+    const el=logs.filter(l=>l.empId===e.id);
+    const inL=el.find(l=>l.type==='in');
+    const outL=[...el].reverse().find(l=>l.type==='out');
+    let h=0,it=null;
+    el.forEach(l=>{if(l.type==='in')it=l.time;if(l.type==='out'&&it){h+=timeDiff(it,l.time);it=null;}});
+    return {name:e.name,role:e.role,in:inL?inL.time.slice(0,5):'—',out:outL?outL.time.slice(0,5):'—',hours:h,late:inL&&isLate(e,inL.time),ot:h>stdHrs(e)&&h>0,std:stdHrs(e)};
+  });
+}
+
+function renderReport(){
+  const type=document.getElementById('reportType').value;
+  const empId=document.getElementById('reportEmpFilter').value;
+  const {from,to,single}=getReportDates();
+  const el=document.getElementById('reportOutput');
+
+  if(type==='daily'){
+    let h=`<div class="card-eyebrow">Daily Summary — ${single}</div><table><thead><tr><th>Employee</th><th>Clock In</th><th>Clock Out</th><th>Hours (dec)</th><th>Status</th></tr></thead><tbody>`;
+    buildDailySummary(single,empId).forEach(r=>{
+      const st=r.in==='—'?`<span style="color:var(--muted)">Absent</span>`:(r.late?`<span style="color:var(--amber)">Late</span>`:`<span style="color:var(--green)">On Time</span>`);
+      h+=`<tr><td>${r.name}<br><span style="font-size:11px;color:var(--muted)">${r.role}</span></td><td class="mono">${r.in}</td><td class="mono">${r.out}</td><td class="mono">${decHrs(r.hours)}${r.ot?` <span style="color:var(--amber)">+OT</span>`:''}</td><td>${st}</td></tr>`;
+    });
+    el.innerHTML=h+'</tbody></table>';
+  }
+  else if(type==='weekly'){
+    const d=new Date(single),day=d.getDay();
+    const mon=new Date(d); mon.setDate(d.getDate()-(day===0?6:day-1));
+    const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+    const s=mon.toISOString().split('T')[0],e2=sun.toISOString().split('T')[0];
+    const emps=getEmps().filter(e=>empId==='all'||e.id===empId);
+    let h=`<div class="card-eyebrow">Weekly Hours — ${s} to ${e2}</div><table><thead><tr><th>Employee</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th><th>Total</th></tr></thead><tbody>`;
+    emps.forEach(e=>{
+      let tot=0;
+      const days=Array.from({length:7},(_,i)=>{ const dd=new Date(mon);dd.setDate(mon.getDate()+i);const ds=dd.toISOString().split('T')[0]; const hh=hoursWorkedDay(e.id,ds); tot+=hh; return hh; });
+      h+=`<tr><td>${e.name}<br><span style="font-size:11px;color:var(--muted)">${e.role}</span></td>`;
+      days.forEach(hh=>h+=`<td class="mono">${hh>0?decHrs(hh):'—'}</td>`);
+      h+=`<td class="mono" style="font-weight:600;color:var(--gold)">${decHrs(tot)}</td></tr>`;
+    });
+    el.innerHTML=h+'</tbody></table>';
+  }
+  else if(type==='late'){
+    const emps=getEmps().filter(e=>empId==='all'||e.id===empId);
+    const logs=getLogs();
+    const dates=[...new Set(logs.map(l=>l.date))].sort().reverse().slice(0,30);
+    let rows=[];
+    dates.forEach(dd=>{ emps.forEach(e=>{ const il=logs.find(l=>l.date===dd&&l.empId===e.id&&l.type==='in'); if(il&&isLate(e,il.time)) rows.push({name:e.name,role:e.role,date:dd,exp:e.shiftStart,act:il.time.slice(0,5),m:Math.round(timeDiff(e.shiftStart+':00',il.time)*60)}); }); });
+    let h=`<div class="card-eyebrow">Late Arrivals</div><table><thead><tr><th>Employee</th><th>Date</th><th>Expected</th><th>Arrived</th><th>Minutes Late</th></tr></thead><tbody>`;
+    if(!rows.length) h+=`<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px">No late arrivals found.</td></tr>`;
+    rows.forEach(r=>h+=`<tr><td>${r.name}<br><span style="font-size:11px;color:var(--muted)">${r.role}</span></td><td class="mono">${r.date}</td><td class="mono">${r.exp}</td><td class="mono" style="color:var(--amber)">${r.act}</td><td class="mono" style="color:var(--amber)">${r.m} min</td></tr>`);
+    el.innerHTML=h+'</tbody></table>';
+  }
+  else if(type==='overtime'){
+    const emps=getEmps().filter(e=>empId==='all'||e.id===empId);
+    const logs=getLogs();
+    const dates=[...new Set(logs.map(l=>l.date))].sort().reverse().slice(0,30);
+    let rows=[];
+    dates.forEach(dd=>{ emps.forEach(e=>{ const hh=hoursWorkedDay(e.id,dd); const std=stdHrs(e); if(hh>std&&hh>0) rows.push({name:e.name,date:dd,total:hh,std,ot:hh-std,pay:(hh-std)*e.rate*1.25}); }); });
+    let h=`<div class="card-eyebrow">Overtime Records</div><table><thead><tr><th>Employee</th><th>Date</th><th>Total (dec)</th><th>Standard</th><th>OT Hours</th><th>OT Pay (125%)</th></tr></thead><tbody>`;
+    if(!rows.length) h+=`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">No overtime recorded.</td></tr>`;
+    rows.forEach(r=>h+=`<tr><td>${r.name}</td><td class="mono">${r.date}</td><td class="mono">${decHrs(r.total)}</td><td class="mono">${decHrs(r.std)}</td><td class="mono" style="color:var(--amber)">${decHrs(r.ot)}</td><td class="mono" style="color:var(--gold)">₱${r.pay.toFixed(2)}</td></tr>`);
+    el.innerHTML=h+'</tbody></table>';
+  }
+  else if(type==='payperiod'){
+    const emps=getEmps().filter(e=>empId==='all'||e.id===empId);
+    const logs=getLogs(); const bonuses=getBonuses();
+    let h=`<div class="card-eyebrow">Pay Period — ${from} to ${to}</div><table><thead><tr><th>Employee</th><th>Days</th><th>Total Hrs</th><th>Regular Pay</th><th>OT Pay</th><th>Bonus / Commission</th><th>Gross Pay</th></tr></thead><tbody>`;
+    emps.forEach(e=>{
+      let days=0,tot=0,reg=0,ot=0;
+      const dates2=[...new Set(logs.filter(l=>l.empId===e.id&&l.date>=from&&l.date<=to).map(l=>l.date))];
+      dates2.forEach(dd=>{ const hh=hoursWorkedDay(e.id,dd); if(hh>0)days++; tot+=hh; const std=stdHrs(e); reg+=Math.min(hh,std)*e.rate; ot+=Math.max(0,hh-std)*e.rate*1.25; });
+      const bonusTotal=bonuses.filter(b=>b.empId===e.id&&b.date>=from&&b.date<=to).reduce((a,b)=>a+b.amount,0);
+      h+=`<tr><td>${e.name}<br><span style="font-size:11px;color:var(--muted)">${e.role}</span></td><td class="mono">${days}</td><td class="mono">${decHrs(tot)}</td><td class="mono">₱${reg.toFixed(2)}</td><td class="mono" style="color:var(--amber)">₱${ot.toFixed(2)}</td><td class="mono" style="color:var(--gold)">₱${bonusTotal.toFixed(2)}</td><td class="mono" style="color:var(--green);font-weight:600">₱${(reg+ot+bonusTotal).toFixed(2)}</td></tr>`;
+    });
+    el.innerHTML=h+'</tbody></table>';
+  }
+}
+
+function exportCSV(){
+  const type=document.getElementById('reportType').value;
+  const empId=document.getElementById('reportEmpFilter').value;
+  const {from,to,single}=getReportDates();
+  let csv='',fn='report.csv';
+  if(type==='daily'){
+    csv='Employee,Role,Clock In,Clock Out,Hours (dec),Status\n';
+    buildDailySummary(single,empId).forEach(r=>csv+=`"${r.name}","${r.role}","${r.in}","${r.out}","${decHrs(r.hours)}","${r.in==='—'?'Absent':r.late?'Late':'On Time'}"\n`);
+    fn=`daily_${single}.csv`;
+  } else if(type==='payperiod'){
+    const emps=getEmps().filter(e=>empId==='all'||e.id===empId);
+    const logs=getLogs(); const bonuses=getBonuses();
+    csv='Employee,Role,Days,Total Hours,Regular Pay,OT Pay,Bonus,Gross Pay\n';
+    emps.forEach(e=>{
+      let days=0,tot=0,reg=0,ot=0;
+      const dates2=[...new Set(logs.filter(l=>l.empId===e.id&&l.date>=from&&l.date<=to).map(l=>l.date))];
+      dates2.forEach(dd=>{ const hh=hoursWorkedDay(e.id,dd); if(hh>0)days++; tot+=hh; const std=stdHrs(e); reg+=Math.min(hh,std)*e.rate; ot+=Math.max(0,hh-std)*e.rate*1.25; });
+      const bt=bonuses.filter(b=>b.empId===e.id&&b.date>=from&&b.date<=to).reduce((a,b)=>a+b.amount,0);
+      csv+=`"${e.name}","${e.role}","${days}","${decHrs(tot)}","${reg.toFixed(2)}","${ot.toFixed(2)}","${bt.toFixed(2)}","${(reg+ot+bt).toFixed(2)}"\n`;
+    });
+    fn=`payperiod_${from}_to_${to}.csv`;
+  } else {
+    const logs=getLogs().filter(l=>empId==='all'||l.empId===empId);
+    const em={}; getEmps().forEach(e=>em[e.id]=e);
+    csv='Date,Employee,Role,Type,Time (PH)\n';
+    logs.sort((a,b)=>a.date.localeCompare(a.date)).forEach(l=>{ const e=em[l.empId]||{}; csv+=`"${l.date}","${e.name||l.empId}","${e.role||''}","${l.type}","${l.time}"\n`; });
+    fn=`logs_${type}_${single||from}.csv`;
+  }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=fn; a.click();
+  showToast('CSV exported','success');
+}
+
+function generatePDFReport(){
+  const {from,to,single}=getReportDates();
+  const empId=document.getElementById('reportEmpFilter').value;
+  const type=document.getElementById('reportType').value;
+  const emps=getEmps().filter(e=>empId==='all'||e.id===empId);
+  const logs=getLogs(); const bonuses=getBonuses();
+  const s=type==='payperiod'?from:single, e2=type==='payperiod'?to:single;
+  let rows='';
+  emps.forEach(e=>{
+    let days=0,tot=0,reg=0,ot=0;
+    const dates2=[...new Set(logs.filter(l=>l.empId===e.id&&l.date>=s&&l.date<=e2).map(l=>l.date))];
+    dates2.forEach(dd=>{ const hh=hoursWorkedDay(e.id,dd); if(hh>0)days++; tot+=hh; const std=stdHrs(e); reg+=Math.min(hh,std)*e.rate; ot+=Math.max(0,hh-std)*e.rate*1.25; });
+    const bt=bonuses.filter(b=>b.empId===e.id&&b.date>=s&&b.date<=e2).reduce((a,b2)=>a+b2.amount,0);
+    rows+=`<tr><td>${e.name}</td><td>${e.role}</td><td>${days}</td><td>${decHrs(tot)}</td><td>₱${reg.toFixed(2)}</td><td>₱${ot.toFixed(2)}</td><td>₱${bt.toFixed(2)}</td><td><strong>₱${(reg+ot+bt).toFixed(2)}</strong></td></tr>`;
+  });
+  const html=`<!DOCTYPE html><html><head><title>Pay Period Report — CLS</title><style>@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;500;600&display=swap');body{font-family:'Poppins',Arial,sans-serif;padding:36px;color:#111;font-size:13px;background:#fff;}h1{font-family:'Poppins',Arial,sans-serif;font-weight:700;font-size:24px;margin-bottom:4px;color:#0c0c0c;}h1 span{color:#c9a84c;}.sub{color:#666;margin-bottom:28px;font-size:12px;}.logo{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#c9a84c;margin-bottom:6px;}table{width:100%;border-collapse:collapse;}th{background:#0c0c0c;color:#f0e8d8;padding:10px 12px;text-align:left;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;}td{padding:10px 12px;border-bottom:1px solid #eee;}tr:nth-child(even) td{background:#faf9f7;}.footer{margin-top:32px;font-size:11px;color:#999;text-align:center;border-top:1px solid #eee;padding-top:16px;}</style></head><body><div class="logo">Click Lounge Studio</div><h1>TimeCommand <span>·</span> Payroll Report</h1><div class="sub">Period: ${s} to ${e2} &nbsp;·&nbsp; Generated: ${new Date().toLocaleString('en-PH',{timeZone:'Asia/Manila'})} PHT</div><table><thead><tr><th>Employee</th><th>Role</th><th>Days</th><th>Hours</th><th>Regular</th><th>OT Pay</th><th>Bonus</th><th>Gross Pay</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Generated by TimeCommand for Click Lounge Studio · Confidential</div></body></html>`;
+  const w=window.open('','_blank'); w.document.write(html); w.document.close();
+  setTimeout(()=>w.print(),500);
+
+  // Save report generation to employee history
+  const empsAll=getEmps();
+  emps.forEach(e=>{
+    const idx=empsAll.findIndex(x=>x.id===e.id);
+    if(idx>-1){
+      if(!empsAll[idx].history) empsAll[idx].history=[];
+      let days=0,tot=0,reg=0,ot=0;
+      const dates2=[...new Set(logs.filter(l=>l.empId===e.id&&l.date>=s&&l.date<=e2).map(l=>l.date))];
+      dates2.forEach(dd=>{ const hh=hoursWorkedDay(e.id,dd); if(hh>0)days++; tot+=hh; const std2=stdHrs(e); reg+=Math.min(hh,std2)*e.rate; ot+=Math.max(0,hh-std2)*e.rate*1.25; });
+      const bt2=bonuses.filter(b=>b.empId===e.id&&b.date>=s&&b.date<=e2).reduce((a,b2)=>a+b2.amount,0);
+      empsAll[idx].history.push({ date:todayPH(), note:`📄 Payroll PDF generated — Period: ${s} to ${e2} · Gross: ₱${(reg+ot+bt2).toFixed(2)}` });
+    }
+  });
+  saveEmps(empsAll);
+  showToast('PDF ready · Saved to employee history','success');
+}
+
+// ══════════════════════════════════
+// EMAIL PAYROLL REPORT
+// ══════════════════════════════════
+function emailPayrollReport(){
+  const {from,to,single}=getReportDates();
+  const empId=document.getElementById('reportEmpFilter').value;
+  const type=document.getElementById('reportType').value;
+  const emps=getEmps().filter(e=>(empId==='all'||e.id===empId)&&e.active);
+  const logs=getLogs(); const bonuses=getBonuses();
+  const s=type==='payperiod'?from:single, e2=type==='payperiod'?to:single;
+  const generated=new Date().toLocaleString('en-PH',{timeZone:'Asia/Manila'});
+
+  // Capture the REAL app URL from main window BEFORE any popup opens
+  // (popup window location is 'about:blank' so we must grab it here)
+  const APP_URL = window.location.href.split('?')[0];
+
+  // Build payroll data per employee
+  const payData=emps.map(e=>{
+    let days=0,tot=0,reg=0,ot=0;
+    const dates2=[...new Set(logs.filter(l=>l.empId===e.id&&l.date>=s&&l.date<=e2).map(l=>l.date))];
+    dates2.forEach(dd=>{
+      const hh=hoursWorkedDay(e.id,dd);
+      if(hh>0){ days++; tot+=hh; const std=stdHrs(e); reg+=Math.min(hh,std)*e.rate; ot+=Math.max(0,hh-std)*e.rate*1.25; }
+    });
+    const bonus=bonuses.filter(b=>b.empId===e.id&&b.date>=s&&b.date<=e2).reduce((a,b2)=>a+b2.amount,0);
+    const gross=reg+ot+bonus;
+    const token=btoa(`${e.id}|${s}|${e2}|${gross.toFixed(2)}`).replace(/=/g,'');
+    const confirmUrl=`${APP_URL}?confirmPay=${token}&empId=${e.id}&period=${s}_${e2}&amount=${gross.toFixed(2)}`;
+    return {e,days,tot,reg,ot,bonus,gross,token,confirmUrl};
+  });
+
+  // Generate a separate email window for EACH employee (or combined for "all")
+  const isSingle = empId!=='all' && payData.length===1;
+
+  payData.forEach(pd=>{
+    const {e,days,tot,reg,ot,bonus,gross,confirmUrl}=pd;
+    const logRows=[];
+    // Detailed daily log
+    const dates3=[...new Set(logs.filter(l=>l.empId===e.id&&l.date>=s&&l.date<=e2).map(l=>l.date))].sort();
+    dates3.forEach(dd=>{
+      const dayLogs=logs.filter(l=>l.empId===e.id&&l.date===dd).sort((a,b)=>a.time.localeCompare(b.time));
+      let inT=null; let hh=0;
+      dayLogs.forEach(l=>{ if(l.type==='in')inT=l.time; if(l.type==='out'&&inT){hh+=timeDiff(inT,l.time);inT=null;} });
+      const std=stdHrs(e);
+      const regH=Math.min(hh,std); const otH=Math.max(0,hh-std);
+      const regP=regH*e.rate; const otP=otH*e.rate*1.25;
+      const inLog=dayLogs.find(l=>l.type==='in');
+      const outLog=[...dayLogs].reverse().find(l=>l.type==='out');
+      logRows.push(`<tr>
+        <td>${dd}</td>
+        <td>${inLog?inLog.time.slice(0,5):'—'}</td>
+        <td>${outLog?outLog.time.slice(0,5):'—'}</td>
+        <td>${decHrs(hh)}</td>
+        <td style="color:#2f4f4f;">₱${regP.toFixed(2)}</td>
+        <td style="color:#d79068;">${otH>0?'₱'+otP.toFixed(2):'—'}</td>
+      </tr>`);
+    });
+    // Bonuses
+    const empBonuses=bonuses.filter(b=>b.empId===e.id&&b.date>=s&&b.date<=e2);
+
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Payroll — ${e.name}</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Poppins',Arial,sans-serif;background:#f0f5f4;color:#1e3333;padding:0;}
+  .wrap{max-width:700px;margin:0 auto;background:#fff;border-radius:0 0 16px 16px;overflow:hidden;}
+  .header{background:#2f4f4f;padding:28px 36px;color:#f4f7f6;}
+  .header h1{font-size:20px;font-weight:700;margin-bottom:2px;}
+  .header p{font-size:12px;color:rgba(244,247,246,0.6);margin-top:4px;}
+  .header .period{font-size:13px;color:rgba(244,247,246,0.8);margin-top:8px;}
+  .body{padding:28px 36px;}
+  .emp-info{display:flex;align-items:center;gap:14px;background:#f0f5f4;border-radius:10px;padding:16px 18px;margin-bottom:20px;}
+  .emp-av{width:44px;height:44px;border-radius:50%;background:#51897d;color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .emp-name{font-size:16px;font-weight:700;}
+  .emp-role{font-size:12px;color:#6b8c8c;margin-top:2px;}
+  .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+  .sum-card{background:#f0f5f4;border-radius:8px;padding:14px 16px;text-align:center;}
+  .sum-val{font-size:20px;font-weight:700;color:#2f4f4f;}
+  .sum-lbl{font-size:10px;color:#6b8c8c;text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
+  .section-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#6b8c8c;margin-bottom:8px;padding-bottom:6px;border-bottom:1.5px solid #e8edec;}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+  th{text-align:left;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6b8c8c;padding:10px 12px;background:#f8faf9;}
+  td{padding:10px 12px;font-size:12px;border-bottom:1px solid #f0f5f4;}
+  .pay-box{background:#f0f5f4;border-radius:10px;padding:16px 20px;margin-bottom:20px;}
+  .pay-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;}
+  .pay-row.total{border-top:2px solid #2f4f4f;margin-top:8px;padding-top:12px;font-weight:700;font-size:16px;}
+  .pay-row.total .amt{color:#2f4f4f;}
+  .confirm-box{background:linear-gradient(135deg,#51897d,#2f4f4f);border-radius:12px;padding:24px;text-align:center;margin:20px 0;}
+  .confirm-box h3{color:#fff;font-size:16px;margin-bottom:6px;}
+  .confirm-box p{color:rgba(255,255,255,0.7);font-size:12px;margin-bottom:18px;line-height:1.6;}
+  .confirm-btn{display:inline-block;background:#d79068;color:#fff;padding:14px 36px;border-radius:50px;font-size:14px;font-weight:700;text-decoration:none;letter-spacing:.5px;}
+  .confirm-btn:hover{background:#c07040;}
+  .footer{background:#f0f5f4;padding:16px 36px;text-align:center;font-size:11px;color:#6b8c8c;border-top:1px solid #e8edec;}
+  @media print{body{background:#fff;}.confirm-box{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(244,247,246,0.5);margin-bottom:8px;">Click Lounge Studio</div>
+    <h1>Payroll Statement</h1>
+    <p class="period">📅 Period: <strong>${s}</strong> to <strong>${e2}</strong></p>
+    <p style="font-size:11px;color:rgba(244,247,246,0.4);margin-top:6px;">Generated: ${generated} PHT</p>
+  </div>
+
+  <div class="body">
+    <div class="emp-info">
+      <div class="emp-av">${e.name[0]}</div>
+      <div>
+        <div class="emp-name">${e.name}</div>
+        <div class="emp-role">${e.role} · ₱${e.rate}/hr · Shift ${e.shiftStart}–${e.shiftEnd}</div>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="sum-card"><div class="sum-val">${days}</div><div class="sum-lbl">Days Worked</div></div>
+      <div class="sum-card"><div class="sum-val">${decHrs(tot)}</div><div class="sum-lbl">Total Hours</div></div>
+      <div class="sum-card"><div class="sum-val" style="color:#d79068;">₱${gross.toFixed(2)}</div><div class="sum-lbl">Gross Pay</div></div>
+    </div>
+
+    <div class="section-title">Daily Time Record</div>
+    <table>
+      <thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Regular Pay</th><th>OT Pay</th></tr></thead>
+      <tbody>${logRows.join('')}</tbody>
+    </table>
+
+    ${empBonuses.length?`<div class="section-title">Bonus & Commission</div><table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th></tr></thead><tbody>${empBonuses.map(b=>`<tr><td>${b.date}</td><td>${b.type}</td><td>${b.task||''}</td><td style="color:#d79068;">₱${b.amount.toFixed(2)}</td></tr>`).join('')}</tbody></table>`:''}
+
+    <div class="section-title">Pay Breakdown</div>
+    <div class="pay-box">
+      <div class="pay-row"><span>Regular Pay</span><span>₱${reg.toFixed(2)}</span></div>
+      <div class="pay-row"><span>Overtime Pay (1.25×)</span><span>₱${ot.toFixed(2)}</span></div>
+      ${bonus>0?`<div class="pay-row"><span>Bonus & Commission</span><span>₱${bonus.toFixed(2)}</span></div>`:''}
+      <div class="pay-row total"><span>GROSS PAY</span><span class="amt">₱${gross.toFixed(2)}</span></div>
+    </div>
+
+    <div class="confirm-box" id="confirmBox">
+      <h3>Please Confirm Receipt of Payment</h3>
+      <p>Once you have received your salary of <strong>₱${gross.toFixed(2)}</strong> for the period ${s} to ${e2}, click the button below to confirm.</p>
+      <a href="${confirmUrl}" class="confirm-btn" style="display:inline-block;margin-bottom:12px;">✅ I Confirm — I Have Received My Pay</a>
+      <p style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px;">If the button does not open, copy and paste this link into your browser:</p>
+      <div style="background:rgba(0,0,0,0.25);border-radius:6px;padding:8px 12px;margin-top:6px;word-break:break-all;font-size:10px;color:rgba(255,255,255,0.6);">${confirmUrl}</div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Click Lounge Studio · TimeCommand Payroll System · Confidential<br>
+    This is an official payroll statement. Please keep a copy for your records.
+  </div>
+</div>
+</body></html>`;
+
+
+    const w=window.open('','_blank');
+    w.document.write(html); w.document.close();
+    // Let page load then offer mailto
+    setTimeout(()=>{
+      const mailSubject=encodeURIComponent(`CLS Payroll — ${s} to ${e2} — ${e.name}`);
+      const plainBody=`Hi ${e.name},\n\nPlease find your payroll statement for ${s} to ${e2}.\n\nGross Pay: ₱${gross.toFixed(2)}\nDays Worked: ${days}\nTotal Hours: ${decHrs(tot)}\n\nTo confirm receipt of your salary, click here:\n${confirmUrl}\n\n---\nClick Lounge Studio`;
+      const gmailUrl=`https://mail.google.com/mail/u/0/?view=cm&fs=1&to=${encodeURIComponent(e.email||'')}&su=${mailSubject}&body=${encodeURIComponent(plainBody)}`;
+      const mailtoUrl=`mailto:${encodeURIComponent(e.email||'')}?subject=${mailSubject}&body=${encodeURIComponent(plainBody)}`;
+
+      w.document.body.insertAdjacentHTML('beforeend',`
+      <div id="_emailToolbar" style="position:fixed;bottom:0;left:0;right:0;background:#2f4f4f;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;font-family:Poppins,Arial,sans-serif;z-index:9999;gap:10px;flex-wrap:wrap;">
+        <span style="color:rgba(244,247,246,0.7);font-size:12px;">📧 Send this report to <strong style="color:#f4f7f6;">${e.name}</strong></span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="(function(){
+            var el=window.document.querySelector('.wrap');
+            var range=window.document.createRange();
+            range.selectNode(el);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            var ok=window.document.execCommand('copy');
+            window.getSelection().removeAllRanges();
+            var b=window.document.getElementById('_copyBtn');
+            b.textContent=ok?'✅ Copied! Paste into Gmail':'⚠ Select All + Copy manually';
+            b.style.background=ok?'#51897d':'#c0544a';
+            setTimeout(()=>{b.textContent='📋 Copy Report';b.style.background='rgba(255,255,255,0.15)';},3000);
+          })()" id="_copyBtn" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Poppins,Arial,sans-serif;">📋 Copy Report</button>
+          <a href="${gmailUrl}" target="_blank" style="background:#d79068;color:#fff;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:Poppins,Arial,sans-serif;">✉ Open Gmail</a>
+          <a href="${mailtoUrl}" target="_blank" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;font-family:Poppins,Arial,sans-serif;">📨 Mail App</a>
+          <button onclick="window.print()" style="background:rgba(255,255,255,0.15);color:#f4f7f6;border:1px solid rgba(255,255,255,0.25);padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Poppins,Arial,sans-serif;">🖨 Print PDF</button>
+        </div>
+        <div id="_copyHint" style="width:100%;font-size:11px;color:rgba(244,247,246,0.5);display:none;">After copying, open Gmail → Compose → Paste (Ctrl+V or ⌘V). The full styled report will paste with formatting intact.</div>
+      </div>
+      <div style="height:64px;"></div>`); // spacer so footer content isn't hidden behind toolbar
+
+      // Show hint when copy button is hovered
+      const copyBtn=w.document.getElementById('_copyBtn');
+      if(copyBtn){
+        copyBtn.addEventListener('mouseenter',()=>{ const h=w.document.getElementById('_copyHint'); if(h)h.style.display=''; });
+        copyBtn.addEventListener('mouseleave',()=>{ const h=w.document.getElementById('_copyHint'); if(h)h.style.display='none'; });
+      }
+    },800);
+  });
+
+  // Save to employee history
+  const empsAll=getEmps();
+  payData.forEach(({e,gross,s:_s})=>{
+    const idx=empsAll.findIndex(x=>x.id===e.id);
+    if(idx>-1){
+      if(!empsAll[idx].history) empsAll[idx].history=[];
+      empsAll[idx].history.push({date:todayPH(),note:`📧 Payroll email sent — Period: ${s} to ${e2} · Gross: ₱${gross.toFixed(2)} · Awaiting confirmation`});
+      // Store pending confirmation token
+      if(!empsAll[idx].pendingConfirmations) empsAll[idx].pendingConfirmations=[];
+      empsAll[idx].pendingConfirmations.push({token:btoa(`${e.id}|${s}|${e2}|${gross.toFixed(2)}`).replace(/=/g,''),sentDate:todayPH(),period:s+'|'+e2,amount:gross.toFixed(2),confirmed:false});
+    }
+  });
+  saveEmps(empsAll);
+  showToast(`Payroll email report opened for ${payData.length} employee${payData.length>1?'s':''}  · Waiting for confirmation`,'success');
+}
+
+// ══════════════════════════════════
+// PAYMENT CONFIRMATION
+// ══════════════════════════════════
+let _pcMethod = '';
+function selectPayMethod(method){
+  _pcMethod=method;
+  ['cash','gcash','bank'].forEach(m=>{
+    const lbl=document.getElementById('pm-'+m+'-lbl');
+    if(lbl) lbl.style.borderColor = m===method ? 'var(--teal)' : 'var(--border)';
+    if(lbl) lbl.style.background  = m===method ? 'rgba(81,137,125,0.08)' : '';
+  });
+  const refWrap=document.getElementById('pc-ref-wrap');
+  if(refWrap) refWrap.style.display = method==='cash' ? 'none' : '';
+}
+
+function openPayConfirm(){
+  const emps=getEmps().filter(e=>e.active);
+  const {from,to,single}=getReportDates();
+  const type=document.getElementById('reportType').value;
+  const empId=document.getElementById('reportEmpFilter').value;
+  const s=type==='payperiod'?from:single, e2=type==='payperiod'?to:single;
+
+  // Pre-fill employee dropdown
+  const empSel=document.getElementById('pc-emp');
+  empSel.innerHTML=emps.map(e=>`<option value="${e.id}" ${e.id===empId?'selected':''}>${e.name}</option>`).join('');
+
+  // Pre-fill dates from current report
+  document.getElementById('pc-from').value=s;
+  document.getElementById('pc-to').value=e2;
+
+  // Auto-calculate gross for selected employee
+  updatePCAmount();
+  empSel.onchange=updatePCAmount;
+
+  // Reset form state
+  _pcMethod='';
+  ['cash','gcash','bank'].forEach(m=>{
+    const lbl=document.getElementById('pm-'+m+'-lbl');
+    if(lbl){ lbl.style.borderColor='var(--border)'; lbl.style.background=''; }
+    const inp=document.getElementById('pm-'+m);
+    if(inp) inp.checked=false;
+  });
+  const ack=document.getElementById('pc-ack');
+  if(ack) ack.checked=false;
+  const btn=document.getElementById('pc-submit-btn');
+  if(btn){ btn.disabled=true; btn.style.opacity='0.5'; }
+  const refWrap=document.getElementById('pc-ref-wrap');
+  if(refWrap) refWrap.style.display='none';
+  const notesEl=document.getElementById('pc-notes');
+  if(notesEl) notesEl.value='';
+  const refEl=document.getElementById('pc-ref');
+  if(refEl) refEl.value='';
+
+  updatePCEmpName();
+  empSel.addEventListener('change', updatePCEmpName);
+
+  document.getElementById('modalPayConfirm').classList.add('open');
+}
+
+function updatePCEmpName(){
+  const empId=document.getElementById('pc-emp').value;
+  const emp=getEmps().find(e=>e.id===empId);
+  const el=document.getElementById('pc-emp-name');
+  if(el&&emp) el.textContent=emp.name;
+}
+
+function updatePCAmount(){
+  const empId=document.getElementById('pc-emp').value;
+  const from=document.getElementById('pc-from').value;
+  const to=document.getElementById('pc-to').value;
+  if(!empId||!from||!to) return;
+  const emps=getEmps(); const logs=getLogs(); const bonuses=getBonuses();
+  const emp=emps.find(e=>e.id===empId); if(!emp) return;
+  let days=0,tot=0,reg=0,ot=0;
+  const dates2=[...new Set(logs.filter(l=>l.empId===empId&&l.date>=from&&l.date<=to).map(l=>l.date))];
+  dates2.forEach(dd=>{ const hh=hoursWorkedDay(empId,dd); if(hh>0)days++; tot+=hh; const std=stdHrs(emp); reg+=Math.min(hh,std)*emp.rate; ot+=Math.max(0,hh-std)*emp.rate*1.25; });
+  const bt=bonuses.filter(b=>b.empId===empId&&b.date>=from&&b.date<=to).reduce((a,b2)=>a+b2.amount,0);
+  const gross=reg+ot+bt;
+  const amtEl=document.getElementById('pc-amount');
+  if(amtEl) amtEl.value=gross.toFixed(2);
+}
+
+function submitPayConfirm(){
+  const empId=document.getElementById('pc-emp').value;
+  const from=document.getElementById('pc-from').value;
+  const to=document.getElementById('pc-to').value;
+  const amount=parseFloat(document.getElementById('pc-amount').value)||0;
+  const notes=(document.getElementById('pc-notes').value||'').trim();
+  const ref=(document.getElementById('pc-ref').value||'').trim();
+  if(!_pcMethod){ showToast('Please select a payment method','error'); return; }
+  if(!amount){ showToast('Enter the amount paid','error'); return; }
+
+  const methodLabel={'cash':'💵 Cash','gcash':'📱 GCash','bank':'🏦 Bank Transfer'}[_pcMethod]||_pcMethod;
+  const refNote=ref?` · Ref: ${ref}`:'';
+  const histNote=`✅ Salary received — ₱${amount.toFixed(2)} via ${methodLabel}${refNote} · Period: ${from} to ${to}${notes?' · '+notes:''}`;
+
+  const emps=getEmps();
+  const idx=emps.findIndex(e=>e.id===empId);
+  if(idx>-1){
+    if(!emps[idx].history) emps[idx].history=[];
+    emps[idx].history.push({ date:todayPH(), note:histNote });
+
+    // Also store structured payment record
+    if(!emps[idx].paymentRecords) emps[idx].paymentRecords=[];
+    emps[idx].paymentRecords.push({
+      date:todayPH(), from, to, amount, method:_pcMethod, ref, notes,
+      confirmedAt:new Date().toLocaleString('en-PH',{timeZone:'Asia/Manila'})
+    });
+
+    saveEmps(emps);
+    closeFormModal('modalPayConfirm');
+    showToast(`✅ Payment confirmed — ${emps[idx].name} · ₱${amount.toFixed(2)} via ${methodLabel}`,'success');
+    renderEmpManage();
+  }
+}
+
+// ══════════════════════════════════
+// ATTENDANCE TAB
+// ══════════════════════════════════
+function setAttWeek(){
+  const today=new Date();
+  const dayOfWeek=today.getDay()||7;
+  const mon=new Date(today); mon.setDate(today.getDate()-dayOfWeek+1);
+  const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+  document.getElementById('att-from').value=mon.toLocaleDateString('en-CA',{timeZone:'Asia/Manila'});
+  document.getElementById('att-to').value=sun.toLocaleDateString('en-CA',{timeZone:'Asia/Manila'});
+  renderAttendance();
+}
+
+function populateAttFilter(){
+  const empSel=document.getElementById('att-emp');
+  if(!empSel) return;
+  const current=empSel.value;
+  empSel.innerHTML='<option value="all">All Employees</option>'+
+    getEmps().filter(e=>e.active).map(e=>`<option value="${e.id}" ${e.id===current?'selected':''}>${e.name}</option>`).join('');
+}
+
+function renderAttendance(){
+  const empId=document.getElementById('att-emp')?.value||'all';
+  const from=document.getElementById('att-from')?.value||todayPH();
+  const to=document.getElementById('att-to')?.value||todayPH();
+  const emps=getEmps();
+  const logs=getLogs().filter(l=>{
+    if(l.date<from||l.date>to) return false;
+    if(empId!=='all'&&l.empId!==empId) return false;
+    return true;
+  });
+
+  // Group by date then employee
+  const grouped={};
+  logs.forEach(l=>{
+    const key=l.date+'__'+l.empId;
+    if(!grouped[key]) grouped[key]={date:l.date,empId:l.empId,logs:[]};
+    grouped[key].logs.push(l);
+  });
+
+  const el=document.getElementById('att-table');
+  if(!el) return;
+  if(!Object.keys(grouped).length){ el.innerHTML='<div class="empty-state" style="padding:40px;text-align:center;color:var(--muted);">No attendance records for this period.</div>'; return; }
+
+  const rows=Object.values(grouped).sort((a,b)=>b.date.localeCompare(a.date)||a.empId.localeCompare(b.empId));
+  let html='<table style="width:100%;border-collapse:collapse;">';
+  html+='<thead><tr><th style="text-align:left;padding:10px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);border-bottom:1px solid var(--border);">Date</th><th style="text-align:left;padding:10px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);">Employee</th><th style="text-align:left;padding:10px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);">Clock In</th><th style="text-align:left;padding:10px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);">Clock Out</th><th style="text-align:left;padding:10px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);">Hours</th><th style="text-align:left;padding:10px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);">Regular</th><th style="text-align:left;padding:10px 12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);background:var(--surface2);">OT</th><th style="padding:10px 12px;background:var(--surface2);"></th></tr></thead><tbody>';
+
+  rows.forEach(row=>{
+    const emp=emps.find(e=>e.id===row.empId);
+    if(!emp) return;
+    const sorted=row.logs.slice().sort((a,b)=>a.time.localeCompare(b.time));
+    const inLog=sorted.find(l=>l.type==='in');
+    const outLog=[...sorted].reverse().find(l=>l.type==='out');
+    const hh=hoursWorkedDay(row.empId,row.date);
+    const std=stdHrs(emp);
+    const regH=Math.min(hh,std), otH=Math.max(0,hh-std);
+    const isManual=row.logs.some(l=>l.manual);
+    const isOT=otH>0;
+    html+=`<tr style="border-bottom:1px solid var(--border);">
+      <td style="padding:10px 12px;font-size:13px;">${row.date}${isManual?'<span style="margin-left:6px;font-size:9px;background:rgba(215,144,104,0.15);color:var(--gold);padding:2px 6px;border-radius:6px;font-weight:600;">MANUAL</span>':''}</td>
+      <td style="padding:10px 12px;font-size:13px;font-weight:500;">${emp.name}</td>
+      <td style="padding:10px 12px;font-size:13px;">${inLog?inLog.time.slice(0,5):'<span style="color:var(--muted);">—</span>'}</td>
+      <td style="padding:10px 12px;font-size:13px;">${outLog?outLog.time.slice(0,5):'<span style="color:var(--muted);">—</span>'}</td>
+      <td style="padding:10px 12px;font-size:13px;font-weight:600;">${hh>0?decHrs(hh):'—'}</td>
+      <td style="padding:10px 12px;font-size:12px;color:var(--teal);">${regH>0?'₱'+(regH*emp.rate).toFixed(2):'—'}</td>
+      <td style="padding:10px 12px;font-size:12px;color:${isOT?'var(--gold)':'var(--muted)'};">${isOT?'₱'+(otH*emp.rate*1.25).toFixed(2)+' <span style="font-size:10px;">('+decHrs(otH)+'h)</span>':'—'}</td>
+      <td style="padding:10px 12px;">
+        <button onclick="openEditEntry('${row.empId}','${row.date}')" class="btn" style="font-size:11px;padding:4px 10px;">✏</button>
+        <button onclick="deleteEntry('${row.empId}','${row.date}')" class="btn" style="font-size:11px;padding:4px 10px;color:var(--red);border-color:var(--red);margin-left:4px;">🗑</button>
+      </td>
+    </tr>`;
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+
+// ══════════════════════════════════
+// MANUAL TIME ENTRY
+// ══════════════════════════════════
+function openManualEntry(empId, date){
+  const emps=getEmps().filter(e=>e.active);
+  const empSel=document.getElementById('me-emp');
+  empSel.innerHTML=emps.map(e=>`<option value="${e.id}" ${e.id===empId?'selected':''}>${e.name}</option>`).join('');
+  document.getElementById('me-date').value=date||todayPH();
+  document.getElementById('me-in').value='';
+  document.getElementById('me-out').value='';
+  document.getElementById('me-note').value='';
+  document.getElementById('me-existing').style.display='none';
+  document.getElementById('me-preview').style.display='none';
+  meUpdateShift();
+  meFillExisting();
+  // Wire live preview
+  ['me-in','me-out'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.oninput=mePreview;
+  });
+  document.getElementById('modalManualEntry').classList.add('open');
+}
+
+function openEditEntry(empId, date){
+  openManualEntry(empId, date);
+  const logs=getLogs().filter(l=>l.empId===empId&&l.date===date);
+  const inLog=logs.find(l=>l.type==='in');
+  const outLog=[...logs].reverse().find(l=>l.type==='out');
+  if(inLog)  document.getElementById('me-in').value=inLog.time.slice(0,5);
+  if(outLog) document.getElementById('me-out').value=outLog.time.slice(0,5);
+  mePreview();
+}
+
+function meUpdateShift(){
+  const empId=document.getElementById('me-emp').value;
+  const emp=getEmps().find(e=>e.id===empId);
+  const hint=document.getElementById('me-shift-hint');
+  if(emp&&hint){
+    const std=stdHrs(emp);
+    hint.textContent=`Scheduled shift: ${emp.shiftStart} – ${emp.shiftEnd} (${std}h standard · OT = anything beyond ${emp.shiftEnd} at ₱${(emp.rate*1.25).toFixed(0)}/hr)`;
+  }
+  meFillExisting();
+  mePreview();
+}
+
+function meFillExisting(){
+  const empId=document.getElementById('me-emp').value;
+  const date=document.getElementById('me-date').value;
+  if(!empId||!date) return;
+  const logs=getLogs().filter(l=>l.empId===empId&&l.date===date).sort((a,b)=>a.time.localeCompare(b.time));
+  const el=document.getElementById('me-existing');
+  if(!logs.length){ el.style.display='none'; return; }
+  el.style.display='';
+  el.innerHTML='<strong style="color:var(--teal);">Existing entries for this date:</strong><br>'+
+    logs.map(l=>`<span style="display:inline-block;margin-top:4px;margin-right:8px;background:var(--surface2);border-radius:6px;padding:3px 8px;">${l.type==='in'?'🟢 In':'🔴 Out'} ${l.time.slice(0,5)}${l.manual?' (manual)':''}</span>`).join('')+
+    '<br><span style="font-size:10px;color:var(--muted);margin-top:4px;display:block;">Saving will replace all entries for this date.</span>';
+}
+
+function mePreview(){
+  const empId=document.getElementById('me-emp').value;
+  const inVal=document.getElementById('me-in').value;
+  const outVal=document.getElementById('me-out').value;
+  const el=document.getElementById('me-preview');
+  if(!empId||!inVal){ el.style.display='none'; return; }
+  const emp=getEmps().find(e=>e.id===empId);
+  if(!emp){ el.style.display='none'; return; }
+  if(!outVal){ el.style.display=''; el.innerHTML='<span style="color:var(--muted);">⏳ Clock-out not set — hours will be calculated when clocked out.</span>'; return; }
+  const hh=timeDiff(inVal+':00', outVal+':00');
+  if(hh<=0){ el.style.display=''; el.innerHTML='<span style="color:var(--red);">⚠ Clock-out must be after clock-in.</span>'; return; }
+  const std=stdHrs(emp), regH=Math.min(hh,std), otH=Math.max(0,hh-std);
+  const regPay=regH*emp.rate, otPay=otH*emp.rate*1.25, gross=regPay+otPay;
+  el.style.display='';
+  el.innerHTML=`<strong style="color:var(--teal);">Preview for this entry:</strong>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;">
+      <div style="text-align:center;"><div style="font-size:15px;font-weight:700;">${decHrs(hh)}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Total Hours</div></div>
+      <div style="text-align:center;"><div style="font-size:14px;font-weight:700;color:var(--teal);">₱${regPay.toFixed(2)}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Regular Pay</div></div>
+      <div style="text-align:center;"><div style="font-size:14px;font-weight:700;color:${otH>0?'var(--gold)':'var(--muted)'};">${otH>0?'₱'+otPay.toFixed(2):'—'}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">OT Pay (1.25×)</div></div>
+      <div style="text-align:center;"><div style="font-size:14px;font-weight:700;">₱${gross.toFixed(2)}</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;">Day Total</div></div>
+    </div>
+    ${otH>0?`<div style="margin-top:8px;font-size:11px;color:var(--gold);">⏰ ${decHrs(otH)} overtime beyond ${emp.shiftEnd} shift end</div>`:''}`;
+}
+
+function submitManualEntry(){
+  const empId=document.getElementById('me-emp').value;
+  const date=document.getElementById('me-date').value;
+  const inVal=document.getElementById('me-in').value;
+  const outVal=document.getElementById('me-out').value;
+  const note=(document.getElementById('me-note').value||'').trim();
+  if(!empId||!date){ showToast('Select employee and date','error'); return; }
+  if(!inVal){ showToast('Clock-in time is required','error'); return; }
+  if(outVal && timeDiff(inVal+':00',outVal+':00')<=0){ showToast('Clock-out must be after clock-in','error'); return; }
+  if(date>todayPH()){ showToast('Cannot add entries for future dates','error'); return; }
+
+  // Remove existing entries for this employee on this date
+  let logs=getLogs().filter(l=>!(l.empId===empId&&l.date===date));
+
+  // Add new entries
+  const emp=getEmps().find(e=>e.id===empId);
+  logs.push({id:'log_'+Date.now(),empId,date,time:inVal+':00',type:'in',manual:true,note});
+  if(outVal) logs.push({id:'log_'+(Date.now()+1),empId,date,time:outVal+':00',type:'out',manual:true,note});
+  saveLogs(logs);
+
+  // Add history note
+  if(emp){
+    const empsAll=getEmps();
+    const idx=empsAll.findIndex(e=>e.id===empId);
+    if(idx>-1){
+      if(!empsAll[idx].history) empsAll[idx].history=[];
+      empsAll[idx].history.push({date:todayPH(),note:`✏ Manual entry added — ${date}: In ${inVal}${outVal?' Out '+outVal:' (no clock-out)'}${note?' — '+note:''}`});
+      saveEmps(empsAll);
+    }
+  }
+
+  closeFormModal('modalManualEntry');
+  renderAttendance();
+  renderDashboard();
+  showToast(`Entry saved — ${emp?.name} on ${date}`,'success');
+}
+
+function deleteEntry(empId, date){
+  if(!confirm(`Delete ALL time entries for ${empId} on ${date}?`)) return;
+  saveLogs(getLogs().filter(l=>!(l.empId===empId&&l.date===date)));
+  renderAttendance();
+  renderDashboard();
+  showToast('Entries deleted','success');
+}
+
+// ══════════════════════════════════
+// UTILS
+function closeFormModal(id){ document.getElementById(id).classList.remove('open'); }
+function showToast(msg,type='info'){
+  const t=document.getElementById('toast'); t.textContent=msg; t.className='show '+type;
+  setTimeout(()=>t.className='',2500);
+}
+
+// ══════════════════════════════════
+// INIT
+// ══════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{
+  initData(); startClocks(); renderKiosk();
+  document.getElementById('reportDate').value=todayPH();
+  document.getElementById('reportFrom').value=todayPH();
+  document.getElementById('reportTo').value=todayPH();
+
+  // ── Handle ?confirmPay= URL param (employee clicked confirm button in email) ──
+  const params=new URLSearchParams(window.location.search);
+  const confirmToken=params.get('confirmPay');
+  const confirmEmpId=params.get('empId');
+  const confirmPeriod=params.get('period');   // format: "from_to"
+  const confirmAmt=params.get('amount');
+
+  if(confirmToken && confirmEmpId){
+    const empsAll=getEmps();
+    const idx=empsAll.findIndex(e=>e.id===confirmEmpId);
+    if(idx>-1){
+      const emp=empsAll[idx];
+      // Check if already confirmed
+      const pending=(emp.pendingConfirmations||[]).find(p=>p.token===confirmToken);
+      const alreadyConfirmed=pending&&pending.confirmed;
+
+      // Show full-screen confirmation UI
+      document.body.innerHTML=`
+      <div style="font-family:'Poppins',Arial,sans-serif;background:#f0f5f4;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#fff;border-radius:20px;box-shadow:0 8px 40px rgba(47,79,79,0.12);max-width:480px;width:100%;overflow:hidden;">
+          <div style="background:#2f4f4f;padding:28px;text-align:center;">
+            <div style="font-size:48px;margin-bottom:10px;">${alreadyConfirmed?'✅':'📋'}</div>
+            <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:rgba(244,247,246,0.5);margin-bottom:6px;">Click Lounge Studio</div>
+            <h1 style="color:#f4f7f6;font-size:20px;font-weight:700;margin-bottom:4px;">${alreadyConfirmed?'Already Confirmed':'Salary Receipt Confirmation'}</h1>
+            <p style="color:rgba(244,247,246,0.6);font-size:13px;">${alreadyConfirmed?'You have already confirmed receipt of this payment.':'Please confirm that you have received your salary.'}</p>
+          </div>
+          <div style="padding:28px;">
+            <div style="background:#f0f5f4;border-radius:12px;padding:18px;margin-bottom:20px;">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+                <div style="width:44px;height:44px;border-radius:50%;background:#51897d;color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;">${emp.name[0]}</div>
+                <div><div style="font-size:15px;font-weight:700;color:#1e3333;">${emp.name}</div><div style="font-size:12px;color:#6b8c8c;">${emp.role}</div></div>
+              </div>
+              ${confirmPeriod?`<div style="font-size:13px;color:#6b8c8c;margin-bottom:4px;">📅 Period: <strong style="color:#1e3333;">${confirmPeriod.replace('_',' to ')}</strong></div>`:''}
+              ${confirmAmt?`<div style="font-size:20px;font-weight:700;color:#2f4f4f;margin-top:8px;">Gross Pay: ₱${parseFloat(confirmAmt).toFixed(2)}</div>`:''}
+            </div>
+            ${alreadyConfirmed
+              ? `<div style="text-align:center;background:rgba(81,137,125,0.08);border:1.5px solid rgba(81,137,125,0.2);border-radius:10px;padding:16px;color:#2f4f4f;font-weight:600;">✅ Payment confirmed on ${pending.confirmedAt||'record'}</div>`
+              : `<div style="margin-bottom:16px;">
+                  <div style="font-size:12px;color:#6b8c8c;margin-bottom:8px;font-weight:600;">Select payment method received:</div>
+                  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+                    <div onclick="document.querySelectorAll('.pm-btn').forEach(b=>b.style.borderColor='rgba(47,79,79,0.1)');this.style.borderColor='#51897d';document.getElementById('conf-method').value='cash';" class="pm-btn" style="border:2px solid rgba(47,79,79,0.1);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;transition:all .15s;"><div style="font-size:22px;">💵</div><div style="font-size:12px;font-weight:600;margin-top:4px;">Cash</div></div>
+                    <div onclick="document.querySelectorAll('.pm-btn').forEach(b=>b.style.borderColor='rgba(47,79,79,0.1)');this.style.borderColor='#51897d';document.getElementById('conf-method').value='gcash';" class="pm-btn" style="border:2px solid rgba(47,79,79,0.1);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;transition:all .15s;"><div style="font-size:22px;">📱</div><div style="font-size:12px;font-weight:600;margin-top:4px;">GCash</div></div>
+                    <div onclick="document.querySelectorAll('.pm-btn').forEach(b=>b.style.borderColor='rgba(47,79,79,0.1)');this.style.borderColor='#51897d';document.getElementById('conf-method').value='bank';" class="pm-btn" style="border:2px solid rgba(47,79,79,0.1);border-radius:10px;padding:14px 8px;cursor:pointer;text-align:center;transition:all .15s;"><div style="font-size:22px;">🏦</div><div style="font-size:12px;font-weight:600;margin-top:4px;">Bank Transfer</div></div>
+                  </div>
+                  <input type="hidden" id="conf-method" value="">
+                  <input type="text" id="conf-ref" placeholder="Reference # (GCash/Bank — optional)" style="width:100%;padding:10px 14px;border:1.5px solid rgba(47,79,79,0.15);border-radius:8px;font-family:Poppins,Arial,sans-serif;font-size:13px;margin-bottom:12px;outline:none;">
+                  <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;">
+                    <input type="checkbox" id="conf-ack" style="accent-color:#51897d;width:16px;height:16px;margin-top:2px;flex-shrink:0;">
+                    <label for="conf-ack" style="font-size:13px;color:#1e3333;cursor:pointer;">I, <strong>${emp.name}</strong>, confirm that I have received my salary of <strong>${confirmAmt?'₱'+parseFloat(confirmAmt).toFixed(2):''}</strong> for the period stated above.</label>
+                  </div>
+                  <button onclick="submitEmailConfirm('${confirmEmpId}','${confirmToken}','${confirmPeriod||''}','${confirmAmt||''}')" style="width:100%;background:linear-gradient(135deg,#51897d,#2f4f4f);color:#fff;border:none;padding:16px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:Poppins,Arial,sans-serif;letter-spacing:.5px;">✅ Confirm Receipt</button>
+                </div>`
+            }
+          </div>
+          <div style="background:#f0f5f4;padding:14px 28px;text-align:center;font-size:11px;color:#6b8c8c;border-top:1px solid #e8edec;">Click Lounge Studio · TimeCommand · Payroll Confirmation</div>
+        </div>
+      </div>`;
+
+      // Clean URL so refreshing doesn't re-trigger
+      window.history.replaceState({},'',window.location.pathname);
+    } else {
+      // Employee not found — show error
+      document.body.innerHTML=`<div style="font-family:Poppins,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f0f5f4;"><div style="background:#fff;border-radius:16px;padding:40px;text-align:center;max-width:400px;"><div style="font-size:48px;">❌</div><h2 style="margin:12px 0 8px;color:#1e3333;">Invalid Link</h2><p style="color:#6b8c8c;font-size:13px;">This confirmation link is invalid or has expired. Please contact your manager.</p></div></div>`;
+    }
+  }
+});
+
+function submitEmailConfirm(empId,token,period,amount){
+  const ack=document.getElementById('conf-ack');
+  const method=document.getElementById('conf-method').value;
+  const ref=(document.getElementById('conf-ref').value||'').trim();
+  if(!ack||!ack.checked){ alert('Please check the acknowledgement checkbox to confirm.'); return; }
+  if(!method){ alert('Please select your payment method (Cash, GCash, or Bank Transfer).'); return; }
+
+  const empsAll=getEmps();
+  const idx=empsAll.findIndex(e=>e.id===empId);
+  if(idx===-1){ alert('Error: Employee record not found.'); return; }
+
+  const methodLabel={'cash':'💵 Cash','gcash':'📱 GCash','bank':'🏦 Bank Transfer'}[method]||method;
+  const refNote=ref?` · Ref: ${ref}`:'';
+  const confirmedAt=new Date().toLocaleString('en-PH',{timeZone:'Asia/Manila'});
+
+  // Update pending confirmation
+  if(!empsAll[idx].pendingConfirmations) empsAll[idx].pendingConfirmations=[];
+  const pcIdx=empsAll[idx].pendingConfirmations.findIndex(p=>p.token===token);
+  if(pcIdx>-1){
+    empsAll[idx].pendingConfirmations[pcIdx].confirmed=true;
+    empsAll[idx].pendingConfirmations[pcIdx].confirmedAt=confirmedAt;
+    empsAll[idx].pendingConfirmations[pcIdx].method=method;
+    empsAll[idx].pendingConfirmations[pcIdx].ref=ref;
+  }
+
+  // Add to history
+  if(!empsAll[idx].history) empsAll[idx].history=[];
+  empsAll[idx].history.push({
+    date:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'}),
+    note:`✅ Salary receipt CONFIRMED by employee — ₱${parseFloat(amount||0).toFixed(2)} via ${methodLabel}${refNote} · Period: ${(period||'').replace('_',' to ')} · Confirmed: ${confirmedAt}`
+  });
+  // Store payment record
+  if(!empsAll[idx].paymentRecords) empsAll[idx].paymentRecords=[];
+  empsAll[idx].paymentRecords.push({ date:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'}), period:(period||'').replace('_','|'), amount:parseFloat(amount||0), method, ref, confirmedAt, confirmedByEmployee:true });
+  saveEmps(empsAll);
+
+  // Show success screen
+  document.body.innerHTML=`
+  <div style="font-family:Poppins,Arial,sans-serif;background:linear-gradient(135deg,#51897d,#2f4f4f);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,0.2);max-width:440px;width:100%;padding:40px;text-align:center;">
+      <div style="font-size:64px;margin-bottom:16px;">✅</div>
+      <h1 style="font-size:22px;font-weight:700;color:#1e3333;margin-bottom:8px;">Payment Confirmed!</h1>
+      <p style="color:#6b8c8c;font-size:14px;line-height:1.6;margin-bottom:20px;">Your receipt of <strong>₱${parseFloat(amount||0).toFixed(2)}</strong> via ${methodLabel} has been recorded.</p>
+      <div style="background:#f0f5f4;border-radius:10px;padding:14px;font-size:12px;color:#6b8c8c;margin-bottom:20px;">Confirmed: ${confirmedAt}</div>
+      <p style="font-size:12px;color:#6b8c8c;">Thank you, <strong>${empsAll[idx].name}</strong>. Your confirmation has been saved. You may close this window.</p>
+    </div>
+  </div>`;
+}
+
+
+</script>
+</body>
+</html>
