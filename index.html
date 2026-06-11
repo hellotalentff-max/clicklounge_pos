@@ -2041,6 +2041,7 @@ tr:hover td { background:var(--light); }
         <button onclick="calNav(1)" style="background:none;border:none;padding:8px 14px;cursor:pointer;font-size:16px;color:var(--slate);font-family:inherit;">›</button>
       </div>
       <button onclick="renderCalendar()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:13px;color:var(--muted);font-family:inherit;" title="Refresh">↻</button>
+      <button onclick="openManualBooking()" style="background:var(--teal);color:var(--cream);border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">📅 Quick Book</button>
       <button onclick="openBlockDialog()" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">🚫 Block Date</button>
     </div>
   </div>
@@ -2166,6 +2167,123 @@ tr:hover td { background:var(--light); }
 
 <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importData(event)">
 
+
+<!-- ════ MANUAL BOOKING MODAL ════ -->
+<div id="manual-booking-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:var(--white);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(47,79,79,.18);">
+
+    <!-- Header -->
+    <div style="background:var(--teal);padding:18px 22px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--cream);">📅 Quick Book — Same Day</div>
+        <div style="font-size:11px;color:rgba(245,240,232,.6);margin-top:2px;">Create a walk-in booking for today or a specific date</div>
+      </div>
+      <button onclick="closeManualBooking()" style="background:rgba(255,255,255,.15);border:none;color:var(--cream);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:18px;line-height:1;font-family:inherit;">✕</button>
+    </div>
+
+    <div style="padding:20px 22px;">
+
+      <!-- Client -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Client Name *</label>
+        <input id="mb-client" class="sinput" style="width:100%;" placeholder="Start typing…" list="mb-client-list" autocomplete="off" oninput="mbAutoFill(this.value)">
+        <datalist id="mb-client-list"></datalist>
+        <div id="mb-client-info" style="font-size:11px;color:var(--muted);margin-top:4px;"></div>
+      </div>
+
+      <!-- Package -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Package *</label>
+        <select id="mb-pkg" class="sinput" style="width:100%;" onchange="mbUpdatePrice()">
+          <option value="">— Select Package —</option>
+          <optgroup label="Self-Shoot">
+            <option value="Basic|1100">Basic — ₱1,100</option>
+            <option value="Standard|1500">Standard — ₱1,500</option>
+            <option value="Premium|2000">Premium — ₱2,000</option>
+          </optgroup>
+          <optgroup label="Photographer Packages">
+            <option value="Styleshots|2500">Styleshots — ₱2,500</option>
+            <option value="Couple Styleshots|3500">Couple Styleshots — ₱3,500</option>
+            <option value="Pop Reveal|3000">Pop Reveal — ₱3,000</option>
+            <option value="Graduation|3500">Graduation — ₱3,500</option>
+            <option value="Family Portraits|4500">Family Portraits — ₱4,500</option>
+            <option value="Radiant Mama|4000">Radiant Mama — ₱4,000</option>
+            <option value="Candid Kids|3500">Candid Kids — ₱3,500</option>
+            <option value="Pawtraits|3000">Pawtraits — ₱3,000</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="Custom|0">Custom / Other</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <!-- Date + Slots side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Date *</label>
+          <input id="mb-date" type="date" class="sinput" style="width:100%;" onchange="mbLoadSlots()">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Time Slot *</label>
+          <select id="mb-slot" class="sinput" style="width:100%;">
+            <option value="">— Pick date first —</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Slot availability hint -->
+      <div id="mb-slot-hint" style="display:none;font-size:11px;margin-bottom:14px;padding:8px 12px;border-radius:8px;"></div>
+
+      <!-- Price + Pax -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Price (₱)</label>
+          <input id="mb-price" type="number" class="sinput" style="width:100%;" placeholder="0">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Guests (pax)</label>
+          <input id="mb-pax" type="number" class="sinput" style="width:100%;" value="1" min="1" max="20">
+        </div>
+      </div>
+
+      <!-- Email -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Client Email (optional)</label>
+        <input id="mb-email" type="email" class="sinput" style="width:100%;" placeholder="For booking confirmation email">
+      </div>
+
+      <!-- Notes -->
+      <div style="margin-bottom:20px;">
+        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Notes</label>
+        <input id="mb-notes" class="sinput" style="width:100%;" placeholder="e.g. Birthday, special request, add-ons…">
+      </div>
+
+      <!-- Also create acknowledgement? -->
+      <div style="background:rgba(81,137,125,0.06);border:1px solid rgba(81,137,125,0.15);border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="mb-also-ack" style="accent-color:var(--teal);width:16px;height:16px;" checked>
+          <span>Also create an <strong>Acknowledgement Receipt</strong> for this booking</span>
+        </label>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;padding-left:26px;">Records a downpayment and appears in the pending bookings list</div>
+        <div id="mb-ack-extra" style="margin-top:10px;padding-left:26px;">
+          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Downpayment Received (₱)</label>
+          <input id="mb-dp" type="number" class="sinput" style="width:140px;" placeholder="0" value="0">
+          <select id="mb-mop" class="sinput" style="width:120px;margin-left:8px;">
+            <option value="Cash">Cash</option>
+            <option value="GCash">GCash</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeManualBooking()" class="btn btn-outline" style="padding:10px 20px;">Cancel</button>
+        <button onclick="submitManualBooking()" class="btn btn-teal" style="padding:10px 24px;font-weight:700;">📅 Create Booking</button>
+      </div>
+    </div>
+  </div>
+</div>
 <script>
 // ================================================================
 //  CONFIGURATION — saved in localStorage, set via Settings
@@ -3234,6 +3352,165 @@ function ackListRow(a, type){
       '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="viewAckDetail(this.dataset.aid)">View</button>'+
     '</div>'+
   '</div>';
+}
+
+
+// ════════════════════════════════════════════
+// MANUAL BOOKING (same-day / walk-in)
+// ════════════════════════════════════════════
+var MB_SLOTS = ['10:00 AM','10:45 AM','11:30 AM','12:15 PM','1:00 PM','1:45 PM','2:30 PM','3:15 PM','4:00 PM','4:45 PM','5:30 PM'];
+
+function openManualBooking(){
+  var overlay = document.getElementById('manual-booking-overlay');
+  if(!overlay) return;
+  // Pre-fill today
+  var dateEl = document.getElementById('mb-date');
+  if(dateEl) dateEl.value = todayStr();
+  // Pre-fill client datalist
+  var dl = document.getElementById('mb-client-list');
+  if(dl) dl.innerHTML = (DB.clients||[]).map(function(c){ return '<option value="'+escHtml(c.fbName||'')+'">'; }).join('');
+  // Clear fields
+  ['mb-client','mb-email','mb-notes','mb-dp'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('mb-client-info').textContent='';
+  document.getElementById('mb-pkg').value='';
+  document.getElementById('mb-price').value='';
+  document.getElementById('mb-pax').value='1';
+  document.getElementById('mb-mop').value='Cash';
+  document.getElementById('mb-also-ack').checked=true;
+  mbLoadSlots();
+  overlay.style.display='flex';
+}
+
+function closeManualBooking(){
+  var overlay=document.getElementById('manual-booking-overlay');
+  if(overlay) overlay.style.display='none';
+}
+
+function mbAutoFill(name){
+  var cl=(DB.clients||[]).find(function(c){ return (c.fbName||'').toLowerCase()===name.toLowerCase(); });
+  var infoEl=document.getElementById('mb-client-info');
+  var emailEl=document.getElementById('mb-email');
+  if(cl){
+    if(infoEl) infoEl.innerHTML='<span style="color:var(--teal);">✓ Existing client</span>'+(cl.email?' · '+cl.email:'')+(cl.phone?' · '+cl.phone:'');
+    if(emailEl&&cl.email&&!emailEl.value) emailEl.value=cl.email;
+  } else {
+    if(infoEl) infoEl.innerHTML=name?'<span style="color:var(--gold);">New client — will be added to records</span>':'';
+  }
+}
+
+function mbUpdatePrice(){
+  var val=(document.getElementById('mb-pkg')?.value||'');
+  var parts=val.split('|');
+  var priceEl=document.getElementById('mb-price');
+  if(priceEl&&parts[1]&&+parts[1]>0) priceEl.value=parts[1];
+}
+
+function mbLoadSlots(){
+  var date=document.getElementById('mb-date')?.value||todayStr();
+  var sel=document.getElementById('mb-slot');
+  var hint=document.getElementById('mb-slot-hint');
+  if(!sel) return;
+  // Get taken slots for this date from local acknowledgements
+  var acks=DB.acknowledgements||[];
+  var taken=acks.filter(function(a){
+    return String(a.bookDate||'').slice(0,10)===date &&
+           !String(a.status||'').toLowerCase().includes('cancel');
+  }).map(function(a){ return a.timeSlot||''; }).filter(Boolean);
+  // Also from cal events
+  (DB._calEvents||[]).forEach(function(ev){
+    var evDate=String(ev.start||'').slice(0,10);
+    if(evDate!==date) return;
+    if(String(ev.status||'').toLowerCase()==='cancelled') return;
+    if(ev.start){
+      try{
+        var dd=new Date(ev.start);
+        var t=dd.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});
+        if(t&&taken.indexOf(t)===-1) taken.push(t);
+      }catch(e2){}
+    }
+  });
+  var available=MB_SLOTS.filter(function(s){ return taken.indexOf(s)===-1; });
+  sel.innerHTML='<option value="">— Select Time Slot —</option>'+
+    MB_SLOTS.map(function(s){
+      var isTaken=taken.indexOf(s)>-1;
+      return '<option value="'+s+'"'+(isTaken?' disabled style="color:#bbb;"':'')+'>'+s+(isTaken?' (Booked)':'')+'</option>';
+    }).join('');
+  if(hint){
+    hint.style.display='';
+    hint.style.background=available.length>0?'rgba(81,137,125,0.06)':'rgba(192,84,74,0.06)';
+    hint.style.border='1px solid '+(available.length>0?'rgba(81,137,125,0.2)':'rgba(192,84,74,0.2)');
+    hint.style.color=available.length>0?'var(--teal)':'var(--danger)';
+    hint.textContent=available.length+' slot'+(available.length!==1?'s':'')+' available — '+taken.length+' booked';
+  }
+}
+
+async function submitManualBooking(){
+  var client=(document.getElementById('mb-client')?.value||'').trim();
+  var pkgVal=document.getElementById('mb-pkg')?.value||'';
+  var date=document.getElementById('mb-date')?.value||'';
+  var slot=document.getElementById('mb-slot')?.value||'';
+  var price=parseFloat(document.getElementById('mb-price')?.value)||0;
+  var pax=parseInt(document.getElementById('mb-pax')?.value)||1;
+  var email=(document.getElementById('mb-email')?.value||'').trim();
+  var notes=(document.getElementById('mb-notes')?.value||'').trim();
+  var alsoAck=document.getElementById('mb-also-ack')?.checked;
+  var dp=parseFloat(document.getElementById('mb-dp')?.value)||0;
+  var mop=document.getElementById('mb-mop')?.value||'Cash';
+
+  if(!client){ notify('Enter client name','error'); return; }
+  if(!pkgVal){ notify('Select a package','error'); return; }
+  if(!date){ notify('Pick a date','error'); return; }
+  if(!slot){ notify('Select a time slot','error'); return; }
+
+  var pkgName=pkgVal.split('|')[0]||pkgVal;
+
+  // Save to Bookings sheet
+  var bookPayload = {
+    fbName: client, email: email, pkg: pkgName, price: price,
+    dateStr: date, timeSlot: slot, pax: pax, notes: notes,
+    submittedBy: CURR_USER||'Staff', source: 'manual'
+  };
+
+  notify('Creating booking…','info');
+  closeManualBooking();
+
+  try {
+    var r = await gasCall('createBooking', bookPayload);
+    if(!r.ok) throw new Error(r.error||'Unknown error');
+
+    notify('✓ Booking created for '+client+' on '+date+' at '+slot, 'success');
+
+    // Also upsert client record
+    var cl=(DB.clients||[]).find(function(c){return (c.fbName||'').toLowerCase()===client.toLowerCase();});
+    var clData={id:cl?cl.id:uid(), fbName:client, email:email||cl?.email||'', type:'booked', added:cl?.added||todayStr()};
+    if(!cl){ if(!DB.clients) DB.clients=[]; DB.clients.push(clData); }
+    else Object.assign(cl,{email:email||cl.email});
+    push('saveClient', clData);
+
+    // Create acknowledgement receipt if requested
+    if(alsoAck){
+      var ackNum='BK-'+Date.now().toString().slice(-6);
+      var ack={
+        id:uid(), ackNum:ackNum, fbName:client, email:email,
+        service:pkgName, bookDate:date, timeSlot:slot,
+        downpayment:dp, mop:mop, balance:price-dp, status:'Pending Payment',
+        staff:CURR_USER||'Staff', notes:notes, submittedAt:new Date().toISOString()
+      };
+      DB.acknowledgements=(DB.acknowledgements||[]);
+      DB.acknowledgements.push(ack);
+      push('saveAcknowledgement', ack);
+      notify('✓ Acknowledgement receipt '+ackNum+' created', 'success');
+    }
+
+    saveLocal();
+    if(typeof renderCalendar==='function') renderCalendar();
+    if(typeof renderClients==='function') renderClients();
+
+  } catch(e){
+    notify('Booking failed: '+e.message, 'error');
+  }
 }
 
 function calNav(dir){
