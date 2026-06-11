@@ -2240,21 +2240,23 @@ tr:hover td { background:var(--light); }
         <input id="mb-notes" class="sinput" style="width:100%;" placeholder="e.g. Birthday, special request, add-ons…">
       </div>
 
-      <!-- Also create acknowledgement? -->
+      <!-- Downpayment -->
       <div style="background:rgba(81,137,125,0.06);border:1px solid rgba(81,137,125,0.15);border-radius:10px;padding:14px 16px;margin-bottom:20px;">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;">
-          <input type="checkbox" id="mb-also-ack" style="accent-color:var(--teal);width:16px;height:16px;" checked>
-          <span>Also create an <strong>Acknowledgement Receipt</strong> for this booking</span>
-        </label>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px;padding-left:26px;">Records a downpayment and appears in the pending bookings list</div>
-        <div id="mb-ack-extra" style="margin-top:10px;padding-left:26px;">
-          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Downpayment Received (₱)</label>
-          <input id="mb-dp" type="number" class="sinput" style="width:140px;" placeholder="0" value="0">
-          <select id="mb-mop" class="sinput" style="width:120px;margin-left:8px;">
-            <option value="Cash">Cash</option>
-            <option value="GCash">GCash</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-          </select>
+        <div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:10px;">🧾 Acknowledgement Receipt — Auto-generated</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">An AR number will be created automatically for this booking.</div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="flex:1;min-width:120px;">
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Downpayment (₱)</label>
+            <input id="mb-dp" type="number" class="sinput" style="width:100%;" placeholder="0" value="0">
+          </div>
+          <div style="flex:1;min-width:120px;">
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Payment Method</label>
+            <select id="mb-mop" class="sinput" style="width:100%;">
+              <option value="Cash">Cash</option>
+              <option value="GCash">GCash</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -3391,7 +3393,6 @@ function openManualBooking(){
   document.getElementById('mb-price').value='';
   document.getElementById('mb-pax').value='1';
   document.getElementById('mb-mop').value='Cash';
-  document.getElementById('mb-also-ack').checked=true;
 
   mbLoadSlots();
   overlay.style.display='flex';
@@ -3469,7 +3470,6 @@ async function submitManualBooking(sendEmail){
   var pax=parseInt(document.getElementById('mb-pax')?.value)||1;
   var email=(document.getElementById('mb-email')?.value||'').trim();
   var notes=(document.getElementById('mb-notes')?.value||'').trim();
-  var alsoAck=document.getElementById('mb-also-ack')?.checked;
   var dp=parseFloat(document.getElementById('mb-dp')?.value)||0;
   var mop=document.getElementById('mb-mop')?.value||'Cash';
 
@@ -3480,6 +3480,9 @@ async function submitManualBooking(sendEmail){
   if(sendEmail && !email){ notify('Enter client email to send confirmation','error'); return; }
 
   var pkgName=pkgVal.split('|')[0]||pkgVal;
+
+  // Always generate AR number using the standard format
+  var ackNum = genARNum(pkgName);
 
   var bookPayload = {
     fbName:   client,
@@ -3504,7 +3507,7 @@ async function submitManualBooking(sendEmail){
     if(!r.ok) throw new Error(r.error||'Unknown error');
 
     var bookingId = r.bookingId || ('BK-'+Date.now().toString().slice(-6));
-    notify('✓ Booking created — '+client+' on '+date+' at '+slot, 'success');
+    notify('✓ Booking created — '+client+' · '+slot+' · AR# '+ackNum, 'success');
 
     // Upsert client record
     var cl=(DB.clients||[]).find(function(c){return (c.fbName||'').toLowerCase()===client.toLowerCase();});
@@ -3513,21 +3516,18 @@ async function submitManualBooking(sendEmail){
     else { if(email) cl.email=email; }
     push('saveClient', clData);
 
-    // Create acknowledgement receipt if requested
-    var ackNum = '';
-    if(alsoAck){
-      ackNum = 'BK-'+Date.now().toString().slice(-6);
-      var ack={
-        id:uid(), ackNum:ackNum, fbName:client, email:email,
-        service:pkgName, bookDate:date, timeSlot:slot,
-        downpayment:dp, totalPrice:price, mop:mop,
-        balance:price-dp, status:'Pending Payment',
-        staff:CURR_USER||'Staff', notes:notes, submittedAt:new Date().toISOString()
-      };
-      if(!DB.acknowledgements) DB.acknowledgements=[];
-      DB.acknowledgements.push(ack);
-      push('saveAcknowledgement', ack);
-    }
+    // Always create acknowledgement receipt with the pre-generated AR number
+    var ack={
+      id:uid(), ackNum:ackNum, fbName:client, email:email,
+      service:pkgName, bookDate:date, timeSlot:slot,
+      downpayment:dp, totalPrice:price, mop:mop,
+      balance:price-dp, status:'Pending Payment',
+      staff:CURR_USER||'Staff', notes:notes,
+      submittedAt:new Date().toISOString()
+    };
+    if(!DB.acknowledgements) DB.acknowledgements=[];
+    DB.acknowledgements.push(ack);
+    push('saveAcknowledgement', ack);
 
     saveLocal();
 
