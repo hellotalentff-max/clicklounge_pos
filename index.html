@@ -3484,9 +3484,11 @@ async function submitManualBooking(sendEmail){
   var bookPayload = {
     fbName:   client,
     email:    email,
-    package:  pkgName,   // Code.gs reads payload.package
+    package:  pkgName,   // Code.gs primary
+    pkg:      pkgName,   // fallback
     price:    price,
-    date:     date,      // Code.gs reads payload.date
+    date:     date,      // Code.gs primary
+    dateStr:  date,      // fallback
     timeSlot: slot,
     pax:      pax,
     notes:    notes,
