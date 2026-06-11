@@ -2193,27 +2193,9 @@ tr:hover td { background:var(--light); }
 
       <!-- Package -->
       <div style="margin-bottom:14px;">
-        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Package *</label>
+        <label style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">Package / Service *</label>
         <select id="mb-pkg" class="sinput" style="width:100%;" onchange="mbUpdatePrice()">
-          <option value="">— Select Package —</option>
-          <optgroup label="Self-Shoot">
-            <option value="Basic|1100">Basic — ₱1,100</option>
-            <option value="Standard|1500">Standard — ₱1,500</option>
-            <option value="Premium|2000">Premium — ₱2,000</option>
-          </optgroup>
-          <optgroup label="Photographer Packages">
-            <option value="Styleshots|2500">Styleshots — ₱2,500</option>
-            <option value="Couple Styleshots|3500">Couple Styleshots — ₱3,500</option>
-            <option value="Pop Reveal|3000">Pop Reveal — ₱3,000</option>
-            <option value="Graduation|3500">Graduation — ₱3,500</option>
-            <option value="Family Portraits|4500">Family Portraits — ₱4,500</option>
-            <option value="Radiant Mama|4000">Radiant Mama — ₱4,000</option>
-            <option value="Candid Kids|3500">Candid Kids — ₱3,500</option>
-            <option value="Pawtraits|3000">Pawtraits — ₱3,000</option>
-          </optgroup>
-          <optgroup label="Other">
-            <option value="Custom|0">Custom / Other</option>
-          </optgroup>
+          <option value="">— Select Service —</option>
         </select>
       </div>
 
@@ -2277,9 +2259,10 @@ tr:hover td { background:var(--light); }
       </div>
 
       <!-- Actions -->
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
         <button onclick="closeManualBooking()" class="btn btn-outline" style="padding:10px 20px;">Cancel</button>
-        <button onclick="submitManualBooking()" class="btn btn-teal" style="padding:10px 24px;font-weight:700;">📅 Create Booking</button>
+        <button onclick="submitManualBooking(false)" class="btn btn-teal" style="padding:10px 22px;font-weight:700;">📅 Create Booking</button>
+        <button onclick="submitManualBooking(true)" class="btn btn-gold" style="padding:10px 22px;font-weight:700;">✉ Create &amp; Send Confirmation</button>
       </div>
     </div>
   </div>
@@ -3363,22 +3346,53 @@ var MB_SLOTS = ['10:00 AM','10:45 AM','11:30 AM','12:15 PM','1:00 PM','1:45 PM',
 function openManualBooking(){
   var overlay = document.getElementById('manual-booking-overlay');
   if(!overlay) return;
+
+  // Populate package dropdown from live SVC list
+  var svc = loadSVC ? loadSVC() : SVC_DEFAULTS;
+  var pkgSel = document.getElementById('mb-pkg');
+  if(pkgSel){
+    pkgSel.innerHTML = '<option value="">— Select Service —</option>';
+    var groups = {ss:'Self Shoot', ph:'Photographer', ot:'Others'};
+    Object.keys(groups).forEach(function(key){
+      if(!svc[key]||!svc[key].length) return;
+      var grp = document.createElement('optgroup');
+      grp.label = groups[key];
+      svc[key].forEach(function(s){
+        var opt = document.createElement('option');
+        opt.value = s.n+'|'+s.p;
+        opt.textContent = s.n + ' — ₱' + fmt(s.p);
+        grp.appendChild(opt);
+      });
+      pkgSel.appendChild(grp);
+    });
+    // Custom option
+    var customGrp = document.createElement('optgroup');
+    customGrp.label = 'Other';
+    var customOpt = document.createElement('option');
+    customOpt.value = 'Custom|0';
+    customOpt.textContent = 'Custom / Other';
+    customGrp.appendChild(customOpt);
+    pkgSel.appendChild(customGrp);
+  }
+
   // Pre-fill today
   var dateEl = document.getElementById('mb-date');
   if(dateEl) dateEl.value = todayStr();
+
   // Pre-fill client datalist
   var dl = document.getElementById('mb-client-list');
   if(dl) dl.innerHTML = (DB.clients||[]).map(function(c){ return '<option value="'+escHtml(c.fbName||'')+'">'; }).join('');
+
   // Clear fields
   ['mb-client','mb-email','mb-notes','mb-dp'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.value='';
   });
   document.getElementById('mb-client-info').textContent='';
-  document.getElementById('mb-pkg').value='';
   document.getElementById('mb-price').value='';
   document.getElementById('mb-pax').value='1';
   document.getElementById('mb-mop').value='Cash';
   document.getElementById('mb-also-ack').checked=true;
+
   mbLoadSlots();
   overlay.style.display='flex';
 }
@@ -3446,7 +3460,7 @@ function mbLoadSlots(){
   }
 }
 
-async function submitManualBooking(){
+async function submitManualBooking(sendEmail){
   var client=(document.getElementById('mb-client')?.value||'').trim();
   var pkgVal=document.getElementById('mb-pkg')?.value||'';
   var date=document.getElementById('mb-date')?.value||'';
@@ -3460,13 +3474,13 @@ async function submitManualBooking(){
   var mop=document.getElementById('mb-mop')?.value||'Cash';
 
   if(!client){ notify('Enter client name','error'); return; }
-  if(!pkgVal){ notify('Select a package','error'); return; }
+  if(!pkgVal){ notify('Select a service','error'); return; }
   if(!date){ notify('Pick a date','error'); return; }
   if(!slot){ notify('Select a time slot','error'); return; }
+  if(sendEmail && !email){ notify('Enter client email to send confirmation','error'); return; }
 
   var pkgName=pkgVal.split('|')[0]||pkgVal;
 
-  // Save to Bookings sheet
   var bookPayload = {
     fbName: client, email: email, pkg: pkgName, price: price,
     dateStr: date, timeSlot: slot, pax: pax, notes: notes,
@@ -3480,37 +3494,122 @@ async function submitManualBooking(){
     var r = await gasCall('createBooking', bookPayload);
     if(!r.ok) throw new Error(r.error||'Unknown error');
 
-    notify('✓ Booking created for '+client+' on '+date+' at '+slot, 'success');
+    var bookingId = r.bookingId || ('BK-'+Date.now().toString().slice(-6));
+    notify('✓ Booking created — '+client+' on '+date+' at '+slot, 'success');
 
-    // Also upsert client record
+    // Upsert client record
     var cl=(DB.clients||[]).find(function(c){return (c.fbName||'').toLowerCase()===client.toLowerCase();});
     var clData={id:cl?cl.id:uid(), fbName:client, email:email||cl?.email||'', type:'booked', added:cl?.added||todayStr()};
     if(!cl){ if(!DB.clients) DB.clients=[]; DB.clients.push(clData); }
-    else Object.assign(cl,{email:email||cl.email});
+    else { if(email) cl.email=email; }
     push('saveClient', clData);
 
     // Create acknowledgement receipt if requested
+    var ackNum = '';
     if(alsoAck){
-      var ackNum='BK-'+Date.now().toString().slice(-6);
+      ackNum = 'BK-'+Date.now().toString().slice(-6);
       var ack={
         id:uid(), ackNum:ackNum, fbName:client, email:email,
         service:pkgName, bookDate:date, timeSlot:slot,
-        downpayment:dp, mop:mop, balance:price-dp, status:'Pending Payment',
+        downpayment:dp, totalPrice:price, mop:mop,
+        balance:price-dp, status:'Pending Payment',
         staff:CURR_USER||'Staff', notes:notes, submittedAt:new Date().toISOString()
       };
-      DB.acknowledgements=(DB.acknowledgements||[]);
+      if(!DB.acknowledgements) DB.acknowledgements=[];
       DB.acknowledgements.push(ack);
       push('saveAcknowledgement', ack);
-      notify('✓ Acknowledgement receipt '+ackNum+' created', 'success');
     }
 
     saveLocal();
+
+    // Send booking confirmation email
+    if(sendEmail && email){
+      await sendManualBookingConfirmation({
+        client, email, pkg:pkgName, date, slot, price, pax, dp, mop, ackNum, notes, bookingId
+      });
+    }
+
     if(typeof renderCalendar==='function') renderCalendar();
     if(typeof renderClients==='function') renderClients();
 
   } catch(e){
     notify('Booking failed: '+e.message, 'error');
   }
+}
+
+async function sendManualBookingConfirmation(d){
+  // Build a beautiful HTML confirmation email in a popup
+  var APP_URL = window.location.href.split('?')[0];
+  var rescheduleUrl = 'https://hellotalentff-max.github.io/clicklounge_pos/ClickLounge_Reschedule.html';
+  var dateFormatted = (function(){
+    try{ var dd=new Date(d.date+'T00:00:00'); return dd.toLocaleDateString('en-PH',{weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'Asia/Manila'}); }catch(e){ return d.date; }
+  })();
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Booking Confirmation</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Poppins,Arial,sans-serif;background:#f0f5f4;padding:0;}.wrap{max-width:600px;margin:0 auto;background:#fff;border-radius:0 0 16px 16px;overflow:hidden;}.header{background:#2f4f4f;padding:28px 32px;text-align:center;}.header h1{color:#f4f7f6;font-size:22px;font-weight:700;margin-bottom:4px;}.header p{color:rgba(244,247,246,.6);font-size:12px;}.body{padding:28px 32px;}.hero{background:linear-gradient(135deg,rgba(81,137,125,.08),rgba(47,79,79,.04));border:1.5px solid rgba(81,137,125,.15);border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;}.hero .check{font-size:48px;margin-bottom:10px;}.hero h2{font-size:18px;font-weight:700;color:#1e3333;margin-bottom:4px;}.hero p{font-size:13px;color:#6b8c8c;}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}.detail-card{background:#f8faf9;border-radius:8px;padding:12px 14px;}.detail-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#6b8c8c;font-weight:600;margin-bottom:4px;}.detail-val{font-size:14px;font-weight:700;color:#1e3333;}.confirm-box{background:linear-gradient(135deg,#51897d,#2f4f4f);border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;}.confirm-box p{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:14px;}.confirm-btn{display:inline-block;background:#d79068;color:#fff;padding:12px 30px;border-radius:50px;text-decoration:none;font-size:14px;font-weight:700;}.reschedule-link{text-align:center;margin-bottom:20px;font-size:12px;color:#6b8c8c;}.reschedule-link a{color:#51897d;font-weight:600;}.footer{background:#f0f5f4;padding:16px 32px;text-align:center;font-size:11px;color:#6b8c8c;border-top:1px solid #e8edec;}</style></head><body>'+
+    '<div class="wrap">'+
+      '<div class="header">'+
+        '<div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(244,247,246,.4);margin-bottom:8px;">Click Lounge Studio</div>'+
+        '<h1>📸 Booking Confirmed!</h1>'+
+        '<p>We\'re excited to see you at the studio.</p>'+
+      '</div>'+
+      '<div class="body">'+
+        '<div class="hero">'+
+          '<div class="check">✅</div>'+
+          '<h2>Hi '+escHtml(d.client)+'!</h2>'+
+          '<p>Your booking has been confirmed. Here are your details:</p>'+
+        '</div>'+
+        '<div class="detail-grid">'+
+          '<div class="detail-card"><div class="detail-label">📅 Date</div><div class="detail-val">'+dateFormatted+'</div></div>'+
+          '<div class="detail-card"><div class="detail-label">🕐 Time Slot</div><div class="detail-val">'+escHtml(d.slot)+'</div></div>'+
+          '<div class="detail-card"><div class="detail-label">📦 Package</div><div class="detail-val">'+escHtml(d.pkg)+'</div></div>'+
+          '<div class="detail-card"><div class="detail-label">👥 Guests</div><div class="detail-val">'+d.pax+' pax</div></div>'+
+          '<div class="detail-card"><div class="detail-label">💰 Total</div><div class="detail-val">₱'+fmt(d.price)+'</div></div>'+
+          (d.dp>0?'<div class="detail-card"><div class="detail-label">✅ Downpayment</div><div class="detail-val">₱'+fmt(d.dp)+' via '+escHtml(d.mop)+'</div></div>':'<div class="detail-card"><div class="detail-label">⚡ Walk-in</div><div class="detail-val">Same-day booking</div></div>')+
+        '</div>'+
+        (d.ackNum?'<div style="background:rgba(215,144,104,.06);border:1px solid rgba(215,144,104,.2);border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#6b8c8c;">📋 Receipt No: <strong style="color:#1e3333;">'+escHtml(d.ackNum)+'</strong></div>':'')+
+        (d.notes?'<div style="background:#f8faf9;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#6b8c8c;">📝 Notes: '+escHtml(d.notes)+'</div>':'')+
+        '<div class="confirm-box">'+
+          '<p>Need to reschedule? You can move your booking any time before your session.</p>'+
+          '<a href="'+rescheduleUrl+'" class="confirm-btn">📅 Reschedule My Booking</a>'+
+        '</div>'+
+        '<div style="font-size:12px;color:#6b8c8c;text-align:center;line-height:1.8;">'+
+          '📍 Talisay City, Cebu<br>'+
+          '📱 Message us on Facebook: <strong>Click Lounge Studio</strong><br>'+
+          'Please arrive 10 minutes before your time slot.'+
+        '</div>'+
+      '</div>'+
+      '<div class="footer">Click Lounge Studio · Photography Sessions · Cebu<br>This is your official booking confirmation. Please keep a copy.</div>'+
+    '</div>'+
+  '</body></html>';
+
+  var w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+
+  // Toolbar
+  setTimeout(function(){
+    var subject = encodeURIComponent('CLS Booking Confirmed — '+d.pkg+' on '+dateFormatted);
+    var body = encodeURIComponent('Hi '+d.client+',\n\nYour booking at Click Lounge Studio is confirmed!\n\nDate: '+dateFormatted+'\nTime: '+d.slot+'\nPackage: '+d.pkg+'\nGuests: '+d.pax+' pax\nTotal: ₱'+fmt(d.price)+(d.dp>0?'\nDownpayment: ₱'+fmt(d.dp)+' via '+d.mop:'')+'\n\nNeed to reschedule?\n'+rescheduleUrl+'\n\nSee you at the studio!\nClick Lounge Studio');
+    var gmailUrl = 'https://mail.google.com/mail/u/0/?view=cm&fs=1&to='+encodeURIComponent(d.email)+'&su='+subject+'&body='+body;
+    var mailtoUrl = 'mailto:'+encodeURIComponent(d.email)+'?subject='+subject+'&body='+body;
+
+    w.document.body.insertAdjacentHTML('beforeend',
+      '<div style="position:fixed;bottom:0;left:0;right:0;background:#2f4f4f;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;font-family:Poppins,Arial,sans-serif;z-index:999;gap:10px;flex-wrap:wrap;">'+
+        '<span style="color:rgba(244,247,246,.7);font-size:12px;">Send confirmation to <strong style="color:#f4f7f6;">'+escHtml(d.client)+'</strong> ('+escHtml(d.email)+')</span>'+
+        '<div style="display:flex;gap:8px;">'+
+          '<button onclick="(function(){var el=window.document.querySelector(\'.wrap\');var r=window.document.createRange();r.selectNode(el);window.getSelection().removeAllRanges();window.getSelection().addRange(r);window.document.execCommand(\'copy\');window.getSelection().removeAllRanges();window.document.getElementById(\'_cb\').textContent=\'✅ Copied — Paste into Gmail\';setTimeout(function(){window.document.getElementById(\'_cb\').textContent=\'📋 Copy\'},3000);})()" id="_cb" style="background:rgba(255,255,255,.15);color:#f4f7f6;border:1px solid rgba(255,255,255,.25);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Poppins,Arial,sans-serif;">📋 Copy</button>'+
+          '<a href="'+gmailUrl+'" target="_blank" style="background:#d79068;color:#fff;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;font-family:Poppins,Arial,sans-serif;">✉ Open Gmail</a>'+
+          '<a href="'+mailtoUrl+'" style="background:rgba(255,255,255,.15);color:#f4f7f6;border:1px solid rgba(255,255,255,.25);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;font-family:Poppins,Arial,sans-serif;">📨 Mail App</a>'+
+          '<button onclick="window.print()" style="background:rgba(255,255,255,.15);color:#f4f7f6;border:1px solid rgba(255,255,255,.25);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Poppins,Arial,sans-serif;">🖨 Print</button>'+
+        '</div>'+
+        '<div style="height:54px;"></div>'+
+      '</div>'
+    );
+  }, 600);
+
+  notify('✓ Booking confirmation ready — send via Gmail or Mail App', 'success');
 }
 
 function calNav(dir){
