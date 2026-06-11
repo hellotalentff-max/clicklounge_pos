@@ -3584,8 +3584,9 @@ async function sendManualBookingConfirmation(d){
           '<a href="'+rescheduleUrl+'" class="confirm-btn">📅 Reschedule My Booking</a>'+
         '</div>'+
         '<div style="font-size:12px;color:#6b8c8c;text-align:center;line-height:1.8;">'+
-          '📍 Talisay City, Cebu<br>'+
+          (DB.studioInfo&&DB.studioInfo.address ? '📍 '+escHtml(DB.studioInfo.address)+'<br>' : '')+
           '📱 Message us on Facebook: <strong>Click Lounge Studio</strong><br>'+
+          (DB.studioInfo&&DB.studioInfo.contact ? '📞 '+escHtml(DB.studioInfo.contact)+'<br>' : '')+
           'Please arrive 10 minutes before your time slot.'+
         '</div>'+
       '</div>'+
