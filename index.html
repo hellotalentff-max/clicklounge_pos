@@ -1869,7 +1869,20 @@ tr:hover td { background:var(--light); }
 
 <!-- SETTINGS (admin only) -->
 <div id="page-settings" class="page">
-  <div class="ph"><div><h2>Settings</h2><p>Admin configuration</p></div></div>
+  <div class="ph"><div><h2>Settings</h2><p>Admin configuration</p></div>
+    <button class="btn btn-outline btn-sm" onclick="runDiagnostics()" style="align-self:center;">🔬 Run Diagnostics</button>
+  </div>
+
+  <!-- DIAGNOSTICS PANEL -->
+  <div id="diag-panel" style="display:none;margin-bottom:20px;background:var(--white);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;">
+    <div style="background:var(--slate);padding:14px 18px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:14px;font-weight:700;color:var(--cream);">🔬 System Diagnostics</span>
+      <span id="diag-timestamp" style="font-size:11px;color:rgba(245,240,232,.4);margin-left:auto;"></span>
+      <button onclick="document.getElementById('diag-panel').style.display='none'" style="background:none;border:none;color:rgba(245,240,232,.5);cursor:pointer;font-size:16px;">✕</button>
+    </div>
+    <div id="diag-results" style="padding:16px 18px;"></div>
+  </div>
+
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;">
     <div>
       <div class="card">
@@ -2597,6 +2610,154 @@ function initKnownGiftIds(){
 // ================================================================
 //  SETTINGS — save functions
 // ================================================================
+// ════════════════════════════════════════════
+// SYSTEM DIAGNOSTICS
+// ════════════════════════════════════════════
+async function runDiagnostics(){
+  const panel = document.getElementById('diag-panel');
+  const el    = document.getElementById('diag-results');
+  const ts    = document.getElementById('diag-timestamp');
+  if(!panel||!el) return;
+  panel.style.display = '';
+  el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);">⏳ Running checks…</div>';
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+
+  const results = [];
+  const ok  = (label, detail) => results.push({status:'ok',  label, detail});
+  const warn= (label, detail) => results.push({status:'warn',label, detail});
+  const err = (label, detail) => results.push({status:'err', label, detail});
+
+  // ── 1. Local DB integrity ──
+  const checks = [
+    ['Clients',          DB.clients,          'clients'],
+    ['Transactions',     DB.transactions,      'transactions'],
+    ['Acknowledgements', DB.acknowledgements,  'acknowledgements'],
+    ['Gifts',            DB.gifts,             'gifts'],
+    ['Registrations',    DB.registrations,     'registrations'],
+    ['Bookings',         DB.bookings,          'bookings'],
+    ['Expenses',         DB.expenses,          'expenses'],
+    ['EOD Reports',      DB.eodReports,        'eodReports'],
+    ['Points Activity',  DB.pointsActivity,    'pointsActivity'],
+    ['Feedback',         DB.feedback,          'feedback'],
+    ['Tasks',            TASKS,                'tasks'],
+  ];
+  checks.forEach(function(c){
+    const arr = c[1];
+    if(!Array.isArray(arr))       err('Local: '+c[0], 'Missing from DB — not loaded or key mismatch');
+    else if(arr.length===0)       warn('Local: '+c[0], 'Empty — no records yet or sync needed');
+    else                          ok('Local: '+c[0],  arr.length+' records loaded');
+  });
+
+  // ── 2. POS function checks (critical functions that must exist) ──
+  const fns = [
+    'renderCalendar','renderClients','renderGiftsPage','verifyGiftPage',
+    'redeemGiftByCode','submitManualBooking','openManualBooking',
+    'openLogPoints','submitLogPoints','openRedeemPoints',
+    'genARNum','saveAck','confirmBooking','renderFinancialReport',
+    'renderBookingsReport','renderTimeDistribution','syncMissingClients',
+    'runSyncClients','emailPayrollReport','renderEOD','submitEOD',
+    'sendManualBookingConfirmation','quickConfirmBooking',
+    'startAutoSync','silentSync','openBlockDialog'
+  ];
+  const missing = fns.filter(function(f){ return typeof window[f]==='undefined'; });
+  if(missing.length===0) ok('POS Functions', 'All '+fns.length+' critical functions present');
+  else err('POS Functions', 'MISSING: '+missing.join(', '));
+
+  // ── 3. GAS connectivity ──
+  if(!hasUrl()){
+    err('GAS Connection', 'No Apps Script URL saved — go to Settings → save your URL');
+  } else {
+    ts.textContent = 'Testing GAS routes…';
+    const GAS_ROUTES = [
+      ['ping',                    {},                    'Connection test'],
+      ['getAll',                  {},                    'Load all data'],
+      ['saveClient',              {id:'_diag_test',fbName:'DIAG TEST',_test:true}, 'Save client'],
+      ['saveGift',                {id:'_diag_gift',code:'DIAGTEST',prize:'Test',_test:true}, 'Save gift'],
+      ['saveFeedback',            {id:'_diag_fb',name:'Test',rating:5,_test:true}, 'Save feedback'],
+      ['getGifts',                {code:'DIAGTEST'},     'Get gifts by code'],
+      ['getBookedSlots',          {date:'2099-01-01'},   'Get booked slots'],
+      ['getAnnouncements',        {},                    'Get announcements'],
+      ['logPoints',               {fbName:'DIAG TEST',action:'Test',points:1,_test:true}, 'Log points'],
+      ['createBooking',           {fbName:'DIAG',package:'Test',date:'2099-01-01',timeSlot:'10:00 AM',_test:true}, 'Create booking'],
+      ['syncClients',             {_dryRun:true},        'Sync missing clients'],
+      ['getTTData',               {},                    'Get time tracker data (separate GAS)'],
+    ];
+
+    for(var i=0; i<GAS_ROUTES.length; i++){
+      const route = GAS_ROUTES[i];
+      try{
+        const r = await gasCall(route[0], route[1]);
+        if(r && (r.ok || r.data !== undefined)){
+          ok('GAS: '+route[0], route[2]+' ✓'+(r.message?' — '+r.message:''));
+        } else if(r && r.error && r.error.includes('Unknown action')){
+          err('GAS: '+route[0], '⚠ Route not deployed — paste new Code.gs and redeploy as new version');
+        } else {
+          warn('GAS: '+route[0], route[2]+' — responded but not ok: '+(r?.error||JSON.stringify(r).slice(0,60)));
+        }
+      }catch(e){
+        if(e.message&&e.message.includes('No URL')) warn('GAS: '+route[0],'Skipped — no URL');
+        else err('GAS: '+route[0], 'Failed: '+e.message);
+      }
+    }
+  }
+
+  // ── 4. Sheet data cross-checks ──
+  const txDates = (DB.transactions||[]).map(function(t){return t.date||'';}).filter(Boolean);
+  if(txDates.length) ok('Data: Transaction dates', 'Most recent: '+txDates.sort().slice(-1)[0]);
+  const noEmailClients = (DB.clients||[]).filter(function(c){return !c.email;}).length;
+  if(noEmailClients>0) warn('Data: Client emails', noEmailClients+' clients have no email — CRM campaigns won\'t reach them');
+  else if((DB.clients||[]).length) ok('Data: Client emails', 'All clients have email');
+  const pendingAcks = (DB.acknowledgements||[]).filter(function(a){return !String(a.status||'').toLowerCase().includes('confirm')&&!String(a.status||'').toLowerCase().includes('cancel');}).length;
+  if(pendingAcks>0) warn('Data: Pending ARs', pendingAcks+' acknowledgements still pending payment confirmation');
+  else ok('Data: Pending ARs', 'None pending');
+  const unredeemedGifts = (DB.gifts||[]).filter(function(g){return g.redeemed!=='Yes'&&g.redeemed!==true;}).length;
+  if(unredeemedGifts>0) warn('Data: Unredeemed Gifts', unredeemedGifts+' gift codes awaiting redemption');
+
+  // ── Render results ──
+  ts.textContent = new Date().toLocaleTimeString('en-PH',{timeZone:'Asia/Manila'});
+  const total=results.length, okCount=results.filter(function(r){return r.status==='ok';}).length;
+  const errCount=results.filter(function(r){return r.status==='err';}).length;
+  const warnCount=results.filter(function(r){return r.status==='warn';}).length;
+
+  const summaryColor = errCount>0?'var(--danger)':warnCount>0?'var(--gold)':'var(--success)';
+  const summaryIcon  = errCount>0?'🔴':warnCount>0?'🟡':'🟢';
+  let html = '<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">'+
+    '<span style="font-size:13px;font-weight:700;color:'+summaryColor+';">'+summaryIcon+' '+okCount+'/'+total+' checks passed</span>'+
+    (errCount?'<span style="font-size:12px;color:var(--danger);font-weight:600;">'+errCount+' errors</span>':'')+
+    (warnCount?'<span style="font-size:12px;color:var(--gold);font-weight:600;">'+warnCount+' warnings</span>':'')+
+  '</div>';
+
+  // Group by section
+  const groups = {
+    'Local':  results.filter(function(r){return r.label.startsWith('Local')||r.label.startsWith('POS')||r.label.startsWith('Data');}),
+    'GAS Routes': results.filter(function(r){return r.label.startsWith('GAS');}),
+  };
+
+  Object.keys(groups).forEach(function(grp){
+    const items = groups[grp];
+    if(!items.length) return;
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px;margin-top:12px;">'+grp+'</div>';
+    html += '<div style="display:grid;gap:4px;">';
+    items.forEach(function(r){
+      const icon  = r.status==='ok'?'✅':r.status==='warn'?'⚠️':'❌';
+      const color = r.status==='ok'?'var(--success)':r.status==='warn'?'var(--gold)':'var(--danger)';
+      html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;border-radius:7px;background:var(--light);font-size:12px;">'+
+        '<span>'+icon+'</span>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<span style="font-weight:600;color:var(--slate);">'+r.label+'</span>'+
+          ' <span style="color:'+color+';">'+r.detail+'</span>'+
+        '</div>'+
+      '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '<div style="margin-top:16px;padding:10px 14px;background:rgba(81,137,125,0.05);border-radius:8px;font-size:11px;color:var(--muted);">'+
+    '💡 Red = broken. Yellow = needs attention. Green = working. Run diagnostics after every deployment to catch issues early.'+
+  '</div>';
+  el.innerHTML = html;
+}
+
 function saveUrl(){
   const url = (document.getElementById('set-url')?.value||'').trim();
   if(!url){ notify('Enter a URL first','error'); return; }
