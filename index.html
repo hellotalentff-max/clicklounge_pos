@@ -2684,7 +2684,7 @@ function renderGiftsPage(){
     var bg = i%2===0?'var(--white)':'var(--light)';
     rows += '<tr style="background:'+bg+';">'+
       '<td style="font-size:11px;white-space:nowrap;">'+String(g.date||'').slice(0,10)+'</td>'+
-      '<td style="font-weight:500;">'+escHtml(g.clientName||g.fbName||'—')+'</td>'+
+      '<td style="font-weight:500;">'+escHtml(g.clientName||g.name||g.fbName||'—')+'</td>'+
       '<td>'+escHtml(g.prize||g.reward||'—')+'</td>'+
       '<td style="font-family:monospace;font-size:11px;">'+escHtml(g.code||'—')+'</td>'+
       '<td>'+(isRed?'<span style="color:var(--success);font-weight:600;">&#10003; Redeemed</span>':'<span style="color:var(--gold);">Pending</span>')+'</td>'+
@@ -2696,16 +2696,72 @@ function renderGiftsPage(){
   '</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
-async function redeemGift(id){
-  const g = (DB.gifts||[]).find(x=>x.id===id);
-  if(!g){ notify('Gift not found','error'); return; }
-  g.redeemed = 'Yes';
-  g.redeemedAt = todayStr();
-  saveLocal();
-  push('saveGift', g);
-  renderGiftsPage();
-  notify('Gift redeemed ✓','success');
+async function verifyGiftPage(){
+  const code  = (document.getElementById('gift-code-input')?.value||'').trim().toUpperCase();
+  const resEl = document.getElementById('gift-verify-result');
+  if(!code){ resEl.innerHTML='<div class="tm">Enter a gift code above.</div>'; return; }
+
+  resEl.innerHTML='<div class="tm">🔍 Looking up code…</div>';
+
+  // 1. Check local DB first
+  let gift = (DB.gifts||[]).find(function(g){ return String(g.code||'').toUpperCase()===code; });
+
+  // 2. If not found locally, fetch from GAS
+  if(!gift && hasUrl()){
+    try{
+      const r = await gasCall('getGifts',{code});
+      if(r.ok && r.data && r.data.length){
+        gift = r.data[0];
+        // Add to local DB for next time
+        if(!DB.gifts) DB.gifts=[];
+        if(!(DB.gifts.some(function(g){ return String(g.code||'').toUpperCase()===code; }))){
+          DB.gifts.push(gift);
+          saveLocal();
+        }
+      }
+    }catch(e){}
+  }
+
+  if(!gift){
+    resEl.innerHTML='<div style="background:rgba(192,84,74,0.06);border:1.5px solid rgba(192,84,74,0.2);border-radius:10px;padding:16px;color:var(--danger);font-weight:600;">❌ Code not found — <code style="letter-spacing:2px;">'+escHtml(code)+'</code></div>';
+    return;
+  }
+
+  const isRed = gift.redeemed==='Yes'||gift.redeemed===true;
+  const name  = gift.clientName||gift.name||gift.fbName||'—';
+  resEl.innerHTML='<div style="background:'+(isRed?'rgba(192,84,74,0.04)':'rgba(81,137,125,0.04)')+';border:1.5px solid '+(isRed?'rgba(192,84,74,0.2)':'rgba(81,137,125,0.2)')+';border-radius:10px;padding:16px;">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'+
+      '<div style="font-size:28px;">'+(isRed?'✅':'🎁')+'</div>'+
+      '<div>'+
+        '<div style="font-size:15px;font-weight:700;">'+(isRed?'Already Redeemed':'Valid Gift Code')+'</div>'+
+        '<div style="font-size:12px;color:var(--muted);">'+escHtml(name)+' · '+String(gift.date||'').slice(0,10)+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="background:var(--white);border-radius:8px;padding:12px 14px;margin-bottom:12px;">'+
+      '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Prize</div>'+
+      '<div style="font-size:16px;font-weight:700;color:var(--teal);">'+escHtml(gift.prize||gift.reward||'—')+'</div>'+
+    '</div>'+
+    (isRed
+      ? '<div style="font-size:12px;color:var(--danger);">Redeemed on '+String(gift.redeemedDate||gift.redeemedAt||'').slice(0,10)+'</div>'
+      : '<button class="btn btn-teal" data-gcode="'+escHtml(code)+'" onclick="redeemGiftByCode(this.dataset.gcode)" style="width:100%;padding:12px;font-size:14px;font-weight:700;">✅ Mark as Redeemed</button>'
+    )+
+  '</div>';
 }
+
+async function redeemGiftByCode(code){
+  const gift = (DB.gifts||[]).find(function(g){ return String(g.code||'').toUpperCase()===code.toUpperCase(); });
+  if(!gift){ notify('Gift not found','error'); return; }
+  gift.redeemed    = 'Yes';
+  gift.redeemedAt  = todayStr();
+  gift.redeemedDate= todayStr();
+  saveLocal();
+  push('saveGift', gift);
+  renderGiftsPage();
+  verifyGiftPage();
+  notify('🎁 Gift redeemed ✓','success');
+}
+
+function verifyGiftCode(){ verifyGiftPage(); } // alias
 
 // ================================================================
 //  EOD (End of Day Report)
@@ -8337,32 +8393,94 @@ function renderFinancialReport(txns, allExp, allFT, eods, acks, label){
   '</div>';
   document.getElementById('fin-chart-rev-exp').innerHTML = revExpHtml;
 
-  // MOP breakdown
-  const mops = ['Cash','GCash','Maya','BPI','Mixed'];
-  const mopData = mops.map(m=>({
-    label:m,
-    val:txns.filter(t=>t.balanceMOP===m).reduce((s,t)=>s+(+t.balance||0),0)
-  })).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
-  const mopMax = mopData[0]?.val||1;
-  const colors = {'Cash':'var(--teal)','GCash':'var(--gold)','Maya':'#5b63d9','BPI':'#c0544a','Mixed':'var(--muted)'};
-  let mopHtml = '<div class="ct" style="margin-bottom:10px;font-size:11px;">Payment Method Split</div>';
-  mopData.forEach(m=>{
+  // MOP breakdown — combines Transactions (balance collected) + ACK downpayments
+  const ALL_MOPS = ['Cash','GCash','Maya','BPI','Bank Transfer','Mixed'];
+  const colors   = {'Cash':'var(--teal)','GCash':'var(--gold)','Maya':'#5b63d9','BPI':'#c0544a','Bank Transfer':'#6b8c8c','Mixed':'var(--muted)'};
+
+  // Collect amounts by MOP from both sources
+  const mopTotals = {};
+  const mopTxnCnt = {};
+  const mopAckCnt = {};
+
+  // From Transactions — balance collected
+  txns.forEach(function(t){
+    const m = t.balanceMOP||'Cash';
+    mopTotals[m] = (mopTotals[m]||0) + (+t.balance||0);
+    mopTxnCnt[m] = (mopTxnCnt[m]||0) + 1;
+  });
+
+  // From Acknowledgements — downpayments collected
+  confirmedAcks.forEach(function(a){
+    const m = a.mop||'Cash';
+    mopTotals[m] = (mopTotals[m]||0) + (+a.downpayment||0);
+    mopAckCnt[m] = (mopAckCnt[m]||0) + 1;
+  });
+
+  const mopData = Object.keys(mopTotals)
+    .map(function(m){ return {label:m, val:mopTotals[m]}; })
+    .filter(function(m){ return m.val>0; })
+    .sort(function(a,b){ return b.val-a.val; });
+
+  const mopMax   = mopData.length ? mopData[0].val : 1;
+  const totalMOP = mopData.reduce(function(s,m){ return s+m.val; }, 0);
+
+  // Chart bars
+  let mopHtml = '<div class="ct" style="margin-bottom:10px;font-size:11px;">Payment Method — Invoices + Downpayments</div>';
+  mopData.forEach(function(m){
+    const txnAmt = txns.filter(function(t){ return (t.balanceMOP||'Cash')===m.label; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+    const ackAmt = confirmedAcks.filter(function(a){ return (a.mop||'Cash')===m.label; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+    const txnPct = m.val>0 ? Math.round(txnAmt/m.val*100) : 0;
+    const ackPct = 100-txnPct;
     mopHtml += '<div class="chart-bar-row">'+
       '<div class="chart-bar-label">'+m.label+'</div>'+
-      '<div class="chart-bar-track"><div class="chart-bar-fill" style="width:'+Math.round(m.val/mopMax*100)+'%;background:'+(colors[m.label]||'var(--teal)')+';"></div></div>'+
-      '<div class="chart-bar-val">₱'+fmt(m.val)+'</div>'+
+      '<div class="chart-bar-track" style="position:relative;">'+
+        '<div style="position:absolute;left:0;top:0;height:100%;width:'+Math.round(m.val/mopMax*100)+'%;display:flex;overflow:hidden;border-radius:4px;">'+
+          (txnAmt>0?'<div style="flex:'+txnPct+';background:'+(colors[m.label]||'var(--teal)')+';" title="Invoices: ₱'+fmt(txnAmt)+'"></div>':'')+
+          (ackAmt>0?'<div style="flex:'+ackPct+';background:'+(colors[m.label]||'var(--teal)')+'55;" title="Downpayments: ₱'+fmt(ackAmt)+'"></div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="chart-bar-val" style="color:'+(colors[m.label]||'var(--teal)')+';">₱'+fmt(m.val)+'</div>'+
     '</div>';
   });
   document.getElementById('fin-chart-mop').innerHTML = mopHtml||'<div class="tm">No payment data.</div>';
 
-  // MOP detail card
-  let mopDetail = '<div style="overflow-x:auto;"><table><thead><tr><th>Method</th><th style="text-align:right;">Amount Collected</th><th style="text-align:center;">Transactions</th><th style="text-align:right;">Share</th></tr></thead><tbody>';
-  const totalMOP = mopData.reduce((s,m)=>s+m.val,0);
-  mopData.forEach(m=>{
-    const cnt   = txns.filter(t=>t.balanceMOP===m.label).length;
-    const share = totalMOP ? Math.round(m.val/totalMOP*100) : 0;
-    mopDetail += '<tr><td style="font-weight:500;">'+m.label+'</td><td style="text-align:right;color:var(--teal);font-weight:600;">₱'+fmt(m.val)+'</td><td style="text-align:center;">'+cnt+'</td><td style="text-align:right;color:var(--muted);">'+share+'%</td></tr>';
+  // MOP detail table — shows invoices, downpayments, and totals per method
+  let mopDetail = '<div style="overflow-x:auto;"><table><thead><tr>'+
+    '<th>Method</th>'+
+    '<th style="text-align:right;">Invoices</th>'+
+    '<th style="text-align:right;">Downpayments</th>'+
+    '<th style="text-align:right;font-weight:700;">Total Collected</th>'+
+    '<th style="text-align:center;">Txns</th>'+
+    '<th style="text-align:center;">ARs</th>'+
+    '<th style="text-align:right;">Share</th>'+
+  '</tr></thead><tbody>';
+  mopData.forEach(function(m){
+    const txnAmt2 = txns.filter(function(t){ return (t.balanceMOP||'Cash')===m.label; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+    const ackAmt2 = confirmedAcks.filter(function(a){ return (a.mop||'Cash')===m.label; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+    const share   = totalMOP ? Math.round(m.val/totalMOP*100) : 0;
+    const txCnt   = mopTxnCnt[m.label]||0;
+    const acCnt   = mopAckCnt[m.label]||0;
+    mopDetail += '<tr>'+
+      '<td style="font-weight:600;">'+(colors[m.label]?'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+(colors[m.label])+'opacity:.8;margin-right:6px;"></span>':'')+m.label+'</td>'+
+      '<td style="text-align:right;color:var(--teal);">'+( txnAmt2>0 ? '₱'+fmt(txnAmt2) : '—' )+'</td>'+
+      '<td style="text-align:right;color:var(--gold);">'+( ackAmt2>0 ? '₱'+fmt(ackAmt2) : '—' )+'</td>'+
+      '<td style="text-align:right;font-weight:700;color:var(--slate);">₱'+fmt(m.val)+'</td>'+
+      '<td style="text-align:center;color:var(--muted);">'+(txCnt||'—')+'</td>'+
+      '<td style="text-align:center;color:var(--muted);">'+(acCnt||'—')+'</td>'+
+      '<td style="text-align:right;color:var(--muted);">'+share+'%</td>'+
+    '</tr>';
   });
+  // Total row
+  const dpTotal = confirmedAcks.reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+  mopDetail += '<tr style="background:rgba(47,79,79,0.04);font-weight:700;border-top:2px solid var(--border);">'+
+    '<td>TOTAL</td>'+
+    '<td style="text-align:right;color:var(--teal);">₱'+fmt(totalRev)+'</td>'+
+    '<td style="text-align:right;color:var(--gold);">₱'+fmt(dpTotal)+'</td>'+
+    '<td style="text-align:right;color:var(--slate);">₱'+fmt(totalMOP)+'</td>'+
+    '<td style="text-align:center;">'+txns.length+'</td>'+
+    '<td style="text-align:center;">'+confirmedAcks.length+'</td>'+
+    '<td style="text-align:right;">100%</td>'+
+  '</tr>';
   mopDetail += '</tbody></table></div>';
   document.getElementById('fin-mop-detail').innerHTML = mopDetail||'<div class="tm">No data.</div>';
 
