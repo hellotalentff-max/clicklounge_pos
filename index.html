@@ -1701,7 +1701,8 @@ tr:hover td { background:var(--light); }
   <!-- ══ FINANCIAL ══ -->
   <div id="rep-cat-financial" class="rep-cat">
     <div class="rep-section-grid">
-      <div class="rep-card-stat" id="fin-total-rev"><div class="rs-label">Total Revenue</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="fin-total-rev"><div class="rs-label">Invoice Revenue</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="fin-total-dp"><div class="rs-label">Downpayments</div><div class="rs-val rs-gold">—</div></div>
       <div class="rep-card-stat" id="fin-total-exp"><div class="rs-label">Total Expenses</div><div class="rs-val rs-danger">—</div></div>
       <div class="rep-card-stat" id="fin-net"><div class="rs-label">Net Income</div><div class="rs-val rs-success">—</div></div>
       <div class="rep-card-stat" id="fin-txns"><div class="rs-label">Transactions</div><div class="rs-val">—</div></div>
@@ -8094,7 +8095,7 @@ function _buildReports(prefixes, label){
   const ackMap={};
   acks.forEach(a=>{ ackMap[a.fbName]=a; });
 
-  renderFinancialReport(txns, allExp, allFT, eods, label);
+  renderFinancialReport(txns, allExp, allFT, eods, acks, label);
   renderClientsReport(regs, txnMap, ackMap, label, prefixes);
   renderPackagesReport(txns, regs, txnMap, ackMap, label);
   renderOperationsReport(txns, eods, allFT, gifts, label);
@@ -8280,29 +8281,45 @@ function renderBookingsReport(acks, bookings, prefixes, label){
     }
   }
 }
-function renderFinancialReport(txns, allExp, allFT, eods, label){
+function renderFinancialReport(txns, allExp, allFT, eods, acks, label){
   const totalRev  = txns.reduce((s,t)=>s+(+t.total||0),0);
   const totalExp  = allExp.reduce((s,e)=>s+(+e.amt||0),0);
   const totalDisc = txns.reduce((s,t)=>s+(+t.discount||0),0);
-  const netIncome = totalRev - totalExp;
+
+  // Downpayments from Acknowledgement Receipts (confirmed only, exclude cancelled)
+  const confirmedAcks = (acks||[]).filter(function(a){
+    const st = String(a.status||'').toLowerCase();
+    return !st.includes('cancel');
+  });
+  const totalDP   = confirmedAcks.reduce((s,a)=>s+(+a.downpayment||0), 0);
+  const dpCash    = confirmedAcks.filter(a=>(a.mop||'').toLowerCase().includes('cash')).reduce((s,a)=>s+(+a.downpayment||0),0);
+  const dpGcash   = confirmedAcks.filter(a=>(a.mop||'').toLowerCase().includes('gcash')).reduce((s,a)=>s+(+a.downpayment||0),0);
+  const dpOther   = totalDP - dpCash - dpGcash;
+
+  const totalIncome = totalRev + totalDP;
+  const netIncome   = totalIncome - totalExp;
   const avgInv    = txns.length ? Math.round(totalRev/txns.length) : 0;
 
   // Stats
-  document.getElementById('fin-total-rev').innerHTML = '<div class="rs-label">Total Revenue</div><div class="rs-val rs-teal">₱'+fmt(totalRev)+'</div>';
+  document.getElementById('fin-total-rev').innerHTML = '<div class="rs-label">Invoice Revenue</div><div class="rs-val rs-teal">₱'+fmt(totalRev)+'</div>';
+  document.getElementById('fin-total-dp').innerHTML  = '<div class="rs-label">Downpayments ('+confirmedAcks.length+' ARs)</div><div class="rs-val rs-gold">₱'+fmt(totalDP)+'</div>';
   document.getElementById('fin-total-exp').innerHTML = '<div class="rs-label">Total Expenses</div><div class="rs-val rs-danger">₱'+fmt(totalExp)+'</div>';
   document.getElementById('fin-net').innerHTML       = '<div class="rs-label">Net Income</div><div class="rs-val '+(netIncome>=0?'rs-success':'rs-danger')+'">₱'+fmt(netIncome)+'</div>';
   document.getElementById('fin-txns').innerHTML      = '<div class="rs-label">Transactions</div><div class="rs-val">'+txns.length+'</div>';
   document.getElementById('fin-disc').innerHTML      = '<div class="rs-label">Discounts Given</div><div class="rs-val rs-muted">₱'+fmt(totalDisc)+'</div>';
   document.getElementById('fin-avg').innerHTML       = '<div class="rs-label">Avg Invoice</div><div class="rs-val">₱'+fmt(avgInv)+'</div>';
 
-  // Revenue vs Expenses bar
-  const revExpMax = Math.max(totalRev, totalExp, 1);
+  // Revenue vs Expenses bar (now includes downpayments)
+  const revExpMax = Math.max(totalIncome, totalExp, 1);
   let revExpHtml = '';
   [
-    {label:'Revenue', val:totalRev, color:'var(--teal)', pct:Math.round(totalRev/revExpMax*100)},
-    {label:'Expenses', val:totalExp, color:'var(--danger)', pct:Math.round(totalExp/revExpMax*100)},
-    {label:'Net Income', val:netIncome, color:netIncome>=0?'var(--success)':'var(--danger)', pct:Math.abs(Math.round(netIncome/revExpMax*100))},
+    {label:'Invoice Revenue', val:totalRev,    color:'var(--teal)',    pct:Math.round(totalRev/revExpMax*100)},
+    {label:'Downpayments',    val:totalDP,     color:'var(--gold)',    pct:Math.round(totalDP/revExpMax*100)},
+    {label:'Total Income',    val:totalIncome, color:'var(--success)', pct:Math.round(totalIncome/revExpMax*100)},
+    {label:'Expenses',        val:totalExp,    color:'var(--danger)',  pct:Math.round(totalExp/revExpMax*100)},
+    {label:'Net Income',      val:netIncome,   color:netIncome>=0?'var(--success)':'var(--danger)', pct:Math.abs(Math.round(netIncome/revExpMax*100))},
   ].forEach(r=>{
+    if(r.val===0) return;
     revExpHtml += '<div class="chart-bar-row">'+
       '<div class="chart-bar-label">'+r.label+'</div>'+
       '<div class="chart-bar-track"><div class="chart-bar-fill" style="width:'+r.pct+'%;background:'+r.color+';"></div></div>'+
@@ -8311,10 +8328,11 @@ function renderFinancialReport(txns, allExp, allFT, eods, label){
   });
 
   // Insight pills
-  const margin = totalRev>0 ? Math.round(netIncome/totalRev*100) : 0;
+  const margin = totalIncome>0 ? Math.round(netIncome/totalIncome*100) : 0;
   revExpHtml += '<div style="margin-top:14px;">'+
     '<span class="insight-pill">📊 Profit margin: '+margin+'%</span>'+
-    (totalDisc>0?'<span class="insight-pill">🏷 Discounts reduced revenue by ₱'+fmt(totalDisc)+'</span>':'')+
+    (totalDP>0?'<span class="insight-pill">📋 Downpayments: ₱'+fmt(dpCash)+' Cash · ₱'+fmt(dpGcash)+' GCash'+(dpOther>0?' · ₱'+fmt(dpOther)+' Other':'')+'</span>':'')+
+    (totalDisc>0?'<span class="insight-pill">🏷 Discounts: ₱'+fmt(totalDisc)+'</span>':'')+
     (netIncome<0?'<span class="insight-pill" style="background:rgba(192,84,74,0.08);border-color:rgba(192,84,74,0.2);color:var(--danger);">⚠ Expenses exceed revenue</span>':'')+
   '</div>';
   document.getElementById('fin-chart-rev-exp').innerHTML = revExpHtml;
