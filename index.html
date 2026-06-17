@@ -5289,6 +5289,7 @@ async function saveAck(){
   var dp      = parseFloat(document.getElementById('ma-dp')?.value)||0;
   var total   = parseFloat(document.getElementById('ma-total')?.value)||0;
   var evId    = (document.getElementById('ma-evid')?.value||'').trim();
+  var timeSlot= (document.getElementById('ma-time')?.value||'').trim();
   var isConfirm = document.getElementById('ma-confirm-mode')?.value === '1';
 
   if(!fbName){ notify('FB Name is required','error'); return; }
@@ -5298,36 +5299,26 @@ async function saveAck(){
   if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = 'Processing…'; }
 
   if(isConfirm && evId && hasUrl()){
-    // Use confirmBooking on server — updates calendar, creates ack, sends email with T&C
     try{
       var result = await gasCall('confirmBooking', {
-        eventId: evId,
-        fbName: fbName,
-        email: email,
-        service: service,
-        mop: mop,
-        downpayment: dp,
-        bookDate: bookDate,
-        timeSlot: (document.getElementById('ma-time')?.value||'').trim()
+        eventId: evId, fbName: fbName, email: email, service: service,
+        mop: mop, downpayment: dp, bookDate: bookDate, timeSlot: timeSlot
       });
       if(result.ok){
-        // Add the ack receipt to local DB
         var ack = result.ack || {
           id: result.ackId||uid(), date: todayStr(), fbName: fbName, email: email,
-          service: service, bookDate: bookDate, mop: mop,
+          service: service, bookDate: bookDate, timeSlot: timeSlot, mop: mop,
           downpayment: dp, totalPrice: total, ackNum: result.ackNum||'', status: 'Confirmed'
         };
         ack.status = 'Confirmed';
+        if(!ack.timeSlot) ack.timeSlot = timeSlot; // ensure timeSlot is always set
         if(!DB.acknowledgements) DB.acknowledgements = [];
         DB.acknowledgements.push(ack);
-
-        // Add client if new
         if(!DB.clients) DB.clients = [];
         if(!DB.clients.find(function(c){ return (c.fbName||'').toLowerCase()===fbName.toLowerCase(); })){
           var cl = {id:uid(), fbName:fbName, email:email, type:'booked', added:todayStr()};
           DB.clients.push(cl);
         }
-
         saveLocal();
         notify('✓ Booking confirmed! Email with T&C sent to '+email,'success');
         closeModal();
@@ -5340,20 +5331,18 @@ async function saveAck(){
       }
     }catch(e){
       notify('Network error: '+e.message+'. Saving locally…','error');
-      // Fall through to local save
-      saveAckLocal(fbName, email, service, bookDate, mop, dp, total);
+      saveAckLocal(fbName, email, service, bookDate, timeSlot, mop, dp, total);
     }
   } else {
-    // Regular save (no email)
-    saveAckLocal(fbName, email, service, bookDate, mop, dp, total);
+    saveAckLocal(fbName, email, service, bookDate, timeSlot, mop, dp, total);
   }
 }
 
-function saveAckLocal(fbName, email, service, bookDate, mop, dp, total){
+function saveAckLocal(fbName, email, service, bookDate, timeSlot, mop, dp, total){
   var ackNum = genARNum(service);
   var ack = {
     id: uid(), date: todayStr(), fbName: fbName, email: email,
-    service: service, bookDate: bookDate, mop: mop,
+    service: service, bookDate: bookDate, timeSlot: timeSlot||'', mop: mop,
     downpayment: dp, totalPrice: total, ackNum: ackNum, status: ''
   };
 
@@ -8382,14 +8371,26 @@ function renderBookingsReport(acks, bookings, prefixes, label){
   if(bkPend)  bkPend.innerHTML  = '<div class="rs-label">Pending Payment</div><div class="rs-val rs-gold">'+pending+'</div>';
   if(bkCanc)  bkCanc.innerHTML  = '<div class="rs-label">Cancelled</div><div class="rs-val rs-danger">'+cancelled+'</div>';
 
+  // Build lookup: clientname|date → timeSlot from Bookings sheet
+  var bkSlotMap = {};
+  (bookings||[]).forEach(function(b){
+    var n = String(b.fb_name||b.fbName||b.clientName||'').toLowerCase().trim();
+    var d = toDateStr(b.date||'');
+    var s = String(b.time_slot||b.timeSlot||'').trim();
+    if(n && d && s) bkSlotMap[n+'|'+d] = s;
+  });
+
   // ── CHART 1: Time slot distribution ──
-  // Use ACKs first, fall back to Bookings sheet
   var slotCounts = {};
   ALL_SLOTS_REP.forEach(function(s){ slotCounts[s]={confirmed:0,pending:0,total:0}; });
 
   // From ACKs (use time_slot OR timeSlot)
   periodAcks.forEach(function(a){
-    var slot = String(a.time_slot||a.timeSlot||'').trim();
+    var slot = String(a.timeSlot||a.time_slot||'').trim();
+    if(!slot){
+      var bkKey = String(a.fbName||a.fb_name||'').toLowerCase().trim()+'|'+toDateStr(a.bookDate||a.book_date||'');
+      slot = bkSlotMap[bkKey]||'';
+    }
     if(!slot) return;
     if(!slotCounts[slot]) slotCounts[slot]={confirmed:0,pending:0,total:0};
     var st = String(a.status||'').toLowerCase();
@@ -8399,19 +8400,7 @@ function renderBookingsReport(acks, bookings, prefixes, label){
     slotCounts[slot].total++;
   });
 
-  // From Bookings sheet (time_slot key)
-  if(periodAcks.length===0){
-    periodBk.forEach(function(b){
-      var slot = String(b.time_slot||b.timeSlot||b['time slot']||'').trim();
-      if(!slot) return;
-      if(!slotCounts[slot]) slotCounts[slot]={confirmed:0,pending:0,total:0};
-      var st = String(b.status||'').toLowerCase();
-      if(st.includes('cancel')) return;
-      if(st.includes('confirm')) slotCounts[slot].confirmed++;
-      else slotCounts[slot].pending++;
-      slotCounts[slot].total++;
-    });
-  }
+
 
   var maxSlot = Math.max.apply(null, ALL_SLOTS_REP.map(function(s){ return slotCounts[s]?slotCounts[s].total:0; }));
   var slotEl = document.getElementById('rep-slot-chart');
