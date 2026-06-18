@@ -8464,30 +8464,21 @@ function renderBookingsReport(acks, bookings, prefixes, label){
   }
 
   // ── CHART 2: Submission hour distribution (from Bookings sheet `submitted` column) ──
+  // NOTE: b.submitted is already a PHT string like "2026-06-10 14:30:00" from Code.gs
+  // Extract the hour directly from the string — do NOT parse with new Date() (browser timezone issue)
   var hourCounts = new Array(24).fill(0);
-  // Use submitted timestamp from Bookings sheet
   var submittedData = periodBk.filter(function(b){ return b.submitted; });
-  // Fallback: use ACK 'date' (booking confirmation date) for submission timing
   if(submittedData.length===0){
-    periodAcks.forEach(function(a){
-      var ts = a.submittedAt||a.submitted_at||a.date||'';
-      if(!ts) return;
-      try{
-        var d2 = new Date(String(ts)+'T12:00:00');
-        if(!isNaN(d2.getTime())){
-          // Use PHT hours (rough estimate — most bookings happen 9AM-9PM)
-          var phtH = (d2.getUTCHours() + 8) % 24;
-          hourCounts[phtH]++;
-        }
-      }catch(e){}
-    });
+    // Fallback: no booking sheet data — skip (ACK dates have no time component)
   } else {
     submittedData.forEach(function(b){
-      try{
-        var sub = b.submitted;
-        var d   = sub instanceof Date ? sub : new Date(String(sub));
-        if(!isNaN(d.getTime())){ hourCounts[d.getUTCHours()]++; } // Sheets stores in UTC
-      }catch(e){}
+      var sub = String(b.submitted||'');
+      // Extract hour from "2026-06-10 14:30:00" → position 11-12
+      var match = sub.match(/\d{4}-\d{2}-\d{2}\s+(\d{1,2}):/);
+      if(match){
+        var phtHour = parseInt(match[1], 10);
+        if(phtHour >= 0 && phtHour < 24) hourCounts[phtHour]++;
+      }
     });
   }
   var maxHour = Math.max.apply(null, hourCounts);
@@ -8617,17 +8608,20 @@ function renderBookingsReport(acks, bookings, prefixes, label){
   }
 
   // ── CHART 2: Submission hour distribution (from Bookings sheet) ──
+  // b.submitted is already a PHT string from Code.gs — extract hour directly
   var hourCounts = new Array(24).fill(0);
   var hasSubmitData = false;
   periodBk.forEach(function(b){
-    var sub = b.submitted;
+    var sub = String(b.submitted||'');
     if(!sub) return;
-    var dt = sub instanceof Date ? sub : new Date(String(sub));
-    if(isNaN(dt.getTime())) return;
-    // Convert to Manila time
-    var manilaHour = (dt.getUTCHours() + 8) % 24;
-    hourCounts[manilaHour]++;
-    hasSubmitData = true;
+    var match = sub.match(/\d{4}-\d{2}-\d{2}\s+(\d{1,2}):/);
+    if(match){
+      var manilaHour = parseInt(match[1], 10);
+      if(manilaHour >= 0 && manilaHour < 24){
+        hourCounts[manilaHour]++;
+        hasSubmitData = true;
+      }
+    }
   });
 
   var subEl = document.getElementById('rep-submit-chart');
