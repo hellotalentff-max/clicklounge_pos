@@ -1242,7 +1242,7 @@ tr:hover td { background:var(--light); }
 
   <!-- Search + Filter row -->
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-    <input class="sinput" style="flex:1;min-width:200px;" type="text" id="cl-search" placeholder="Search by name, email, phone…" oninput="clearTimeout(_clSearchTimer);_clSearchTimer=setTimeout(renderClients,200)">
+    <input class="sinput" style="flex:1;min-width:200px;" type="text" id="cl-search" placeholder="Search by name, email, phone…" oninput="filterClientSearch(this.value)">
     <select class="sinput" style="width:160px;" id="cl-filter" onchange="renderClients()">
       <option value="all">All Clients</option>
       <optgroup label="— Tier —">
@@ -6970,6 +6970,20 @@ function getNextTier(pts){
   return null;
 }
 
+// ── Instant client search — toggles card visibility via CSS, no DOM rebuild ──
+function filterClientSearch(val){
+  var q = (val||'').toLowerCase().trim();
+  var cards = document.querySelectorAll('.cl-card');
+  var shown = 0;
+  for(var i=0; i<cards.length; i++){
+    var match = !q || (cards[i].getAttribute('data-search')||'').indexOf(q) !== -1;
+    cards[i].style.display = match ? '' : 'none';
+    if(match) shown++;
+  }
+  var cc = document.getElementById('cl-count');
+  if(cc) cc.textContent = q ? shown+' of '+cards.length+' match' : cards.length+' client'+(cards.length!==1?'s':'');
+}
+
 // ── Client list cache (recompute only on data change, not on every keystroke) ──
 var _cachedClientsComputed = null;
 var _cachedClientsTierBar  = null;
@@ -7112,7 +7126,7 @@ function renderClients(){
     var isBday  = c.birthday && String(c.birthday).slice(5,7)===thisMonth;
     var pctNext = nextT ? Math.min(100, Math.round(((pts-tier.min)/(nextT.min-tier.min))*100)) : 100;
 
-    return '<div class="cl-card" onclick="openClientProfile(\''+encodeURIComponent(name)+'\')">'+
+    return '<div class="cl-card" data-search="'+escHtml((name+' '+(c.email||'')+' '+(c.phone||'')+' '+(c.referredBy||'')+' '+(tier.name||'')).toLowerCase())+'" onclick="openClientProfile(\''+encodeURIComponent(name)+'\')">'+
       '<div class="cl-card-header">'+
         '<div class="cl-avatar" style="background:'+tier.color+';color:#fff;">'+ini+'</div>'+
         '<div style="flex:1;min-width:0;">'+
