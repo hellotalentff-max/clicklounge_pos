@@ -2372,7 +2372,7 @@ function clockPH()    { return {
 // ================================================================
 //  STATE
 // ================================================================
-let DB = { staff:[], studioInfo:{name:'ClickLounge Studio',address:'',contact:''}, clients:[], acknowledgements:[], registrations:[], transactions:[], eodReports:[], expenses:[], fundTransfers:[], gifts:[], feedback:[], tasks:[] };
+let DB = { staff:[], studioInfo:{name:'ClickLounge Studio',address:'',contact:''}, clients:[], acknowledgements:[], registrations:[], transactions:[], eodReports:[], expenses:[], fundTransfers:[], gifts:[], feedback:[], tasks:[], bookings:[], pointsActivity:[], announcements:[] };
 let _deletedTaskIds = new Set();
 // Offline queue — declared here so push() can access it from the start
 let _offlineQueue = [];
@@ -2560,6 +2560,9 @@ async function syncAll(){
     }
     if(Array.isArray(d.gifts))            DB.gifts            =d.gifts;
     if(Array.isArray(d.feedback))         DB.feedback         =d.feedback;
+    if(Array.isArray(d.bookings))         DB.bookings         =d.bookings;
+    if(Array.isArray(d.pointsActivity))   DB.pointsActivity   =d.pointsActivity;
+    if(Array.isArray(d.announcements))    DB.announcements    =d.announcements;
     if(Array.isArray(d.staff)&&d.staff.length) DB.staff=d.staff;
     if(d.studioInfo&&Object.keys(d.studioInfo).length) DB.studioInfo=d.studioInfo;
     // Remove any tasks that were deleted locally
@@ -2572,7 +2575,14 @@ async function syncAll(){
     populateInvClient(); populateBookedSel(); updateClientDatalist();
   }catch(e){ setSS('error'); notify('Sync failed: '+e.message,'error'); }
 }
-async function initRemote(){ try{ const r=await gasCall('initSheets'); notify(r.message||'Sheets initialised ✓','success'); }catch(e){ notify('Init failed: '+e.message,'error'); } }
+async function initRemote(){ 
+  try{ 
+    const r=await gasCall('initSheets'); 
+    // Also migrate existing sheet headers (adds missing columns)
+    const m=await gasCall('migrateSheetHeaders');
+    notify((r.message||'Sheets initialised ✓') + (m.message?' · '+m.message:''),'success'); 
+  }catch(e){ notify('Init failed: '+e.message,'error'); } 
+}
 async function formatSheets(){ try{ notify('Formatting sheets…','info'); const r=await gasCall('formatSheets'); notify(r.message||'Sheets formatted ✓','success'); }catch(e){ notify('Format failed: '+e.message,'error'); } }
 
 // ================================================================
@@ -2639,6 +2649,7 @@ async function runDiagnostics(){
     ['Points Activity',  DB.pointsActivity,    'pointsActivity'],
     ['Feedback',         DB.feedback,          'feedback'],
     ['Tasks',            TASKS,                'tasks'],
+    ['Tasks',            TASKS,                'tasks'],
   ];
   checks.forEach(function(c){
     const arr = c[1];
@@ -2679,6 +2690,7 @@ async function runDiagnostics(){
       ['logPoints',               {fbName:'DIAG TEST',action:'Test',points:1,_test:true}, 'Log points'],
       ['createBooking',           {fbName:'DIAG',package:'Test',date:'2099-01-01',timeSlot:'10:00 AM',_test:true}, 'Create booking'],
       ['syncClients',             {_dryRun:true},        'Sync missing clients'],
+      ['migrateSheetHeaders',    {},                    'Migrate sheet headers (add missing columns)'],
       ['getTTData',               {},                    'Get time tracker data (separate GAS)'],
     ];
 
@@ -8323,7 +8335,22 @@ function _buildReports(prefixes, label){
   renderClientsReport(regs, txnMap, ackMap, label, prefixes);
   renderPackagesReport(txns, regs, txnMap, ackMap, label);
   renderOperationsReport(txns, eods, allFT, gifts, label);
-  renderBookingsReport(acks, DB.bookings||[], prefixes, label);
+  // Normalize Bookings sheet keys (fb_name→fbName, time_slot→timeSlot)
+  var normalizedBookings = (DB.bookings||[]).map(function(b){
+    return {
+      id:          b.id||'',
+      submitted:   b.submitted||'',
+      fbName:      b.fb_name||b.fbName||b.clientName||'',
+      email:       b.email||'',
+      package:     b.package||b.pkg||'',
+      price:       b.price||0,
+      date:        b.date||'',
+      timeSlot:    b.time_slot||b.timeSlot||'',
+      pax:         b.guests||b.pax||1,
+      status:      b.status||''
+    };
+  });
+  renderBookingsReport(acks, normalizedBookings, prefixes, label);
   notify('Reports generated for '+label,'success');
 }
 
@@ -8440,14 +8467,18 @@ function renderBookingsReport(acks, bookings, prefixes, label){
   var hourCounts = new Array(24).fill(0);
   // Use submitted timestamp from Bookings sheet
   var submittedData = periodBk.filter(function(b){ return b.submitted; });
-  // Also try submittedAt from ACKs if bookings sheet has no data
+  // Fallback: use ACK 'date' (booking confirmation date) for submission timing
   if(submittedData.length===0){
     periodAcks.forEach(function(a){
-      var ts = a.submittedAt||a.submitted_at||'';
+      var ts = a.submittedAt||a.submitted_at||a.date||'';
       if(!ts) return;
       try{
-        var d = new Date(String(ts));
-        if(!isNaN(d.getTime())){ hourCounts[d.getUTCHours()]++; }
+        var d2 = new Date(String(ts)+'T12:00:00');
+        if(!isNaN(d2.getTime())){
+          // Use PHT hours (rough estimate — most bookings happen 9AM-9PM)
+          var phtH = (d2.getUTCHours() + 8) % 24;
+          hourCounts[phtH]++;
+        }
       }catch(e){}
     });
   } else {
@@ -8486,8 +8517,12 @@ function renderBookingsReport(acks, bookings, prefixes, label){
   // ── CHART 3: Day of week ──
   var dowCounts = [0,0,0,0,0,0,0]; // Mon=0…Sun=6
   // Use booking date (when session is, not when submitted)
-  var dowSource = periodAcks.length > 0 ? periodAcks.map(function(a){ return toDateStr(a.bookDate||a.book_date||''); }) :
-                  periodBk.map(function(b){ return toDateStr(b.date||''); });
+  // Combine both ACK bookDates AND Bookings sheet dates
+  var dowSource = [];
+  periodAcks.forEach(function(a){ var d=toDateStr(a.bookDate||a.book_date||''); if(d) dowSource.push(d); });
+  // Add bookings not already counted via ACK
+  var ackDates = new Set(dowSource);
+  periodBk.forEach(function(b){ var d=toDateStr(b.date||''); if(d && !ackDates.has(d)) dowSource.push(d); });
   dowSource.forEach(function(d){
     if(!d) return;
     try{
