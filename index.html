@@ -1238,7 +1238,7 @@ tr:hover td { background:var(--light); }
   </div>
 
   <!-- Tier summary bar -->
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;" id="cl-tier-bar"></div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;" id="cl-tier-bar"></div>
 
   <!-- Search + Filter row -->
   <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
@@ -1763,7 +1763,15 @@ tr:hover td { background:var(--light); }
     <!-- Time Heatmap -->
     <div class="card">
       <div class="ct">⏰ Session Time Heatmap (PHT)</div>
+      <div class="ct" style="font-size:11px;font-weight:400;margin-top:-6px;margin-bottom:10px;color:var(--muted);">Walk-in vs Booked arrival times — when clients actually come to the studio</div>
       <div id="cli-heatmap"></div>
+    </div>
+
+    <!-- Walk-in Arrival Time -->
+    <div class="card">
+      <div class="ct">🚶 Walk-in Arrival Times (PHT)</div>
+      <div class="ct" style="font-size:11px;font-weight:400;margin-top:-6px;margin-bottom:10px;color:var(--muted);">When unbooked clients show up — use this to plan staffing and ad timing</div>
+      <div id="cli-walkin-time"></div>
     </div>
 
     <!-- Full Registrations Table -->
@@ -6980,12 +6988,14 @@ function renderClients(){
     return Object.assign({}, c, { _pts:pts, _tier:tier });
   });
 
-  // Search
+  // Search — check all name/contact fields
   if(q) clients = clients.filter(function(c){
-    return (c.fbName||'').toLowerCase().includes(q)||
+    var name = (c.fbName||c.name||c.clientName||'').toLowerCase();
+    return name.includes(q)||
            (c.email||'').toLowerCase().includes(q)||
            (c.phone||'').toLowerCase().includes(q)||
-           (c.referredBy||'').toLowerCase().includes(q);
+           (c.referredBy||'').toLowerCase().includes(q)||
+           (c._tier&&c._tier.name||'').toLowerCase().includes(q);
   });
 
   // Filters
@@ -8942,9 +8952,9 @@ function renderClientsReport(regs, txnMap, ackMap, label, prefixes){
   } else { arrHtml = '<div class="tm">No registrations this period.</div>'; }
   document.getElementById('cli-arrival-chart').innerHTML = arrHtml;
 
-  // Heatmap
-  const hourCount={};
-  for(let h=10;h<=18;h++) hourCount[h]=0;
+  // Heatmap — split walk-in vs booked
+  const wiHourCount={}, bkHourCount={}, allHourCount={};
+  for(let h=10;h<=18;h++){ wiHourCount[h]=0; bkHourCount[h]=0; allHourCount[h]=0; }
   regs.forEach(r=>{
     if(!r.time) return;
     const t=String(r.time).trim();
@@ -8953,26 +8963,100 @@ function renderClientsReport(regs, txnMap, ackMap, label, prefixes){
     let h=-1;
     if(p12){ h=parseInt(p12[1]); if(p12[3].toUpperCase()==='PM'&&h!==12) h+=12; if(p12[3].toUpperCase()==='AM'&&h===12) h=0; }
     else if(p24){ h=parseInt(p24[1]); }
-    if(h>=10&&h<=18&&hourCount.hasOwnProperty(h)) hourCount[h]++;
+    if(h>=10&&h<=18){
+      allHourCount[h]++;
+      if(r.arrType==='walkin') wiHourCount[h]++;
+      else bkHourCount[h]++;
+    }
   });
-  const maxH=Math.max(...Object.values(hourCount),1);
+  const maxH=Math.max(...Object.values(allHourCount),1);
   const timeLabels={10:'10AM',11:'11AM',12:'12PM',13:'1PM',14:'2PM',15:'3PM',16:'4PM',17:'5PM',18:'6PM'};
+
+  // Stacked bar heatmap
   let hmHtml='<div style="display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-bottom:12px;">';
-  Object.entries(hourCount).forEach(([h,cnt])=>{
-    const intensity=cnt===0?0.06:0.15+(cnt/maxH)*0.75;
+  Object.keys(allHourCount).forEach(function(h){
+    const wi=wiHourCount[h], bk=bkHourCount[h], tot=allHourCount[h];
+    const barH = tot===0 ? 4 : Math.round((tot/maxH)*60);
+    const wiH  = tot>0 ? Math.round((wi/tot)*barH) : 0;
+    const bkH  = barH - wiH;
     hmHtml+='<div style="text-align:center;">'+
-      '<div style="height:60px;background:rgba(81,137,125,'+intensity.toFixed(2)+');border-radius:6px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:5px;">'+
-        (cnt>0?'<span style="font-size:12px;font-weight:700;color:var(--teal-dk);">'+cnt+'</span>':'<span style="font-size:10px;color:var(--light2);">0</span>')+
+      '<div style="font-size:10px;font-weight:700;color:var(--slate);margin-bottom:3px;">'+(tot||'')+'</div>'+
+      '<div style="height:60px;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;">'+
+        (bkH>0?'<div style="height:'+bkH+'px;background:var(--gold);border-radius:4px 4px 0 0;"></div>':'')+
+        (wiH>0?'<div style="height:'+wiH+'px;background:var(--teal);border-radius:'+(bkH>0?'0':'4px 4px')+' 0 0;"></div>':'')+
       '</div>'+
       '<div style="font-size:10px;color:var(--muted);margin-top:4px;">'+timeLabels[h]+'</div>'+
     '</div>';
   });
   hmHtml+='</div>';
-  if(maxH>0){
-    const peakH=Object.entries(hourCount).sort((a,b)=>b[1]-a[1])[0];
+
+  // Legend + insights
+  hmHtml+='<div style="display:flex;gap:16px;margin-bottom:8px;font-size:11px;color:var(--muted);">'+
+    '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);display:inline-block;"></span>Walk-in</span>'+
+    '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--gold);display:inline-block;"></span>Booked</span>'+
+  '</div>';
+  if(maxH>1){
+    const peakH=Object.entries(allHourCount).sort((a,b)=>b[1]-a[1])[0];
     hmHtml+='<span class="insight-pill">📈 Peak: '+(timeLabels[peakH[0]]||peakH[0])+' — '+peakH[1]+' session'+(peakH[1]!==1?'s':'')+'</span>';
   }
   document.getElementById('cli-heatmap').innerHTML=hmHtml;
+
+  // ── Walk-in Arrival Time Chart ──
+  var wiEl = document.getElementById('cli-walkin-time');
+  if(wiEl){
+    const wiTotal = Object.values(wiHourCount).reduce((s,v)=>s+v,0);
+    if(wiTotal===0){
+      wiEl.innerHTML='<div class="tm">No walk-in time data for this period.</div>';
+    } else {
+      const wiMax = Math.max(...Object.values(wiHourCount),1);
+      const wiPeakEntry = Object.entries(wiHourCount).sort((a,b)=>b[1]-a[1])[0];
+      const wiPeakH = wiPeakEntry[0];
+      const wiPeakCnt = wiPeakEntry[1];
+
+      // Horizontal bar chart
+      let wiHtml = '<div style="display:grid;gap:5px;">';
+      Object.entries(wiHourCount).forEach(function(entry){
+        const h=entry[0], cnt=entry[1];
+        const pct = Math.round((cnt/wiMax)*100);
+        const isPeak = cnt===wiPeakCnt && cnt>0;
+        wiHtml += '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<div style="font-size:11px;font-weight:600;color:var(--muted);min-width:48px;text-align:right;">'+timeLabels[h]+'</div>'+
+          '<div style="flex:1;height:24px;border-radius:4px;background:var(--light);overflow:hidden;position:relative;">'+
+            (pct>0?'<div style="position:absolute;left:0;top:0;height:100%;width:'+pct+'%;background:'+(isPeak?'var(--teal)':'rgba(81,137,125,0.4)')+';border-radius:4px;transition:width .3s;"></div>':'')+
+          '</div>'+
+          '<div style="min-width:50px;font-size:13px;font-weight:'+(isPeak?'800':'600')+';color:'+(isPeak?'var(--teal)':'var(--slate)')+';">'+cnt+
+            (isPeak&&cnt>0?' <span style="font-size:9px;background:rgba(81,137,125,0.1);color:var(--teal);padding:1px 5px;border-radius:6px;">Peak</span>':'')+
+          '</div>'+
+        '</div>';
+      });
+      wiHtml += '</div>';
+
+      // Insights
+      wiHtml += '<div style="margin-top:14px;padding:12px 14px;background:rgba(81,137,125,0.04);border:1px solid rgba(81,137,125,0.1);border-radius:10px;">';
+      wiHtml += '<div style="font-size:12px;font-weight:600;color:var(--teal);margin-bottom:6px;">💡 Walk-in Insights</div>';
+      wiHtml += '<div style="font-size:12px;color:var(--muted);line-height:1.8;">';
+      wiHtml += '🚶 <strong>'+wiTotal+'</strong> walk-in client'+(wiTotal!==1?'s':'')+' this period<br>';
+      wiHtml += '⏰ Most walk-ins arrive at <strong>'+(timeLabels[wiPeakH]||wiPeakH)+'</strong> ('+wiPeakCnt+' visit'+(wiPeakCnt!==1?'s':'')+')<br>';
+
+      // Find quiet hours (0 walk-ins)
+      var quietHours = Object.entries(wiHourCount).filter(function(e){ return e[1]===0; }).map(function(e){ return timeLabels[e[0]]; });
+      if(quietHours.length>0 && quietHours.length<9){
+        wiHtml += '😴 No walk-ins at: <strong>'+quietHours.join(', ')+'</strong> — consider reduced staffing<br>';
+      }
+
+      // Morning vs afternoon split
+      var morning = [10,11,12].reduce(function(s,h){ return s+(wiHourCount[h]||0); },0);
+      var afternoon = [13,14,15,16,17,18].reduce(function(s,h){ return s+(wiHourCount[h]||0); },0);
+      if(wiTotal>2){
+        wiHtml += '🌅 Morning (10AM–12PM): <strong>'+morning+'</strong> · Afternoon (1PM–6PM): <strong>'+afternoon+'</strong>';
+        if(afternoon>morning*2) wiHtml += ' — <em style="color:var(--gold);">afternoon-heavy, schedule promos for morning to balance</em>';
+        else if(morning>afternoon*2) wiHtml += ' — <em style="color:var(--gold);">morning-heavy, great for early bird deals</em>';
+      }
+
+      wiHtml += '</div></div>';
+      wiEl.innerHTML = wiHtml;
+    }
+  }
 
   // Full table
   function getPkg(r){
