@@ -39,7 +39,7 @@ body { font-family:'Poppins',sans-serif; background:var(--light); color:var(--te
 
 /* ── APP LAYOUT ── */
 #app { display:flex; min-height:100vh; }
-#sidebar { width:var(--sidebar-w); background:var(--slate); display:flex; flex-direction:column; position:fixed; top:0; left:0; height:100vh; z-index:100; }
+#sidebar { width:var(--sidebar-w); background:var(--slate); display:flex; flex-direction:column; position:fixed; top:0; left:0; height:100vh; z-index:100; overflow-y:auto; }
 #sidebar-logo { padding:18px 16px 14px; border-bottom:1px solid rgba(255,255,255,0.08); }
 #sidebar-logo h1 { font-size:13px; font-weight:700; color:var(--gold); letter-spacing:1.5px; text-transform:uppercase; }
 #sidebar-logo p { font-size:9px; color:var(--teal-lt); letter-spacing:2.5px; text-transform:uppercase; margin-top:2px; font-weight:300; }
@@ -896,7 +896,7 @@ tr:hover td { background:var(--light); }
     <button onclick="showPage('fund')" data-page="fund"><span class="ni">🔄</span>Fund Transfers</button>
     <button onclick="showPage('gifts')" data-page="gifts"><span class="ni">🎁</span>Gifts</button>
     <button onclick="showPage('eod')" data-page="eod"><span class="ni">◑</span>End of Shift</button>
-    <button onclick="showPage('reports')" data-page="reports"><span class="ni">📊</span>Monthly Reports</button>
+    <button onclick="showPage('reports')" data-page="reports" class="admin-only"><span class="ni">📊</span>Monthly Reports</button>
     <button onclick="showPage('settings')" data-page="settings" class="admin-only"><span class="ni">⚙</span>Settings</button>
   </nav>
   <div id="sidebar-bottom">
@@ -2115,16 +2115,6 @@ tr:hover td { background:var(--light); }
       <span id="confirmed-badge" style="font-size:10px;background:rgba(81,137,125,0.1);color:var(--teal);padding:3px 10px;border-radius:10px;font-weight:700;"></span>
     </div>
     <div id="confirmed-list"><div style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">No confirmed bookings this month.</div></div>
-  </div>
-
-  <!-- ── TIME DISTRIBUTION ── -->
-  <div style="background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:14px;">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-      <div style="width:3px;height:20px;background:var(--gold);border-radius:2px;flex-shrink:0;"></div>
-      <span style="font-size:14px;font-weight:700;color:var(--slate);">Booking Requests by Time Slot</span>
-      <span style="font-size:11px;color:var(--muted);">— most popular this month</span>
-    </div>
-    <div id="time-dist-chart"></div>
   </div>
 
   <!-- ── BLOCKED ── -->
@@ -3460,7 +3450,7 @@ function renderCalendarLists(acks, yr, mo){
   }
 
   // ── TIME DISTRIBUTION CHART ──
-  renderTimeDistribution(monthAcks, calEvents.filter(function(ev){ return !ev.status || ev.status==='pending'||ev.status==='confirmed'; }));
+  // Time distribution moved to Monthly Reports → Bookings tab
 }
 
 function renderTimeDistribution(monthAcks, calEvs){
@@ -8536,7 +8526,38 @@ function renderBookingsReport(acks, bookings, prefixes, label){
     slotCounts[slot].total++;
   });
 
+  // Also count from calendar events (Google Calendar data)
+  (DB._calEvents||[]).forEach(function(ev){
+    var evDate = String(ev.start||'').slice(0,10);
+    if(!evDate || !prefixes.some(function(p){ return evDate.startsWith(p); })) return;
+    if(String(ev.status||'')==='cancelled') return;
+    var evTime = '';
+    var tmMatch = (ev.description||'').match(/Time:\s*(.+)/i);
+    if(tmMatch) evTime = tmMatch[1].trim();
+    if(!evTime && ev.start){
+      try{
+        var dd = new Date(ev.start);
+        evTime = dd.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});
+      }catch(e2){}
+    }
+    if(!evTime) return;
+    if(!slotCounts[evTime]) slotCounts[evTime]={confirmed:0,pending:0,total:0};
+    var evSt = String(ev.status||'').toLowerCase();
+    if(evSt.includes('confirm')) slotCounts[evTime].confirmed++;
+    else slotCounts[evTime].pending++;
+    slotCounts[evTime].total++;
+  });
 
+  // Also count from Bookings sheet directly
+  (bookings||[]).forEach(function(b){
+    var d = toDateStr(b.date||'');
+    if(!d || !prefixes.some(function(p){ return d.startsWith(p); })) return;
+    var slot = String(b.timeSlot||b.time_slot||'').trim();
+    if(!slot) return;
+    if(!slotCounts[slot]) slotCounts[slot]={confirmed:0,pending:0,total:0};
+    slotCounts[slot].pending++;
+    slotCounts[slot].total++;
+  });
 
   var maxSlot = Math.max.apply(null, ALL_SLOTS_REP.map(function(s){ return slotCounts[s]?slotCounts[s].total:0; }));
   var slotEl = document.getElementById('rep-slot-chart');
@@ -8654,168 +8675,8 @@ function renderBookingsReport(acks, bookings, prefixes, label){
     }
   }
 
-  // Stats
-  var total     = periodAcks.length;
-  var confirmed = periodAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('confirm'); }).length;
-  var cancelled = periodAcks.filter(function(a){ return String(a.status||'').toLowerCase().includes('cancel'); }).length;
-  var pending   = total - confirmed - cancelled;
-
-  var bkTotal = document.getElementById('bk-total');
-  var bkConf  = document.getElementById('bk-confirmed');
-  var bkPend  = document.getElementById('bk-pending');
-  var bkCanc  = document.getElementById('bk-cancelled');
-  if(bkTotal) bkTotal.innerHTML = '<div class="rs-label">Total Bookings</div><div class="rs-val">'+total+'</div>';
-  if(bkConf)  bkConf.innerHTML  = '<div class="rs-label">Confirmed</div><div class="rs-val rs-teal">'+confirmed+'</div>';
-  if(bkPend)  bkPend.innerHTML  = '<div class="rs-label">Pending Payment</div><div class="rs-val rs-gold">'+pending+'</div>';
-  if(bkCanc)  bkCanc.innerHTML  = '<div class="rs-label">Cancelled</div><div class="rs-val rs-danger">'+cancelled+'</div>';
-
-  // ── CHART 1: Time slot distribution ──
-  var slotCounts = {};
-  ALL_SLOTS_REP.forEach(function(s){ slotCounts[s]={confirmed:0,pending:0,total:0}; });
-  periodAcks.forEach(function(a){
-    var slot = String(a.timeSlot||'').trim();
-    if(!slot) return;
-    if(!slotCounts[slot]) slotCounts[slot]={confirmed:0,pending:0,total:0};
-    var st = String(a.status||'').toLowerCase();
-    if(st.includes('cancel')) return;
-    if(st.includes('confirm')) slotCounts[slot].confirmed++;
-    else slotCounts[slot].pending++;
-    slotCounts[slot].total++;
-  });
-  var maxSlot = Math.max.apply(null, ALL_SLOTS_REP.map(function(s){ return slotCounts[s]?slotCounts[s].total:0; }));
-  var slotEl = document.getElementById('rep-slot-chart');
-  if(slotEl){
-    if(maxSlot===0){ slotEl.innerHTML='<div class="tm">No booking slot data for this period.</div>'; }
-    else {
-      var sh = '<div style="display:grid;gap:6px;">';
-      ALL_SLOTS_REP.forEach(function(slot){
-        var c = slotCounts[slot]||{confirmed:0,pending:0,total:0};
-        var pct = Math.round((c.total/maxSlot)*100);
-        var isTop = c.total===maxSlot&&c.total>0;
-        sh += '<div style="display:flex;align-items:center;gap:10px;">'+
-          '<div style="font-size:11px;font-weight:600;color:var(--muted);min-width:72px;text-align:right;flex-shrink:0;">'+slot+'</div>'+
-          '<div style="flex:1;height:22px;border-radius:4px;background:var(--light);overflow:hidden;position:relative;">'+
-            (pct>0?'<div style="position:absolute;left:0;top:0;height:100%;width:'+pct+'%;display:flex;overflow:hidden;border-radius:4px;">'+
-              (c.confirmed>0?'<div style="height:100%;flex:'+c.confirmed+';background:var(--teal);"></div>':'')+
-              (c.pending>0?'<div style="height:100%;flex:'+c.pending+';background:#ffc107;"></div>':'')+
-            '</div>':'')+
-          '</div>'+
-          '<div style="min-width:90px;display:flex;align-items:center;gap:5px;flex-shrink:0;">'+
-            '<span style="font-size:13px;font-weight:700;color:'+(isTop?'var(--gold)':'var(--slate)')+';">'+c.total+'</span>'+
-            '<span style="font-size:10px;color:var(--muted);">booking'+(c.total!==1?'s':'')+'</span>'+
-            (isTop&&c.total>0?'<span style="font-size:9px;background:rgba(215,144,104,0.12);color:var(--gold);padding:1px 5px;border-radius:6px;font-weight:700;">★</span>':'')+
-          '</div>'+
-        '</div>';
-      });
-      sh += '</div>';
-      sh += '<div style="display:flex;gap:14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--light2);">'+
-        '<span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--teal);display:inline-block;"></span>Confirmed</span>'+
-        '<span style="font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;"><span style="width:10px;height:10px;border-radius:2px;background:#ffc107;display:inline-block;"></span>Pending payment</span>'+
-      '</div>';
-      slotEl.innerHTML = sh;
-    }
-  }
-
-  // ── CHART 2: Submission hour distribution (from Bookings sheet) ──
-  // b.submitted is already a PHT string from Code.gs — extract hour directly
-  var hourCounts = new Array(24).fill(0);
-  var hasSubmitData = false;
-  periodBk.forEach(function(b){
-    var sub = String(b.submitted||'');
-    if(!sub) return;
-    var match = sub.match(/\d{4}-\d{2}-\d{2}\s+(\d{1,2}):/);
-    if(match){
-      var manilaHour = parseInt(match[1], 10);
-      if(manilaHour >= 0 && manilaHour < 24){
-        hourCounts[manilaHour]++;
-        hasSubmitData = true;
-      }
-    }
-  });
-
-  var subEl = document.getElementById('rep-submit-chart');
-  if(subEl){
-    if(!hasSubmitData){ subEl.innerHTML='<div class="tm">No submission time data. Make sure Code.gs is updated and redeployed.</div>'; }
-    else {
-      var maxHour = Math.max.apply(null, hourCounts);
-      // Group into 4-hour blocks for cleaner display
-      var blocks = [];
-      for(var h=0; h<24; h+=2){
-        blocks.push({
-          label: HOUR_LABELS[h]+' – '+HOUR_LABELS[(h+2)%24],
-          count: hourCounts[h]+(hourCounts[h+1]||0),
-          hours: [h, h+1]
-        });
-      }
-      var maxBlock = Math.max.apply(null, blocks.map(function(b){ return b.count; }));
-      var topIdx = blocks.reduce(function(best,b,i){ return b.count>blocks[best].count?i:best; }, 0);
-
-      var subH = '<div style="display:grid;gap:6px;">';
-      blocks.forEach(function(blk, i){
-        var pct = maxBlock>0 ? Math.round((blk.count/maxBlock)*100) : 0;
-        var isTop = i===topIdx && blk.count>0;
-        var isPeak = (blk.hours[0]>=18&&blk.hours[0]<=23)||(blk.hours[0]>=6&&blk.hours[0]<=9);
-        subH += '<div style="display:flex;align-items:center;gap:10px;">'+
-          '<div style="font-size:10px;font-weight:600;color:var(--muted);min-width:90px;text-align:right;flex-shrink:0;white-space:nowrap;">'+blk.label+'</div>'+
-          '<div style="flex:1;height:20px;border-radius:4px;background:var(--light);overflow:hidden;">'+
-            (pct>0?'<div style="height:100%;width:'+pct+'%;border-radius:4px;background:'+(isTop?'var(--gold)':isPeak?'var(--teal)':'var(--slate)')+'25;"></div>':'')+
-            (pct>0?'<div style="height:100%;width:'+pct+'%;border-radius:4px;background:'+(isTop?'var(--gold)':isPeak?'var(--teal)':'rgba(47,79,79,.25)')+';margin-top:-20px;"></div>':'')+
-          '</div>'+
-          '<div style="min-width:60px;display:flex;align-items:center;gap:5px;flex-shrink:0;">'+
-            '<span style="font-size:12px;font-weight:700;color:'+(isTop?'var(--gold)':'var(--slate)')+';">'+blk.count+'</span>'+
-            (isTop?'<span style="font-size:9px;background:rgba(215,144,104,0.12);color:var(--gold);padding:1px 5px;border-radius:6px;font-weight:700;">Peak</span>':'')+
-          '</div>'+
-        '</div>';
-      });
-      subH += '</div>';
-
-      // Insight
-      var peakBlock = blocks[topIdx];
-      subH += '<div style="margin-top:12px;padding:10px 14px;background:rgba(81,137,125,0.06);border-radius:8px;font-size:12px;color:var(--teal);">'+
-        '💡 Most bookings are submitted between <strong>'+peakBlock.label+'</strong> ('+peakBlock.count+' submission'+(peakBlock.count!==1?'s':'')+'). Consider running promos during this window.'+
-      '</div>';
-
-      subEl.innerHTML = subH;
-    }
-  }
-
-  // ── CHART 3: Day of week ──
-  var dowCounts = [0,0,0,0,0,0,0]; // Mon=0 … Sun=6
-  periodBk.forEach(function(b){
-    var sub = b.submitted;
-    if(!sub) return;
-    var dt = sub instanceof Date ? sub : new Date(String(sub));
-    if(isNaN(dt.getTime())) return;
-    var dow = (dt.getDay()+6)%7; // JS Sun=0 → Mon=0
-    dowCounts[dow]++;
-  });
-  var dowEl = document.getElementById('rep-dow-chart');
-  if(dowEl){
-    var maxDow = Math.max.apply(null, dowCounts);
-    if(maxDow===0){ dowEl.innerHTML='<div class="tm">No submission data for this period.</div>'; }
-    else {
-      var dowH = '<div style="display:flex;gap:8px;align-items:flex-end;justify-content:center;height:100px;margin-bottom:8px;">';
-      DOW_LABELS.forEach(function(lbl,i){
-        var pct  = Math.round((dowCounts[i]/maxDow)*100);
-        var isTop = dowCounts[i]===maxDow&&dowCounts[i]>0;
-        var isSun = i===6;
-        dowH += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">'+
-          '<div style="font-size:10px;font-weight:700;color:'+(isTop?'var(--gold)':'var(--slate)')+';">'+dowCounts[i]+'</div>'+
-          '<div style="width:100%;border-radius:4px 4px 0 0;background:'+(isSun?'rgba(192,84,74,0.2)':isTop?'var(--gold)':'var(--teal)')+';height:'+Math.max(pct,4)+'px;transition:height .3s;"></div>'+
-          '<div style="font-size:10px;color:'+(isSun?'var(--danger)':'var(--muted)')+';font-weight:600;">'+lbl+'</div>'+
-        '</div>';
-      });
-      dowH += '</div>';
-
-      // Insight
-      var topDowIdx = dowCounts.reduce(function(best,c,i){ return c>dowCounts[best]?i:best; }, 0);
-      dowH += '<div style="font-size:12px;padding:10px 14px;background:rgba(81,137,125,0.06);border-radius:8px;color:var(--teal);">'+
-        '💡 Clients most often book on <strong>'+DOW_LABELS[topDowIdx]+'</strong>. Schedule promos or reminders the night before.'+
-      '</div>';
-      dowEl.innerHTML = dowH;
-    }
-  }
 }
+
 function renderFinancialReport(txns, allExp, allFT, eods, acks, label){
   const totalRev  = txns.reduce((s,t)=>s+(+t.total||0),0);
   const totalExp  = allExp.reduce((s,e)=>s+(+e.amt||0),0);
