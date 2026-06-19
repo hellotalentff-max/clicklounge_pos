@@ -1225,57 +1225,34 @@ tr:hover td { background:var(--light); }
   </div>
 </div>
 
-<!-- CLIENTS -->
+<!-- CLIENTS — CRM DASHBOARD -->
 <div id="page-clients" class="page">
   <div class="ph">
-    <div><h2>ClickCard &amp; Client Hub</h2><p>Loyalty points, CRM records and client history</p></div>
+    <div><h2>ClickCard CRM</h2><p>Client intelligence &amp; engagement analytics</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <a class="btn btn-gold" href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" style="text-decoration:none;font-weight:700;">⭐ Open Full CRM →</a>
-      <button class="btn btn-sm btn-outline" onclick="runSyncClients()" title="Scan all sheets and auto-fill missing client records">🔄 Sync</button>
-      <button class="btn btn-sm btn-outline" onclick="openImportClients()">📥 Import</button>
+      <button class="btn btn-sm btn-outline" onclick="runSyncClients()">🔄 Sync Clients</button>
       <button class="btn btn-sm btn-outline" onclick="recalcAllPoints()">🏅 Recalc Points</button>
-      <button class="btn btn-gold" onclick="openCRMCompose()">✉ Campaign</button>
     </div>
   </div>
 
-  <!-- Tier summary bar -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;" id="cl-tier-bar"></div>
+  <!-- Big CRM button -->
+  <a href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" style="display:block;text-decoration:none;background:linear-gradient(135deg,var(--dark),#3a6b60);border-radius:16px;padding:28px 32px;margin-bottom:20px;overflow:hidden;position:relative;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:6px;">⭐ ClickCard Client Hub</div>
+        <div style="font-size:22px;font-weight:800;color:var(--cream);margin-bottom:4px;">Open Full CRM</div>
+        <div style="font-size:13px;color:rgba(245,240,232,.5);">Search all clients · Manage points · Log activity · Send campaigns</div>
+      </div>
+      <div style="font-size:42px;color:var(--gold);font-weight:800;opacity:.8;">→</div>
+    </div>
+  </a>
 
-  <!-- Search + Filter row -->
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-    <input class="sinput" style="flex:1;min-width:200px;" type="text" id="cl-search" placeholder="Search by name, email, phone…" oninput="filterClientSearch(this.value)">
-    <select class="sinput" style="width:160px;" id="cl-filter" onchange="renderClients()">
-      <option value="all">All Clients</option>
-      <optgroup label="— Tier —">
-        <option value="tier-gold">👑 Gold VIP</option>
-        <option value="tier-silver">💎 Silver</option>
-        <option value="tier-bronze">⭐ Bronze</option>
-        <option value="tier-new">🆕 New (not yet visited)</option>
-      </optgroup>
-      <optgroup label="— Type —">
-        <option value="walkin">Walk-in only</option>
-        <option value="booked">Booked only</option>
-      </optgroup>
-      <optgroup label="— Status —">
-        <option value="smc-yes">SM Consent ✅</option>
-        <option value="smc-no">SM No Consent 🚫</option>
-        <option value="at-risk">At Risk (60d+)</option>
-        <option value="birthday-month">🎂 Birthday This Month</option>
-      </optgroup>
-    </select>
-    <select class="sinput" style="width:140px;" id="cl-sort" onchange="renderClients()">
-      <option value="alpha">A → Z</option>
-      <option value="points">Most Points</option>
-      <option value="sessions">Most Sessions</option>
-      <option value="spent">Most Spent</option>
-      <option value="recent">Recent First</option>
-    </select>
-    <div id="cl-count" style="font-size:12px;color:var(--muted);white-space:nowrap;"></div>
+  <!-- CRM Dashboard -->
+  <div id="crm-dashboard">
+    <div style="text-align:center;padding:32px;color:var(--muted);">Loading CRM data…</div>
   </div>
-  <input type="file" id="cl-import-file" accept=".csv" style="display:none" onchange="processClientImport(this)">
 
-  <!-- Client cards grid -->
-  <div id="cl-table"></div>
+  <input type="file" id="cl-import-file" accept=".csv" style="display:none" onchange="processClientImport(this)">
 </div>
 
 
@@ -2726,7 +2703,7 @@ async function runDiagnostics(){
   const txDates = (DB.transactions||[]).map(function(t){return t.date||'';}).filter(Boolean);
   if(txDates.length) ok('Data: Transaction dates', 'Most recent: '+txDates.sort().slice(-1)[0]);
   const noEmailClients = (DB.clients||[]).filter(function(c){return !c.email;}).length;
-  if(noEmailClients>0) warn('Data: Client emails', noEmailClients+' clients have no email — CRM campaigns won\'t reach them');
+  if(noEmailClients>0) warn('Data: Client emails', noEmailClients+' clients have no email — CRM campaigns won&#39;t reach them');
   else if((DB.clients||[]).length) ok('Data: Client emails', 'All clients have email');
   const pendingAcks = (DB.acknowledgements||[]).filter(function(a){return !String(a.status||'').toLowerCase().includes('confirm')&&!String(a.status||'').toLowerCase().includes('cancel');}).length;
   if(pendingAcks>0) warn('Data: Pending ARs', pendingAcks+' acknowledgements still pending payment confirmation');
@@ -6971,207 +6948,261 @@ function getNextTier(pts){
   return null;
 }
 
-// ── Instant client search — toggles card visibility via CSS, no DOM rebuild ──
-function filterClientSearch(val){
-  var q = (val||'').toLowerCase().trim();
-  var cards = document.querySelectorAll('.cl-card');
-  var shown = 0;
-  for(var i=0; i<cards.length; i++){
-    var match = !q || (cards[i].getAttribute('data-search')||'').indexOf(q) !== -1;
-    cards[i].style.display = match ? '' : 'none';
-    if(match) shown++;
-  }
-  var cc = document.getElementById('cl-count');
-  if(cc) cc.textContent = q ? shown+' of '+cards.length+' match' : cards.length+' client'+(cards.length!==1?'s':'');
-}
-
-// ── Client list cache (recompute only on data change, not on every keystroke) ──
-var _cachedClientsComputed = null;
-var _cachedClientsTierBar  = null;
-var _clSearchTimer = null;
-
-function invalidateClientCache(){ _cachedClientsComputed = null; _cachedClientsTierBar = null; }
-
-function _computeClients(){
-  if(_cachedClientsComputed) return _cachedClientsComputed;
-  var txns = DB.transactions||[];
-  var regs = DB.registrations||[];
-  var pa   = DB.pointsActivity||[];
-
-  // Pre-build lookup maps for O(1) access instead of O(n) per client
-  var regCountMap  = {};
-  var lastVisitMap = {};
-  regs.forEach(function(r){
-    var n = (r.fbName||'').toLowerCase();
-    regCountMap[n] = (regCountMap[n]||0) + 1;
-    if(!lastVisitMap[n] || r.date > lastVisitMap[n]) lastVisitMap[n] = r.date;
-  });
-  var txnSpentMap  = {};
-  var txnCountMap  = {};
-  txns.forEach(function(t){
-    if(String(t.invoiceNum||'').startsWith('[VOID]')) return;
-    var n = (t.clientName||'').toLowerCase();
-    txnSpentMap[n] = (txnSpentMap[n]||0) + (+t.total||0);
-    txnCountMap[n] = (txnCountMap[n]||0) + 1;
-  });
-
-  // Check if name exists in regs or txns (for hasSession in getClientTier)
-  var hasSessionMap = {};
-  regs.forEach(function(r){ hasSessionMap[(r.fbName||'').toLowerCase()] = true; });
-  txns.forEach(function(t){ if(!String(t.invoiceNum||'').startsWith('[VOID]')) hasSessionMap[(t.clientName||'').toLowerCase()] = true; });
-
-  _cachedClientsComputed = (DB.clients||[]).map(function(c){
-    var pts  = getClientPoints(c, txns, pa);
-    var nameL = (c.fbName||'').toLowerCase();
-    var hasSession = hasSessionMap[nameL] || c.type==='booked' || c.type==='walkin';
-    var tier;
-    if(!hasSession) tier = { name:'New', emoji:'🆕', min:0, color:'var(--muted)', bg:'var(--light)', border:'var(--border)' };
-    else { tier = getTier(pts); }
-    var sessions = regCountMap[nameL]||0;
-    var spent    = txnSpentMap[nameL]||0;
-    var txnCnt   = txnCountMap[nameL]||0;
-    var lastV    = lastVisitMap[nameL]||c.added||'';
-    return Object.assign({}, c, { _pts:pts, _tier:tier, _sessions:sessions, _spent:spent, _txnCnt:txnCnt, _lastVisit:lastV });
-  });
-
-  // Tier bar counts (reuse computed data)
-  var tierCounts = {};
-  TIERS.forEach(function(t){ tierCounts[t.name]=0; });
-  tierCounts['New'] = 0;
-  _cachedClientsComputed.forEach(function(c){ tierCounts[c._tier.name] = (tierCounts[c._tier.name]||0)+1; });
-  _cachedClientsTierBar = tierCounts;
-
-  return _cachedClientsComputed;
-}
-
+// ══════════════════════════════════════════════
+// CRM DASHBOARD (replaces old client card list)
+// ══════════════════════════════════════════════
 function renderClients(){
-  var searchEl = document.getElementById('cl-search');
-  var filterEl = document.getElementById('cl-filter');
-  var sortEl   = document.getElementById('cl-sort');
-  var q        = searchEl ? searchEl.value.toLowerCase().trim() : '';
-  var filter   = filterEl ? filterEl.value : 'all';
-  var sortBy   = sortEl   ? sortEl.value   : 'alpha';
+  var el = document.getElementById('crm-dashboard');
+  if(!el) return;
+  var clients = (DB.clients||[]);
+  var txns    = (DB.transactions||[]).filter(function(t){ return !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var regs    = DB.registrations||[];
+  var pa      = DB.pointsActivity||[];
+  var total   = clients.length;
+  if(!total){ el.innerHTML='<div style="text-align:center;padding:48px;color:var(--muted);">No client data. Click 🔄 Sync Clients to load.</div>'; return; }
 
-  var allClients = _computeClients();
-  var clients    = allClients.slice();
-
-  // Search — check all name/contact fields
-  if(q) clients = clients.filter(function(c){
-    var name = (c.fbName||c.name||c.clientName||'').toLowerCase();
-    return name.includes(q)||
-           (c.email||'').toLowerCase().includes(q)||
-           (c.phone||'').toLowerCase().includes(q)||
-           (c.referredBy||'').toLowerCase().includes(q)||
-           (c._tier&&c._tier.name||'').toLowerCase().includes(q);
+  // ── Pre-compute lookup maps (O(n) single pass) ──
+  var regCount={}, lastVisit={}, txnSpent={}, hasSession={};
+  regs.forEach(function(r){
+    var n=(r.fbName||'').toLowerCase();
+    regCount[n]=(regCount[n]||0)+1;
+    if(!lastVisit[n]||r.date>lastVisit[n]) lastVisit[n]=r.date;
+    hasSession[n]=true;
+  });
+  txns.forEach(function(t){
+    var n=(t.clientName||'').toLowerCase();
+    txnSpent[n]=(txnSpent[n]||0)+(+t.total||0);
+    hasSession[n]=true;
   });
 
-  // Filters
+  // Tier assignment
+  var tierCounts = {'Gold VIP':0,'Silver':0,'Bronze':0,'New':0};
+  var allPts = [];
+  var totalSpent = 0, totalSessions = 0;
+  var withEmail=0, withPhone=0;
+  var thisMonth = String(new Date().getMonth()+1).padStart(2,'0');
+  var birthdayThisMonth = [];
   var cutoff60 = new Date(); cutoff60.setDate(cutoff60.getDate()-60);
   var cutoffStr = cutoff60.toISOString().slice(0,10);
-  var thisMonth = String(new Date().getMonth()+1).padStart(2,'0');
-  var tierFilters = { 'tier-gold':'Gold VIP', 'tier-silver':'Silver', 'tier-bronze':'Bronze', 'tier-new':'New' };
+  var atRisk = [];
+  var topBySpend = [];
+  var recentClients = [];
+  var newThisMonth = 0;
+  var nowMonth = new Date().toISOString().slice(0,7); // 2026-06
 
-  if(tierFilters[filter]) clients = clients.filter(function(c){ return c._tier.name===tierFilters[filter]; });
-  else if(filter==='walkin')  clients = clients.filter(function(c){ return c.type==='walkin'; });
-  else if(filter==='booked')  clients = clients.filter(function(c){ return c.type==='booked'; });
-  else if(filter==='smc-yes') clients = clients.filter(function(c){ return c.socialConsent==='yes'; });
-  else if(filter==='smc-no')  clients = clients.filter(function(c){ return c.socialConsent==='no'; });
-  else if(filter==='at-risk') clients = clients.filter(function(c){ return c._lastVisit && c._lastVisit < cutoffStr; });
-  else if(filter==='birthday-month') clients = clients.filter(function(c){ return c.birthday && String(c.birthday).slice(5,7)===thisMonth; });
+  clients.forEach(function(c){
+    var nameL = (c.fbName||'').toLowerCase();
+    var spend = Math.floor((txnSpent[nameL]||0)/100);
+    var bonusPts = (pa||[]).filter(function(a){ return (a.fbName||'').toLowerCase()===nameL; }).reduce(function(s,a){ return s+(parseInt(a.points)||0); },0);
+    var pts = (parseInt(c.points)>0) ? parseInt(c.points) : spend+bonusPts;
+    var hasSess = hasSession[nameL]||c.type==='booked'||c.type==='walkin';
+    var tierName = 'New';
+    if(hasSess){ tierName='Bronze'; if(pts>=200) tierName='Silver'; if(pts>=500) tierName='Gold VIP'; }
+    tierCounts[tierName]++;
+    allPts.push(pts);
+    totalSpent += txnSpent[nameL]||0;
+    totalSessions += regCount[nameL]||0;
+    if(c.email) withEmail++;
+    if(c.phone) withPhone++;
+    if(c.birthday && String(c.birthday).slice(5,7)===thisMonth) birthdayThisMonth.push(c);
+    var lv = lastVisit[nameL]||c.added||'';
+    if(lv && lv < cutoffStr && hasSess) atRisk.push({name:c.fbName,lastVisit:lv,spent:txnSpent[nameL]||0});
+    topBySpend.push({name:c.fbName,spent:txnSpent[nameL]||0,sessions:regCount[nameL]||0,pts:pts,tier:tierName});
+    if(String(c.added||'').startsWith(nowMonth)) newThisMonth++;
+  });
 
-  // Sort (using pre-computed values — no more O(n*m) per comparison)
-  if(sortBy==='alpha')    clients.sort(function(a,b){ return (a.fbName||'').localeCompare(b.fbName||''); });
-  if(sortBy==='points')   clients.sort(function(a,b){ return b._pts - a._pts; });
-  if(sortBy==='sessions') clients.sort(function(a,b){ return b._sessions - a._sessions; });
-  if(sortBy==='spent')    clients.sort(function(a,b){ return b._spent - a._spent; });
-  if(sortBy==='recent')   clients.sort(function(a,b){ return (b.added||'').localeCompare(a.added||''); });
+  topBySpend.sort(function(a,b){ return b.spent-a.spent; });
+  atRisk.sort(function(a,b){ return (a.lastVisit||'').localeCompare(b.lastVisit||''); });
 
-  // Tier summary bar (use cached counts — no recomputation)
-  var tierBar = document.getElementById('cl-tier-bar');
-  if(tierBar && _cachedClientsTierBar){
-    var displayTiers = TIERS.concat([{name:'New',emoji:'🆕',color:'var(--muted)',bg:'var(--light)',border:'var(--border)'}]);
-    tierBar.innerHTML = displayTiers.map(function(t){
-      var cnt = _cachedClientsTierBar[t.name]||0;
-      var filterKey = 'tier-'+t.name.toLowerCase().replace(' vip','').replace(' ','');
-      return '<div style="background:var(--white);border:1.5px solid '+t.border+';border-radius:10px;padding:10px 12px;text-align:center;cursor:pointer;" onclick="(function(){var el=document.getElementById(\'cl-filter\');if(el)el.value=\''+filterKey+'\';renderClients();})()">'+
-        '<div style="font-size:18px;">'+t.emoji+'</div>'+
-        '<div style="font-size:18px;font-weight:800;color:'+t.color+';">'+cnt+'</div>'+
-        '<div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;">'+t.name+'</div>'+
-      '</div>';
-    }).join('');
-  }
+  var returning = Object.values(regCount).filter(function(v){return v>1;}).length;
+  var oneTime   = Object.keys(regCount).length - returning;
+  var retRate   = Object.keys(regCount).length ? Math.round(returning/Object.keys(regCount).length*100) : 0;
+  var avgSpend  = total ? Math.round(totalSpent/total) : 0;
+  var avgPts    = total ? Math.round(allPts.reduce(function(s,p){return s+p;},0)/total) : 0;
+  var emailPct  = total ? Math.round(withEmail/total*100) : 0;
+  var phonePct  = total ? Math.round(withPhone/total*100) : 0;
 
-  // Limit render to 100 cards for performance (show "load more" if truncated)
-  var MAX_RENDER = 100;
-  var truncated  = clients.length > MAX_RENDER;
-  var renderList = truncated ? clients.slice(0, MAX_RENDER) : clients;
+  var h = '';
 
-  var el = document.getElementById('cl-table');
-  var cc = document.getElementById('cl-count');
-  if(cc) cc.textContent = clients.length+' client'+(clients.length!==1?'s':'')+(truncated?' (showing first '+MAX_RENDER+')':'');
-  if(!el) return;
-  if(!clients.length){ el.innerHTML='<div class="tm">No clients found.</div>'; return; }
+  // ── ROW 1: Key Metrics ──
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">';
+  var metrics = [
+    {label:'Total Clients',val:fmt(total),color:'var(--teal)',icon:'👥'},
+    {label:'New This Month',val:newThisMonth,color:'var(--success)',icon:'🆕'},
+    {label:'Retention Rate',val:retRate+'%',color:retRate>=50?'var(--success)':'var(--gold)',icon:'🔄'},
+    {label:'Avg Spend / Client',val:'₱'+fmt(avgSpend),color:'var(--teal)',icon:'💰'},
+    {label:'Total Revenue',val:'₱'+fmt(totalSpent),color:'var(--teal)',icon:'📊'},
+    {label:'Total Sessions',val:fmt(totalSessions),color:'var(--slate)',icon:'📸'},
+  ];
+  metrics.forEach(function(m){
+    h += '<div style="background:var(--white);border-radius:12px;padding:14px 16px;border:1px solid var(--border);">'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px;">'+m.icon+' '+m.label+'</div>'+
+      '<div style="font-size:22px;font-weight:800;color:'+m.color+';">'+m.val+'</div>'+
+    '</div>';
+  });
+  h += '</div>';
 
-  var regs = DB.registrations||[];
-  var txns = DB.transactions||[];
-  el.innerHTML = '<div class="cl-grid">'+renderList.map(function(c){
-    var name    = c.fbName||'';
-    var ini     = name.split(' ').map(function(w){ return w[0]||''; }).join('').slice(0,2).toUpperCase();
-    var tier    = c._tier;
-    var pts     = c._pts;
-    var nextT   = getNextTier(pts);
-    var sessions= c._sessions;
-    var spent   = c._spent;
-    var lastVisit= c._lastVisit;
-    var smc     = c.socialConsent;
-    var isBday  = c.birthday && String(c.birthday).slice(5,7)===thisMonth;
-    var pctNext = nextT ? Math.min(100, Math.round(((pts-tier.min)/(nextT.min-tier.min))*100)) : 100;
+  // ── ROW 2: Tier Distribution + Contact Coverage ──
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">';
 
-    return '<div class="cl-card" data-search="'+escHtml((name+' '+(c.email||'')+' '+(c.phone||'')+' '+(c.referredBy||'')+' '+(tier.name||'')).toLowerCase())+'" onclick="openClientProfile(\''+encodeURIComponent(name)+'\')">'+
-      '<div class="cl-card-header">'+
-        '<div class="cl-avatar" style="background:'+tier.color+';color:#fff;">'+ini+'</div>'+
-        '<div style="flex:1;min-width:0;">'+
-          '<div class="cl-name">'+escHtml(name)+(isBday?' 🎂':'')+
-            '<span style="margin-left:6px;font-size:11px;background:'+tier.bg+';color:'+tier.color+';border:1px solid '+tier.border+';padding:2px 8px;border-radius:10px;font-weight:600;vertical-align:middle;">'+tier.emoji+' '+tier.name+'</span>'+
-          '</div>'+
-          '<div class="cl-email">'+(c.email||'No email on file')+'</div>'+
+  // Tier distribution card
+  h += '<div style="background:var(--white);border-radius:14px;padding:18px 20px;border:1px solid var(--border);">'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;">⭐ Tier Distribution</div>';
+  var tierAll = [
+    {name:'Gold VIP',emoji:'👑',color:'#b8860b',cnt:tierCounts['Gold VIP']},
+    {name:'Silver',emoji:'💎',color:'#5b63d9',cnt:tierCounts['Silver']},
+    {name:'Bronze',emoji:'⭐',color:'#d79068',cnt:tierCounts['Bronze']},
+    {name:'New',emoji:'🆕',color:'var(--muted)',cnt:tierCounts['New']},
+  ];
+  tierAll.forEach(function(t){
+    var pct = total ? Math.round(t.cnt/total*100) : 0;
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'+
+      '<div style="font-size:14px;min-width:20px;">'+t.emoji+'</div>'+
+      '<div style="flex:1;">'+
+        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">'+
+          '<span style="font-weight:600;color:'+t.color+';">'+t.name+'</span>'+
+          '<span style="color:var(--muted);">'+t.cnt+' ('+pct+'%)</span>'+
         '</div>'+
-        '<button class="btn btn-sm btn-outline" style="flex-shrink:0;padding:4px 10px;font-size:11px;" '+
-          'data-cname="'+encodeURIComponent(name)+'" '+
-          'onclick="event.stopPropagation();openEditClient(this.dataset.cname)">✏</button>'+
-      '</div>'+
-      // Points bar
-      '<div style="margin:8px 0;">'+
-        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">'+
-          '<span style="font-weight:700;color:'+tier.color+';">🏅 '+pts+' pts</span>'+
-          (nextT?'<span style="color:var(--muted);">'+nextT.emoji+' '+nextT.name+' at '+nextT.min+'</span>':'<span style="color:'+tier.color+';">Max tier reached!</span>')+
+        '<div style="height:6px;background:var(--light2);border-radius:3px;overflow:hidden;">'+
+          '<div style="height:100%;width:'+pct+'%;background:'+t.color+';border-radius:3px;"></div>'+
         '</div>'+
-        '<div style="height:4px;background:var(--light2);border-radius:2px;overflow:hidden;">'+
-          '<div style="height:100%;width:'+pctNext+'%;background:'+tier.color+';border-radius:2px;transition:width .4s;"></div>'+
-        '</div>'+
-      '</div>'+
-      '<div class="cl-stats">'+
-        '<div class="cl-stat"><div class="cl-stat-val">'+sessions+'</div><div class="cl-stat-lbl">Visits</div></div>'+
-        '<div class="cl-stat"><div class="cl-stat-val">'+(c._txnCnt||0)+'</div><div class="cl-stat-lbl">Invoices</div></div>'+
-        '<div class="cl-stat"><div class="cl-stat-val" style="font-size:12px;">'+(spent>0?'&#8369;'+fmt(spent):'&#8369;0')+'</div><div class="cl-stat-lbl">Spent</div></div>'+
-      '</div>'+
-      (c.phone||c.birthday?'<div style="font-size:11px;color:var(--muted);margin-bottom:6px;">'+
-        (c.phone?'📱 '+escHtml(c.phone)+' ':'')+
-        (c.birthday?'🎂 '+fmtBirthday(c.birthday):'')+
-      '</div>':'')+
-      '<div style="display:flex;gap:6px;margin-top:8px;">'+
-        '<button class="btn btn-sm btn-teal" style="flex:1;font-size:11px;" '+
-          'data-cname="'+encodeURIComponent(name)+'" '+
-          'onclick="event.stopPropagation();openLogPoints(this.dataset.cname)">🏅 Log Points</button>'+
-        '<button class="btn btn-sm btn-outline" style="flex:1;font-size:11px;" '+
-          'data-cname="'+encodeURIComponent(name)+'" '+
-          'onclick="event.stopPropagation();openRedeemPoints(this.dataset.cname)">🎁 Redeem</button>'+
       '</div>'+
     '</div>';
-  }).join('')+'</div>'+
-    (truncated ? '<div style="text-align:center;padding:20px;"><span style="font-size:12px;color:var(--muted);">Showing '+MAX_RENDER+' of '+clients.length+' clients. Use search to find a specific client.</span></div>' : '');
+  });
+  h += '</div>';
+
+  // Contact coverage card
+  h += '<div style="background:var(--white);border-radius:14px;padding:18px 20px;border:1px solid var(--border);">'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;">📇 Contact Coverage</div>';
+  var coverageItems = [
+    {label:'Has Email',pct:emailPct,count:withEmail,color:'var(--teal)'},
+    {label:'Has Phone',pct:phonePct,count:withPhone,color:'var(--gold)'},
+    {label:'SM Consent',pct:total?Math.round(clients.filter(function(c){return c.socialConsent==='yes';}).length/total*100):0,count:clients.filter(function(c){return c.socialConsent==='yes';}).length,color:'var(--success)'},
+  ];
+  coverageItems.forEach(function(item){
+    h += '<div style="margin-bottom:12px;">'+
+      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">'+
+        '<span style="font-weight:600;">'+item.label+'</span>'+
+        '<span style="color:'+item.color+';font-weight:700;">'+item.count+' / '+total+' ('+item.pct+'%)</span>'+
+      '</div>'+
+      '<div style="height:8px;background:var(--light2);border-radius:4px;overflow:hidden;">'+
+        '<div style="height:100%;width:'+item.pct+'%;background:'+item.color+';border-radius:4px;"></div>'+
+      '</div>'+
+    '</div>';
+  });
+  var emailGap = total - withEmail;
+  if(emailGap > 0) h += '<div style="font-size:11px;color:var(--gold);margin-top:8px;">⚠ '+emailGap+' clients have no email — campaigns won&#39;t reach them</div>';
+  h += '</div></div>';
+
+  // ── ROW 3: Retention + Client Value ──
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">';
+
+  // Retention
+  h += '<div style="background:var(--white);border-radius:14px;padding:18px 20px;border:1px solid var(--border);">'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;">🔄 Retention</div>'+
+    '<div style="display:flex;gap:16px;align-items:center;margin-bottom:12px;">'+
+      '<div style="width:80px;height:80px;border-radius:50%;border:6px solid var(--light2);position:relative;display:flex;align-items:center;justify-content:center;">'+
+        '<div style="position:absolute;inset:0;border-radius:50%;border:6px solid var(--teal);border-color:var(--teal) transparent transparent transparent;transform:rotate('+(retRate*3.6)+'deg);"></div>'+
+        '<span style="font-size:18px;font-weight:800;color:var(--teal);">'+retRate+'%</span>'+
+      '</div>'+
+      '<div style="font-size:13px;line-height:1.8;">'+
+        '<div><strong style="color:var(--teal);">'+returning+'</strong> returning clients</div>'+
+        '<div><strong>'+oneTime+'</strong> one-time visitors</div>'+
+        '<div style="font-size:11px;color:var(--muted);">Avg '+avgPts+' pts / client</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+
+  // At-risk
+  h += '<div style="background:var(--white);border-radius:14px;padding:18px 20px;border:1px solid var(--border);">'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--danger);margin-bottom:10px;">⚠ At-Risk Clients <span style="font-weight:400;color:var(--muted);">(60+ days since last visit)</span></div>';
+  if(atRisk.length===0) h += '<div style="font-size:12px;color:var(--muted);">No at-risk clients — great retention!</div>';
+  else {
+    h += '<div style="max-height:160px;overflow-y:auto;">';
+    atRisk.slice(0,10).forEach(function(c){
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12px;border-bottom:1px solid var(--light2);">'+
+        '<span style="font-weight:600;">'+escHtml(c.name)+'</span>'+
+        '<span style="color:var(--danger);font-size:11px;">Last: '+c.lastVisit.slice(0,10)+'</span>'+
+      '</div>';
+    });
+    h += '</div>';
+    if(atRisk.length>10) h += '<div style="font-size:11px;color:var(--muted);margin-top:6px;">+ '+(atRisk.length-10)+' more — open CRM for full list</div>';
+  }
+  h += '</div></div>';
+
+  // ── ROW 4: Top Clients + Birthdays ──
+  h += '<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px;">';
+
+  // Top 10 clients by spend
+  h += '<div style="background:var(--white);border-radius:14px;padding:18px 20px;border:1px solid var(--border);">'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:10px;">🏆 Top Clients by Revenue</div>';
+  var top10 = topBySpend.filter(function(c){return c.spent>0;}).slice(0,10);
+  if(!top10.length) h += '<div style="font-size:12px;color:var(--muted);">No transaction data yet.</div>';
+  else {
+    var topMax = top10[0].spent||1;
+    top10.forEach(function(c,i){
+      var pct = Math.round(c.spent/topMax*100);
+      var tierEmoji = c.tier==='Gold VIP'?'👑':c.tier==='Silver'?'💎':c.tier==='Bronze'?'⭐':'🆕';
+      h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--muted);width:18px;text-align:right;">'+(i+1)+'</div>'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">'+
+            '<span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+tierEmoji+' '+escHtml(c.name)+'</span>'+
+            '<span style="font-weight:700;color:var(--teal);white-space:nowrap;">₱'+fmt(c.spent)+'</span>'+
+          '</div>'+
+          '<div style="height:4px;background:var(--light2);border-radius:2px;overflow:hidden;">'+
+            '<div style="height:100%;width:'+pct+'%;background:var(--teal);border-radius:2px;"></div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    });
+  }
+  h += '</div>';
+
+  // Birthdays this month
+  h += '<div style="background:var(--white);border-radius:14px;padding:18px 20px;border:1px solid var(--border);">'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--gold);margin-bottom:10px;">🎂 Birthdays This Month</div>';
+  if(!birthdayThisMonth.length) h += '<div style="font-size:12px;color:var(--muted);">No birthdays this month</div>';
+  else {
+    birthdayThisMonth.slice(0,8).forEach(function(c){
+      h += '<div style="padding:5px 0;font-size:12px;border-bottom:1px solid var(--light2);display:flex;justify-content:space-between;">'+
+        '<span style="font-weight:600;">🎂 '+escHtml(c.fbName)+'</span>'+
+        '<span style="color:var(--muted);font-size:11px;">'+String(c.birthday).slice(5)+'</span>'+
+      '</div>';
+    });
+    if(birthdayThisMonth.length>8) h += '<div style="font-size:11px;color:var(--muted);margin-top:6px;">+ '+(birthdayThisMonth.length-8)+' more</div>';
+  }
+  h += '</div></div>';
+
+  // ── ROW 5: Acquisition trend (last 6 months) ──
+  h += '<div style="background:var(--white);border-radius:14px;padding:18px 20px;border:1px solid var(--border);margin-bottom:16px;">'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;">📈 Client Acquisition — Last 6 Months</div>';
+  var months = [];
+  for(var mi=5;mi>=0;mi--){
+    var d = new Date(); d.setMonth(d.getMonth()-mi);
+    var key = d.toISOString().slice(0,7);
+    var label = d.toLocaleDateString('en-PH',{month:'short',timeZone:'Asia/Manila'});
+    var count = clients.filter(function(c){ return String(c.added||'').startsWith(key); }).length;
+    months.push({key:key,label:label,count:count});
+  }
+  var monthMax = Math.max.apply(null,months.map(function(m){return m.count;}))||1;
+  h += '<div style="display:flex;align-items:flex-end;gap:8px;height:100px;padding:0 4px;">';
+  months.forEach(function(m){
+    var pct = Math.round(m.count/monthMax*100);
+    var isPeak = m.count===monthMax&&m.count>0;
+    h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;">'+
+      '<div style="font-size:10px;font-weight:700;color:'+(isPeak?'var(--teal)':'var(--muted)')+';">'+m.count+'</div>'+
+      '<div style="width:100%;border-radius:4px 4px 0 0;background:'+(isPeak?'var(--teal)':'rgba(81,137,125,.25)')+';height:'+Math.max(pct,4)+'%;min-height:4px;"></div>'+
+      '<div style="font-size:11px;font-weight:600;color:var(--muted);">'+m.label+'</div>'+
+    '</div>';
+  });
+  h += '</div></div>';
+
+  el.innerHTML = h;
 }
 
+function filterClientSearch(){} // no-op — search moved to standalone CRM
+function _computeClients(){ return DB.clients||[]; } // stub for compatibility
 
 
 async function recalcAllPoints(){
