@@ -2411,7 +2411,7 @@ function loadLocal(){
   }catch(e){}
 }
 function saveLocal(){
-  invalidateClientCache(); try{ localStorage.setItem('cl_db',JSON.stringify(DB)); }catch(e){} }
+  try{ localStorage.setItem('cl_db',JSON.stringify(DB)); }catch(e){} }
 
 // ================================================================
 //  UTILS
@@ -2546,7 +2546,7 @@ async function syncAll(){
     if(_deletedTaskIds.size > 0){
       DB.tasks = (DB.tasks||[]).filter(t=>!_deletedTaskIds.has(String(t.id)));
     }
-    saveLocal(); invalidateClientCache(); notify('Sync complete ✓','success');
+    saveLocal(); notify('Sync complete ✓','success');
     if(typeof loadTasks==='function'){ loadTasks(); if(TASK_VIEW==='board') renderKanban(); else renderTasks(); updateDashTaskAlert(); }
     const pg=document.querySelector('.page.active'); if(pg) showPage(pg.id.replace('page-',''));
     populateInvClient(); populateBookedSel(); updateClientDatalist();
@@ -7191,8 +7191,6 @@ function renderClients(){
   el.innerHTML = h;
 }
 
-function filterClientSearch(){} // no-op — search moved to standalone CRM
-function _computeClients(){ return DB.clients||[]; } // stub for compatibility
 
 
 async function recalcAllPoints(){
