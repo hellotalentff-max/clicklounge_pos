@@ -1227,52 +1227,286 @@ tr:hover td { background:var(--light); }
 
 <!-- CLIENTS -->
 <div id="page-clients" class="page">
+  <style>
+    /* ── Scoped Clients page styles ── */
+    .cl-hub-hero{
+      background:linear-gradient(135deg,#51897d 0%,#3d6b61 100%);
+      border-radius:14px;
+      padding:24px 28px;
+      margin-bottom:18px;
+      display:flex;
+      align-items:center;
+      gap:20px;
+      flex-wrap:wrap;
+      color:#fff;
+      box-shadow:0 6px 24px rgba(81,137,125,0.22);
+      position:relative;
+      overflow:hidden;
+    }
+    .cl-hub-hero::before{
+      content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;
+      background:radial-gradient(circle,rgba(215,144,104,0.18) 0%,transparent 70%);
+      pointer-events:none;
+    }
+    .cl-hub-hero-icon{font-size:42px;line-height:1;flex-shrink:0;}
+    .cl-hub-hero-body{flex:1;min-width:220px;position:relative;z-index:1;}
+    .cl-hub-hero-eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.75;margin-bottom:4px;}
+    .cl-hub-hero-title{font-size:22px;font-weight:800;margin-bottom:4px;letter-spacing:-0.3px;}
+    .cl-hub-hero-desc{font-size:12.5px;opacity:0.88;line-height:1.55;max-width:480px;}
+    .cl-hub-launch-btn{
+      background:#d79068;
+      color:#fff !important;
+      text-decoration:none;
+      padding:13px 24px;
+      border-radius:30px;
+      font-weight:700;
+      font-size:13px;
+      letter-spacing:0.4px;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      box-shadow:0 4px 14px rgba(0,0,0,0.18);
+      white-space:nowrap;
+      transition:transform 0.15s,box-shadow 0.15s;
+      position:relative;
+      z-index:1;
+    }
+    .cl-hub-launch-btn:hover{transform:translateY(-2px);box-shadow:0 7px 20px rgba(0,0,0,0.25);}
+
+    .cl-hub-section-label{
+      font-size:10px;
+      font-weight:700;
+      color:var(--muted, #6b8c8c);
+      text-transform:uppercase;
+      letter-spacing:0.8px;
+      margin:6px 0 10px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .cl-hub-section-label::after{content:'';flex:1;height:1px;background:var(--border, #e0e6e4);}
+
+    .cl-kpi-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(168px,1fr));
+      gap:12px;
+      margin-bottom:18px;
+    }
+    .cl-kpi{
+      background:#fff;
+      border:1px solid var(--border, #e0e6e4);
+      border-radius:12px;
+      padding:16px 18px;
+      transition:transform 0.15s,box-shadow 0.15s,border-color 0.15s;
+      position:relative;
+      overflow:hidden;
+    }
+    .cl-kpi:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,0.05);border-color:#cbd6d2;}
+    .cl-kpi-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+    .cl-kpi-label{
+      font-size:10px;
+      font-weight:700;
+      color:var(--muted, #6b8c8c);
+      text-transform:uppercase;
+      letter-spacing:0.5px;
+    }
+    .cl-kpi-icon{font-size:16px;opacity:0.6;}
+    .cl-kpi-value{
+      font-size:28px;
+      font-weight:800;
+      color:var(--slate, #2f4f4f);
+      line-height:1;
+      margin-bottom:4px;
+      letter-spacing:-0.5px;
+    }
+    .cl-kpi-sub{font-size:11px;color:var(--muted, #6b8c8c);font-weight:500;}
+
+    .cl-kpi.accent-active{border-left:3px solid #3d8c6e;}
+    .cl-kpi.accent-active .cl-kpi-value{color:#3d8c6e;}
+    .cl-kpi.accent-vip{border-left:3px solid #d79068;}
+    .cl-kpi.accent-vip .cl-kpi-value{color:#b8860b;}
+    .cl-kpi.accent-new{border-left:3px solid #51897d;}
+    .cl-kpi.accent-new .cl-kpi-value{color:#51897d;}
+    .cl-kpi.accent-bday{border-left:3px solid #d79068;background:linear-gradient(135deg,#fff 70%,#fff8e8);}
+    .cl-kpi.accent-bday .cl-kpi-value{color:#d79068;}
+
+    .cl-report-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+      gap:14px;
+    }
+    .cl-report-card{
+      background:#fff;
+      border:1px solid var(--border, #e0e6e4);
+      border-radius:12px;
+      padding:18px 20px;
+      transition:box-shadow 0.15s;
+    }
+    .cl-report-card:hover{box-shadow:0 4px 14px rgba(0,0,0,0.04);}
+    .cl-report-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding-bottom:10px;
+      margin-bottom:12px;
+      border-bottom:1px solid var(--border, #e0e6e4);
+    }
+    .cl-report-title{
+      font-size:12px;
+      font-weight:700;
+      color:var(--slate, #2f4f4f);
+      text-transform:uppercase;
+      letter-spacing:0.5px;
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+    .cl-report-tag{
+      font-size:9px;
+      font-weight:700;
+      color:#d79068;
+      background:#fff8e8;
+      padding:2px 8px;
+      border-radius:10px;
+      letter-spacing:0.4px;
+      text-transform:uppercase;
+    }
+
+    .cl-tier-row{margin-bottom:10px;}
+    .cl-tier-row:last-child{margin-bottom:0;}
+    .cl-tier-head{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;}
+    .cl-tier-head .name{font-weight:600;}
+    .cl-tier-head .stat{color:var(--muted, #6b8c8c);font-size:11px;}
+    .cl-tier-bar{background:#f4f7f6;height:7px;border-radius:4px;overflow:hidden;}
+    .cl-tier-bar-fill{height:100%;border-radius:4px;transition:width 0.4s;}
+
+    .cl-att-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:10px 0;
+      border-bottom:1px solid var(--border, #e0e6e4);
+      font-size:12.5px;
+    }
+    .cl-att-row:last-child{border-bottom:none;padding-bottom:0;}
+    .cl-att-row:first-child{padding-top:0;}
+    .cl-att-text{display:flex;align-items:center;gap:8px;}
+    .cl-att-icon{font-size:16px;}
+    .cl-att-link{
+      font-size:11px;
+      font-weight:600;
+      text-decoration:none;
+      padding:4px 10px;
+      border-radius:14px;
+      transition:all 0.15s;
+    }
+    .cl-att-link:hover{background:rgba(0,0,0,0.05);}
+    .cl-att-empty{text-align:center;padding:20px 8px;color:#3d8c6e;font-size:13px;font-weight:600;}
+
+    .cl-recent-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:10px 0;
+      border-bottom:1px solid var(--border, #e0e6e4);
+      gap:8px;
+    }
+    .cl-recent-row:last-child{border-bottom:none;padding-bottom:0;}
+    .cl-recent-row:first-child{padding-top:0;}
+    .cl-recent-name{font-size:13px;font-weight:600;color:var(--slate, #2f4f4f);}
+    .cl-recent-email{font-size:11px;color:var(--muted, #6b8c8c);margin-top:1px;}
+    .cl-recent-date{
+      font-size:10px;
+      color:var(--muted, #6b8c8c);
+      white-space:nowrap;
+      background:#f4f7f6;
+      padding:3px 8px;
+      border-radius:10px;
+      font-weight:500;
+    }
+
+    @media(max-width:640px){
+      .cl-hub-hero{padding:20px;}
+      .cl-hub-hero-title{font-size:19px;}
+      .cl-hub-launch-btn{width:100%;justify-content:center;}
+      .cl-kpi-value{font-size:24px;}
+    }
+  </style>
+
   <div class="ph">
     <div><h2>👥 Clients</h2><p>Quick CRM access + client snapshot</p></div>
     <button class="btn btn-sm btn-outline" onclick="renderClientsHub()">🔄 Refresh</button>
   </div>
 
   <!-- ── BIG CRM LINK CARD ── -->
-  <div style="background:linear-gradient(135deg,#51897d,#3d6b61);border-radius:14px;padding:28px 28px;margin-bottom:18px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;color:#fff;box-shadow:0 4px 16px rgba(81,137,125,.18);">
-    <div style="font-size:50px;line-height:1;">⭐</div>
-    <div style="flex:1;min-width:200px;">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.7;margin-bottom:6px;">CLS OS · Client Management</div>
-      <div style="font-size:24px;font-weight:800;margin-bottom:4px;">Open ClickCard CRM</div>
-      <div style="font-size:13px;opacity:.85;line-height:1.5;">Lifecycle pipeline, RFM scoring, email campaigns, points management, data cleanup — all in one place.</div>
+  <div class="cl-hub-hero">
+    <div class="cl-hub-hero-icon">⭐</div>
+    <div class="cl-hub-hero-body">
+      <div class="cl-hub-hero-eyebrow">CLS OS · Client Management</div>
+      <div class="cl-hub-hero-title">Open ClickCard CRM</div>
+      <div class="cl-hub-hero-desc">Lifecycle pipeline, RFM scoring, email campaigns, points management, and data cleanup — all in one place.</div>
     </div>
-    <a href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" style="background:#d79068;color:#fff;text-decoration:none;padding:14px 28px;border-radius:30px;font-weight:700;font-size:14px;letter-spacing:.5px;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);white-space:nowrap;transition:transform .12s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 18px rgba(0,0,0,.2)';" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 12px rgba(0,0,0,.15)';">
+    <a href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" class="cl-hub-launch-btn">
       Launch CRM →
     </a>
   </div>
 
   <!-- ── KPI CARDS ── -->
-  <div class="kpi-row" id="cl-kpi-row" style="margin-bottom:18px;">
-    <div class="kpi"><div class="kpi-l">Total Clients</div><div class="kpi-v" id="cl-kpi-total">—</div><div class="kpi-s" id="cl-kpi-total-sub">all-time</div></div>
-    <div class="kpi"><div class="kpi-l">Active (60d)</div><div class="kpi-v" id="cl-kpi-active" style="color:var(--success);">—</div><div class="kpi-s" id="cl-kpi-active-sub">visited recently</div></div>
-    <div class="kpi"><div class="kpi-l">VIP / Loyal</div><div class="kpi-v" id="cl-kpi-vip" style="color:var(--gold);">—</div><div class="kpi-s" id="cl-kpi-vip-sub">5+ visits or ₱10k+</div></div>
-    <div class="kpi"><div class="kpi-l">New This Month</div><div class="kpi-v" id="cl-kpi-new" style="color:var(--teal);">—</div><div class="kpi-s" id="cl-kpi-new-sub">first visits</div></div>
-    <div class="kpi"><div class="kpi-l">Email-Reachable</div><div class="kpi-v" id="cl-kpi-email">—</div><div class="kpi-s" id="cl-kpi-email-sub">have email on file</div></div>
-    <div class="kpi"><div class="kpi-l">Birthday This Month</div><div class="kpi-v" id="cl-kpi-bday" style="color:#d79068;">—</div><div class="kpi-s" id="cl-kpi-bday-sub">🎂 send a gift!</div></div>
+  <div class="cl-hub-section-label">📊 Quick Snapshot</div>
+  <div class="cl-kpi-grid">
+    <div class="cl-kpi">
+      <div class="cl-kpi-top"><div class="cl-kpi-label">Total Clients</div><div class="cl-kpi-icon">👥</div></div>
+      <div class="cl-kpi-value" id="cl-kpi-total">—</div>
+      <div class="cl-kpi-sub" id="cl-kpi-total-sub">all-time</div>
+    </div>
+    <div class="cl-kpi accent-active">
+      <div class="cl-kpi-top"><div class="cl-kpi-label">Active</div><div class="cl-kpi-icon">✨</div></div>
+      <div class="cl-kpi-value" id="cl-kpi-active">—</div>
+      <div class="cl-kpi-sub" id="cl-kpi-active-sub">visited in last 60d</div>
+    </div>
+    <div class="cl-kpi accent-vip">
+      <div class="cl-kpi-top"><div class="cl-kpi-label">VIP / Loyal</div><div class="cl-kpi-icon">⭐</div></div>
+      <div class="cl-kpi-value" id="cl-kpi-vip">—</div>
+      <div class="cl-kpi-sub" id="cl-kpi-vip-sub">5+ visits or ₱10k+</div>
+    </div>
+    <div class="cl-kpi accent-new">
+      <div class="cl-kpi-top"><div class="cl-kpi-label">New This Month</div><div class="cl-kpi-icon">🆕</div></div>
+      <div class="cl-kpi-value" id="cl-kpi-new">—</div>
+      <div class="cl-kpi-sub" id="cl-kpi-new-sub">first visits</div>
+    </div>
+    <div class="cl-kpi">
+      <div class="cl-kpi-top"><div class="cl-kpi-label">Email-Reachable</div><div class="cl-kpi-icon">📧</div></div>
+      <div class="cl-kpi-value" id="cl-kpi-email">—</div>
+      <div class="cl-kpi-sub" id="cl-kpi-email-sub">have email on file</div>
+    </div>
+    <div class="cl-kpi accent-bday">
+      <div class="cl-kpi-top"><div class="cl-kpi-label">Birthday This Month</div><div class="cl-kpi-icon">🎂</div></div>
+      <div class="cl-kpi-value" id="cl-kpi-bday">—</div>
+      <div class="cl-kpi-sub" id="cl-kpi-bday-sub">send a gift!</div>
+    </div>
   </div>
 
   <!-- ── REPORT GRID ── -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
-
-    <div style="background:#fff;border:1px solid var(--border, #dce3e1);border-radius:12px;padding:16px 18px;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🏆 Tier Distribution</div>
+  <div class="cl-hub-section-label">📈 Reports</div>
+  <div class="cl-report-grid">
+    <div class="cl-report-card">
+      <div class="cl-report-header">
+        <div class="cl-report-title">🏆 Tier Distribution</div>
+      </div>
       <div id="cl-tier-chart" style="font-size:12px;color:var(--muted);">Loading…</div>
     </div>
-
-    <div style="background:#fff;border:1px solid var(--border, #dce3e1);border-radius:12px;padding:16px 18px;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">⚠ Attention Needed</div>
+    <div class="cl-report-card">
+      <div class="cl-report-header">
+        <div class="cl-report-title">⚠ Attention Needed</div>
+      </div>
       <div id="cl-attention" style="font-size:12px;color:var(--muted);">Loading…</div>
     </div>
-
-    <div style="background:#fff;border:1px solid var(--border, #dce3e1);border-radius:12px;padding:16px 18px;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🆕 Recently Added</div>
+    <div class="cl-report-card">
+      <div class="cl-report-header">
+        <div class="cl-report-title">🆕 Recently Added</div>
+      </div>
       <div id="cl-recent" style="font-size:12px;color:var(--muted);">Loading…</div>
     </div>
-
   </div>
 
   <input type="file" id="cl-import-file" accept=".csv" style="display:none" onchange="processClientImport(this)">
@@ -5961,13 +6195,13 @@ function renderClientsHub(){
   var tierEl = document.getElementById('cl-tier-chart');
   if(tierEl){
     var tierOrder = ['Gold VIP','Silver','Bronze','New'];
-    var tierColors = { 'Gold VIP':'#b8860b', 'Silver':'#5b63d9', 'Bronze':'#d79068', 'New':'var(--muted)' };
+    var tierColors = { 'Gold VIP':'#b8860b', 'Silver':'#5b63d9', 'Bronze':'#d79068', 'New':'#9aabab' };
     tierEl.innerHTML = tierOrder.map(function(t){
       var count = tiers[t];
       var pct = total ? Math.round(count/total*100) : 0;
-      return '<div style="margin-bottom:8px;">' +
-        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:'+tierColors[t]+';font-weight:600;">'+t+'</span><span style="color:var(--muted);">'+count+' · '+pct+'%</span></div>' +
-        '<div style="background:var(--light, #f4f7f6);height:6px;border-radius:3px;overflow:hidden;"><div style="background:'+tierColors[t]+';height:100%;width:'+pct+'%;border-radius:3px;transition:width .3s;"></div></div>' +
+      return '<div class="cl-tier-row">' +
+        '<div class="cl-tier-head"><span class="name" style="color:'+tierColors[t]+';">'+t+'</span><span class="stat">'+count+' · '+pct+'%</span></div>' +
+        '<div class="cl-tier-bar"><div class="cl-tier-bar-fill" style="background:'+tierColors[t]+';width:'+pct+'%;"></div></div>' +
       '</div>';
     }).join('');
   }
@@ -5977,15 +6211,13 @@ function renderClientsHub(){
   if(attEl){
     if(attentionItems.length){
       attEl.innerHTML = attentionItems.map(function(item){
-        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border, #dce3e1);font-size:12px;">' +
-          '<span><span style="font-size:14px;">'+item.icon+'</span> '+item.label+'</span>' +
-          '<a href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" style="color:'+item.color+';text-decoration:none;font-size:11px;font-weight:600;">Open CRM →</a>' +
+        return '<div class="cl-att-row">' +
+          '<div class="cl-att-text"><span class="cl-att-icon">'+item.icon+'</span><span>'+item.label+'</span></div>' +
+          '<a href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" class="cl-att-link" style="color:'+item.color+';">Open CRM →</a>' +
         '</div>';
-      }).join('').replace(/border-bottom:[^;]+;(?=[^<]*<\/div>\s*$)/, '');
-      // Remove last border
-      attEl.innerHTML = attEl.innerHTML.replace(/border-bottom:1px solid var\(--border[^)]*\);/g, function(m,i){ return i > attEl.innerHTML.lastIndexOf('border-bottom') - 100 ? '' : m; });
+      }).join('');
     } else {
-      attEl.innerHTML = '<div style="font-size:12px;color:var(--success);">✓ All clear — no immediate issues</div>';
+      attEl.innerHTML = '<div class="cl-att-empty">✓ All clear — no immediate issues</div>';
     }
   }
 
@@ -5994,13 +6226,13 @@ function renderClientsHub(){
   if(recEl){
     if(recent.length){
       recEl.innerHTML = recent.map(function(c){
-        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border, #dce3e1);font-size:12px;">' +
-          '<div><strong>'+(c.fbName||'(no name)')+'</strong>'+(c.email?'<br><span style="color:var(--muted);font-size:11px;">'+c.email+'</span>':'')+'</div>' +
-          '<div style="font-size:10px;color:var(--muted);text-align:right;white-space:nowrap;">'+(c.added||'—')+'</div>' +
+        return '<div class="cl-recent-row">' +
+          '<div><div class="cl-recent-name">'+(c.fbName||'(no name)')+'</div>'+(c.email?'<div class="cl-recent-email">'+c.email+'</div>':'')+'</div>' +
+          '<div class="cl-recent-date">'+(c.added||'—')+'</div>' +
         '</div>';
       }).join('');
     } else {
-      recEl.innerHTML = '<div style="font-size:12px;color:var(--muted);">No clients yet.</div>';
+      recEl.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:14px 0;">No clients yet.</div>';
     }
   }
 }
