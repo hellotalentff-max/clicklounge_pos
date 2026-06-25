@@ -890,7 +890,6 @@ tr:hover td { background:var(--light); }
     <button onclick="showPage('acknowledgement')" data-page="acknowledgement"><span class="ni">◈</span>Acknowledgement</button>
     <button onclick="showPage('invoice')" data-page="invoice"><span class="ni">◧</span>Invoice / POS</button>
     <button onclick="showPage('clients')" data-page="clients"><span class="ni">♟</span>Clients</button>
-    <button onclick="showPage('emails')" data-page="emails"><span class="ni">✉</span>Email Center</button>
     <button onclick="showPage('transactions')" data-page="transactions"><span class="ni">≡</span>Transactions</button>
     <button onclick="showPage('tasks')" data-page="tasks"><span class="ni">✓</span>Tasks</button>
     <button onclick="showPage('expenses')" data-page="expenses"><span class="ni">💸</span>Expenses</button>
@@ -1229,140 +1228,54 @@ tr:hover td { background:var(--light); }
 <!-- CLIENTS -->
 <div id="page-clients" class="page">
   <div class="ph">
-    <div><h2>Client Records</h2><p>CRM — history, activity and direct messaging</p></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-sm btn-outline" onclick="openImportClients()">📥 Import CSV</button>
-      <button class="btn btn-gold" onclick="openCRMCompose()">✉ Send Campaign</button>
-    </div>
+    <div><h2>👥 Clients</h2><p>Quick CRM access + client snapshot</p></div>
+    <button class="btn btn-sm btn-outline" onclick="renderClientsHub()">🔄 Refresh</button>
   </div>
 
-  <!-- Search + Filter row -->
-  <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-    <input class="sinput" style="flex:1;min-width:200px;" type="text" id="cl-search" placeholder="Search by name, email, phone…" oninput="renderClients()">
-    <select class="sinput" style="width:150px;" id="cl-filter" onchange="renderClients()">
-      <option value="all">All Clients</option>
-      <option value="walkin">Walk-in only</option>
-      <option value="booked">Booked only</option>
-      <option value="smc-yes">SM Consent ✅</option>
-      <option value="smc-no">SM No Consent 🚫</option>
-      <option value="at-risk">At Risk (60d+)</option>
-      <option value="birthday-month">🎂 Birthday This Month</option>
-    </select>
-    <div id="cl-count" style="font-size:12px;color:var(--muted);white-space:nowrap;"></div>
+  <!-- ── BIG CRM LINK CARD ── -->
+  <div style="background:linear-gradient(135deg,#51897d,#3d6b61);border-radius:14px;padding:28px 28px;margin-bottom:18px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;color:#fff;box-shadow:0 4px 16px rgba(81,137,125,.18);">
+    <div style="font-size:50px;line-height:1;">⭐</div>
+    <div style="flex:1;min-width:200px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.7;margin-bottom:6px;">CLS OS · Client Management</div>
+      <div style="font-size:24px;font-weight:800;margin-bottom:4px;">Open ClickCard CRM</div>
+      <div style="font-size:13px;opacity:.85;line-height:1.5;">Lifecycle pipeline, RFM scoring, email campaigns, points management, data cleanup — all in one place.</div>
+    </div>
+    <a href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" style="background:#d79068;color:#fff;text-decoration:none;padding:14px 28px;border-radius:30px;font-weight:700;font-size:14px;letter-spacing:.5px;display:inline-flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);white-space:nowrap;transition:transform .12s,box-shadow .15s;" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 18px rgba(0,0,0,.2)';" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 12px rgba(0,0,0,.15)';">
+      Launch CRM →
+    </a>
   </div>
+
+  <!-- ── KPI CARDS ── -->
+  <div class="kpi-row" id="cl-kpi-row" style="margin-bottom:18px;">
+    <div class="kpi"><div class="kpi-l">Total Clients</div><div class="kpi-v" id="cl-kpi-total">—</div><div class="kpi-s" id="cl-kpi-total-sub">all-time</div></div>
+    <div class="kpi"><div class="kpi-l">Active (60d)</div><div class="kpi-v" id="cl-kpi-active" style="color:var(--success);">—</div><div class="kpi-s" id="cl-kpi-active-sub">visited recently</div></div>
+    <div class="kpi"><div class="kpi-l">VIP / Loyal</div><div class="kpi-v" id="cl-kpi-vip" style="color:var(--gold);">—</div><div class="kpi-s" id="cl-kpi-vip-sub">5+ visits or ₱10k+</div></div>
+    <div class="kpi"><div class="kpi-l">New This Month</div><div class="kpi-v" id="cl-kpi-new" style="color:var(--teal);">—</div><div class="kpi-s" id="cl-kpi-new-sub">first visits</div></div>
+    <div class="kpi"><div class="kpi-l">Email-Reachable</div><div class="kpi-v" id="cl-kpi-email">—</div><div class="kpi-s" id="cl-kpi-email-sub">have email on file</div></div>
+    <div class="kpi"><div class="kpi-l">Birthday This Month</div><div class="kpi-v" id="cl-kpi-bday" style="color:#d79068;">—</div><div class="kpi-s" id="cl-kpi-bday-sub">🎂 send a gift!</div></div>
+  </div>
+
+  <!-- ── REPORT GRID ── -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;">
+
+    <div style="background:#fff;border:1px solid var(--border, #dce3e1);border-radius:12px;padding:16px 18px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🏆 Tier Distribution</div>
+      <div id="cl-tier-chart" style="font-size:12px;color:var(--muted);">Loading…</div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--border, #dce3e1);border-radius:12px;padding:16px 18px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">⚠ Attention Needed</div>
+      <div id="cl-attention" style="font-size:12px;color:var(--muted);">Loading…</div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--border, #dce3e1);border-radius:12px;padding:16px 18px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">🆕 Recently Added</div>
+      <div id="cl-recent" style="font-size:12px;color:var(--muted);">Loading…</div>
+    </div>
+
+  </div>
+
   <input type="file" id="cl-import-file" accept=".csv" style="display:none" onchange="processClientImport(this)">
-
-  <!-- Client cards grid -->
-  <div id="cl-table"></div>
-
-  <!-- Client Profile Modal (full detail) rendered inside modal overlay -->
-</div>
-
-
-<!-- ═══════════════════════════════════════════════════
-     ✉ EMAIL CENTER — Send templated emails to CRM clients
-     ═══════════════════════════════════════════════════ -->
-<div id="page-emails" class="page">
-  <div class="ph">
-    <div><h2>✉ Email Center</h2><p>Send templated emails to your CRM clients — points updates, promos, birthday gifts, win-backs, and more</p></div>
-    <div style="display:flex;gap:6px;">
-      <button class="btn-ghost" onclick="em_switchTab('compose')" id="em-tab-compose" data-em-tab="compose" style="border-bottom:2px solid var(--teal);">✉ Compose</button>
-      <button class="btn-ghost" onclick="em_switchTab('history')" id="em-tab-history" data-em-tab="history">📋 Send History</button>
-    </div>
-  </div>
-
-  <!-- COMPOSE VIEW -->
-  <div id="em-view-compose">
-    <div style="display:grid;grid-template-columns:260px 1fr;gap:14px;align-items:flex-start;">
-
-      <!-- Left: template list -->
-      <div style="background:#fff;border-radius:10px;padding:10px 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);position:sticky;top:14px;">
-        <div style="padding:6px 16px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;">Templates</div>
-        <div id="em-tpl-list" style="max-height:600px;overflow-y:auto;">
-          <div style="padding:14px 16px;font-size:12px;color:var(--muted);">Loading templates…</div>
-        </div>
-      </div>
-
-      <!-- Right: configuration + preview -->
-      <div>
-
-        <div id="em-empty-state" style="background:#fff;border-radius:10px;padding:40px 24px;text-align:center;color:var(--muted);font-size:13px;">
-          ← Pick a template from the left to begin
-        </div>
-
-        <div id="em-config" style="display:none;">
-
-          <!-- Template info card -->
-          <div style="background:#fff;border-radius:10px;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-            <div style="font-size:15px;font-weight:700;color:var(--slate);margin-bottom:4px;" id="em-tpl-title"></div>
-            <div style="font-size:12px;color:var(--muted);" id="em-tpl-subject"></div>
-          </div>
-
-          <!-- Recipients -->
-          <div style="background:#fff;border-radius:10px;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-            <div style="font-size:13px;font-weight:700;color:var(--slate);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">👥 Recipients</div>
-            <select id="em-filter" onchange="em_loadRecipients()" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;background:#fff;margin-bottom:10px;">
-              <option value="all">All clients with email</option>
-              <option value="tier_gold">Gold + Platinum tier</option>
-              <option value="tier_silver">Silver tier</option>
-              <option value="tier_bronze">Bronze tier</option>
-              <option value="birthday_month">🎂 Birthday this month</option>
-              <option value="inactive_90d">💭 Inactive 90+ days</option>
-              <option value="inactive_180d">💭 Inactive 180+ days</option>
-              <option value="has_points">⭐ Has unused points</option>
-              <option value="one">📧 Just one client (specify below)</option>
-            </select>
-            <div id="em-single-field" style="display:none;margin-bottom:10px;">
-              <input type="text" id="em-single-client" placeholder="client@email.com or client ID" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;">
-            </div>
-            <div id="em-recip-count" style="font-size:13px;font-weight:600;color:var(--teal);margin-bottom:8px;"></div>
-            <div id="em-recip-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;display:none;"></div>
-          </div>
-
-          <!-- Custom variables -->
-          <div style="background:#fff;border-radius:10px;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);" id="em-vars-card">
-            <div style="font-size:13px;font-weight:700;color:var(--slate);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">🔧 Campaign Values</div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">CRM auto-fills client variables (name, points, tier, etc). Fill campaign-specific values below.</div>
-            <div id="em-vars-form"></div>
-          </div>
-
-          <!-- Preview -->
-          <div style="background:#fff;border-radius:10px;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-              <div style="font-size:13px;font-weight:700;color:var(--slate);text-transform:uppercase;letter-spacing:.5px;">👁 Preview</div>
-              <button class="btn-ghost" onclick="em_preview()" style="padding:6px 12px;font-size:11px;">🔄 Refresh</button>
-            </div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Subject: <strong style="color:var(--text);" id="em-preview-subj"></strong></div>
-            <div style="background:var(--light);border-radius:6px;overflow:hidden;border:1px solid var(--border);">
-              <iframe id="em-preview-iframe" style="width:100%;height:500px;border:none;display:block;"></iframe>
-            </div>
-          </div>
-
-          <!-- Send -->
-          <div style="background:#fff;border-radius:10px;padding:16px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-            <div style="font-size:13px;font-weight:700;color:var(--slate);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">🚀 Send</div>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <button class="btn-primary" onclick="em_sendNow()" id="em-send-btn">🚀 Send Now</button>
-              <button class="btn-ghost" onclick="em_sendTest()">📧 Test Send to Me</button>
-              <div id="em-send-status" style="font-size:12px;color:var(--muted);flex:1;"></div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- HISTORY VIEW -->
-  <div id="em-view-history" style="display:none;">
-    <div style="background:#fff;border-radius:10px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <div style="font-size:14px;font-weight:700;color:var(--slate);">Recent Email Sends</div>
-        <button class="btn-ghost" onclick="em_loadHistory()">🔄 Refresh</button>
-      </div>
-      <div id="em-history-content" style="font-size:12px;color:var(--muted);">Loading…</div>
-    </div>
-  </div>
 </div>
 
 
@@ -3319,7 +3232,7 @@ function showPage(pg){
     registration: ()=>{ renderReg(); initRegReportMonths(); renderRegReport(); },
     acknowledgement: renderAcks,
     invoice:      renderInvoicePage,
-    clients:      renderClients,
+    clients:      renderClientsHub,
     transactions: ()=>{ if(hasUrl()&&(!DB.transactions||!DB.transactions.length)){ syncAll().then(()=>{ renderTxns(); showTxTab('inv'); }); } else { renderTxns(); showTxTab('inv'); } },
     expenses:     renderExpensesPage,
     gifts:        ()=>{ syncAll().then(renderGiftsPage); },
@@ -3328,8 +3241,7 @@ function showPage(pg){
     settings:     renderSettings,
     calendar:     renderCalendar,
     reports:      renderReports,
-    tasks: function(){ var link=document.getElementById('tasks-app-link'); if(link&&DB.studioInfo&&DB.studioInfo.tasksAppUrl) link.href=DB.studioInfo.tasksAppUrl; },
-    emails: em_init
+    tasks: function(){ var link=document.getElementById('tasks-app-link'); if(link&&DB.studioInfo&&DB.studioInfo.tasksAppUrl) link.href=DB.studioInfo.tasksAppUrl; }
   };
   if(map[pg]) map[pg]();
 }
@@ -5935,6 +5847,167 @@ function renderSettings(){
 // ================================================================
 //  RENDER CLIENTS
 // ================================================================
+
+// ════════════════════════════════════════════════════════════════
+//  RENDER CLIENTS HUB — KPI summary + CRM link page
+// ════════════════════════════════════════════════════════════════
+function renderClientsHub(){
+  var clients = DB.clients || [];
+  var regs    = DB.registrations || [];
+  var txns    = (DB.transactions || []).filter(function(t){ return !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var acks    = DB.acknowledgements || [];
+
+  var now = new Date();
+  var curMonth = now.getMonth() + 1;
+  var curYear  = now.getFullYear();
+  var cutoff60 = new Date(); cutoff60.setDate(cutoff60.getDate() - 60);
+  var cutoff60Str = cutoff60.toISOString().slice(0, 10);
+  var thisMonthStr = curYear + '-' + String(curMonth).padStart(2, '0');
+
+  // Build merged client list (clients + walk-ins from regs/txns/acks)
+  var known = {};
+  clients.forEach(function(c){ known[(c.fbName||'').toLowerCase().trim()] = c; });
+  regs.forEach(function(r){
+    var n = (r.fbName||'').toLowerCase().trim();
+    if(n && !known[n]) known[n] = { fbName: r.fbName, email: r.email||'', added: r.date||'', _walkin: true };
+  });
+  txns.forEach(function(t){
+    var n = (t.clientName||'').toLowerCase().trim();
+    if(n && !known[n]) known[n] = { fbName: t.clientName, email: '', added: t.date||'', _walkin: true };
+  });
+  acks.forEach(function(a){
+    var n = (a.fbName||'').toLowerCase().trim();
+    if(n && !known[n]) known[n] = { fbName: a.fbName, email: a.email||'', added: a.date||a.bookDate||'', _booked: true };
+  });
+  var allClients = Object.values(known);
+
+  // Per-client lookup: visits, spent, last visit
+  var visitCnt = {}, txnSpent = {}, lastVisit = {};
+  regs.forEach(function(r){
+    var n = (r.fbName||'').toLowerCase();
+    visitCnt[n] = (visitCnt[n]||0) + 1;
+    if(!lastVisit[n] || r.date > lastVisit[n]) lastVisit[n] = r.date;
+  });
+  txns.forEach(function(t){
+    var n = (t.clientName||'').toLowerCase();
+    txnSpent[n] = (txnSpent[n]||0) + (parseFloat(t.total)||0);
+  });
+
+  // KPIs
+  var total = allClients.length;
+  var withEmail = allClients.filter(function(c){ return c.email && c.email.indexOf('@')>-1; }).length;
+  var active = allClients.filter(function(c){
+    var n = (c.fbName||'').toLowerCase();
+    return lastVisit[n] && lastVisit[n] >= cutoff60Str;
+  }).length;
+  var vip = allClients.filter(function(c){
+    var n = (c.fbName||'').toLowerCase();
+    return (visitCnt[n]||0) >= 5 || (txnSpent[n]||0) >= 10000;
+  }).length;
+  var newThisMonth = allClients.filter(function(c){
+    return String(c.added||'').startsWith(thisMonthStr);
+  }).length;
+  var bdayThisMonth = clients.filter(function(c){
+    if(!c.birthday) return false;
+    var bd = new Date(c.birthday);
+    if(isNaN(bd.getTime())) return false;
+    return (bd.getMonth()+1) === curMonth;
+  }).length;
+
+  // Tier distribution (Bronze/Silver/Gold/New)
+  var tiers = { 'Gold VIP': 0, 'Silver': 0, 'Bronze': 0, 'New': 0 };
+  allClients.forEach(function(c){
+    var n = (c.fbName||'').toLowerCase();
+    var spent = txnSpent[n] || 0;
+    var sessions = visitCnt[n] || 0;
+    var basePts = Math.floor(spent / 100);
+    var pts = Math.max(parseInt(c.points)||0, basePts);
+    var hasSession = sessions > 0;
+    var tier;
+    if(!hasSession && !c._booked) tier = 'New';
+    else if(pts >= 500) tier = 'Gold VIP';
+    else if(pts >= 200) tier = 'Silver';
+    else tier = 'Bronze';
+    tiers[tier]++;
+  });
+
+  // Attention needed: missing email/phone, at risk, no socialConsent
+  var attentionItems = [];
+  var noEmail = clients.filter(function(c){ return !c.email; }).length;
+  var noPhone = clients.filter(function(c){ return !c.phone; }).length;
+  var atRisk = allClients.filter(function(c){
+    var n = (c.fbName||'').toLowerCase();
+    return lastVisit[n] && lastVisit[n] < cutoff60Str;
+  }).length;
+  if(noEmail) attentionItems.push({ icon:'📧', label:noEmail+' missing email', color:'var(--danger)' });
+  if(noPhone) attentionItems.push({ icon:'📞', label:noPhone+' missing phone', color:'var(--danger)' });
+  if(atRisk)  attentionItems.push({ icon:'⚠', label:atRisk+' at-risk clients (60d+)', color:'var(--gold)' });
+  if(bdayThisMonth) attentionItems.push({ icon:'🎂', label:bdayThisMonth+' birthdays this month', color:'#d79068' });
+
+  // Recently added (last 5)
+  var recent = allClients.slice().sort(function(a,b){ return String(b.added||'').localeCompare(String(a.added||'')); }).slice(0, 5);
+
+  // ─── Populate KPI cards ───
+  var el;
+  if(el=document.getElementById('cl-kpi-total'))  el.textContent = total;
+  if(el=document.getElementById('cl-kpi-active')) el.textContent = active;
+  if(el=document.getElementById('cl-kpi-vip'))    el.textContent = vip;
+  if(el=document.getElementById('cl-kpi-new'))    el.textContent = newThisMonth;
+  if(el=document.getElementById('cl-kpi-email'))  el.textContent = withEmail;
+  if(el=document.getElementById('cl-kpi-bday'))   el.textContent = bdayThisMonth;
+  if(el=document.getElementById('cl-kpi-email-sub')) el.textContent = total ? Math.round(withEmail/total*100)+'% reachable' : 'have email on file';
+
+  // ─── Tier chart ───
+  var tierEl = document.getElementById('cl-tier-chart');
+  if(tierEl){
+    var tierOrder = ['Gold VIP','Silver','Bronze','New'];
+    var tierColors = { 'Gold VIP':'#b8860b', 'Silver':'#5b63d9', 'Bronze':'#d79068', 'New':'var(--muted)' };
+    tierEl.innerHTML = tierOrder.map(function(t){
+      var count = tiers[t];
+      var pct = total ? Math.round(count/total*100) : 0;
+      return '<div style="margin-bottom:8px;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span style="color:'+tierColors[t]+';font-weight:600;">'+t+'</span><span style="color:var(--muted);">'+count+' · '+pct+'%</span></div>' +
+        '<div style="background:var(--light, #f4f7f6);height:6px;border-radius:3px;overflow:hidden;"><div style="background:'+tierColors[t]+';height:100%;width:'+pct+'%;border-radius:3px;transition:width .3s;"></div></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // ─── Attention needed ───
+  var attEl = document.getElementById('cl-attention');
+  if(attEl){
+    if(attentionItems.length){
+      attEl.innerHTML = attentionItems.map(function(item){
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border, #dce3e1);font-size:12px;">' +
+          '<span><span style="font-size:14px;">'+item.icon+'</span> '+item.label+'</span>' +
+          '<a href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" style="color:'+item.color+';text-decoration:none;font-size:11px;font-weight:600;">Open CRM →</a>' +
+        '</div>';
+      }).join('').replace(/border-bottom:[^;]+;(?=[^<]*<\/div>\s*$)/, '');
+      // Remove last border
+      attEl.innerHTML = attEl.innerHTML.replace(/border-bottom:1px solid var\(--border[^)]*\);/g, function(m,i){ return i > attEl.innerHTML.lastIndexOf('border-bottom') - 100 ? '' : m; });
+    } else {
+      attEl.innerHTML = '<div style="font-size:12px;color:var(--success);">✓ All clear — no immediate issues</div>';
+    }
+  }
+
+  // ─── Recently added ───
+  var recEl = document.getElementById('cl-recent');
+  if(recEl){
+    if(recent.length){
+      recEl.innerHTML = recent.map(function(c){
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border, #dce3e1);font-size:12px;">' +
+          '<div><strong>'+(c.fbName||'(no name)')+'</strong>'+(c.email?'<br><span style="color:var(--muted);font-size:11px;">'+c.email+'</span>':'')+'</div>' +
+          '<div style="font-size:10px;color:var(--muted);text-align:right;white-space:nowrap;">'+(c.added||'—')+'</div>' +
+        '</div>';
+      }).join('');
+    } else {
+      recEl.innerHTML = '<div style="font-size:12px;color:var(--muted);">No clients yet.</div>';
+    }
+  }
+}
+
+// ================================================================
+//  LEGACY: RENDER CLIENTS (kept for reference / other callers)
+// ================================================================
 function renderClients(){
   const q      = (document.getElementById('cl-search')?.value||'').toLowerCase();
   const filter = document.getElementById('cl-filter')?.value || 'all';
@@ -8421,244 +8494,166 @@ if('serviceWorker' in navigator){
 }
 
 // ════════════════════════════════════════════════════════════════
-//  ✉ EMAIL CENTER
+//  👥 CLIENTS PAGE — CRM link + summary KPIs
 // ════════════════════════════════════════════════════════════════
-//  Uses the existing gasCall() helper since email_engine.gs is
-//  installed in the same POS GAS project.
-// ════════════════════════════════════════════════════════════════
-var EM_TEMPLATES = [];
-var EM_SELECTED = null;
-var EM_RECIPIENTS = [];
-var EM_INITIALIZED = false;
-
-async function em_init(){
-  // Load templates once on first visit
-  if(!EM_INITIALIZED){
-    await em_loadTemplates();
-    EM_INITIALIZED = true;
-  }
-}
-
-function em_switchTab(view){
-  document.querySelectorAll('[data-em-tab]').forEach(function(el){
-    el.style.borderBottom = el.dataset.emTab === view ? '2px solid var(--teal)' : '2px solid transparent';
+function renderClientsHub(){
+  // Pull all source data
+  var clients = (DB.clients || []).slice();
+  var regs    = (DB.registrations || []);
+  var txns    = (DB.transactions || []).filter(function(t){
+    return !String(t.invoiceNum || '').startsWith('[VOID]');
   });
-  document.getElementById('em-view-compose').style.display = view === 'compose' ? '' : 'none';
-  document.getElementById('em-view-history').style.display = view === 'history' ? '' : 'none';
-  if(view === 'history') em_loadHistory();
-}
+  var acks    = (DB.acknowledgements || []);
 
-async function em_loadTemplates(){
-  try{
-    var r = await gasCall('getEmailTemplates');
-    if(!r.ok) throw new Error(r.error || 'Failed to load templates');
-    EM_TEMPLATES = r.templates || [];
-    em_renderTemplateList();
-  }catch(e){
-    document.getElementById('em-tpl-list').innerHTML = '<div style="padding:14px 16px;font-size:11px;color:var(--danger);">Error: '+e.message+'<br><br>Make sure email_engine.gs is installed in your POS Apps Script and the router is wired up.</div>';
-  }
-}
+  // Build lookups
+  var regsByName = {}, txnByName = {}, lastVisit = {};
+  regs.forEach(function(r){
+    var n = String(r.fbName || '').toLowerCase().trim(); if(!n) return;
+    regsByName[n] = (regsByName[n] || 0) + 1;
+    if(r.date && (!lastVisit[n] || r.date > lastVisit[n])) lastVisit[n] = r.date;
+  });
+  txns.forEach(function(t){
+    var n = String(t.clientName || '').toLowerCase().trim(); if(!n) return;
+    if(!txnByName[n]) txnByName[n] = { spent:0, count:0 };
+    txnByName[n].spent += (+t.total || 0);
+    txnByName[n].count += 1;
+  });
 
-function em_renderTemplateList(){
-  var html = EM_TEMPLATES.map(function(t){
-    return '<div class="em-tpl-item" data-em-key="'+t.key+'" onclick="em_select(\''+t.key+'\')" style="padding:11px 16px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text);border-left:3px solid transparent;display:flex;align-items:center;gap:10px;">' +
-      '<span style="font-size:18px;">'+t.icon+'</span><div>'+t.title+'</div>' +
-      '</div>';
+  // Merge: ensure every named human is counted (some only appear in regs/txns)
+  var allNames = {};
+  clients.forEach(function(c){ var n=String(c.fbName||'').toLowerCase().trim(); if(n) allNames[n] = c; });
+  Object.keys(regsByName).forEach(function(n){ if(!allNames[n]) allNames[n] = {fbName:n, _stub:true}; });
+  Object.keys(txnByName).forEach(function(n){ if(!allNames[n]) allNames[n] = {fbName:n, _stub:true}; });
+  acks.forEach(function(a){
+    var n = String(a.fbName||'').toLowerCase().trim();
+    if(n && !allNames[n]) allNames[n] = {fbName:n, email:a.email||'', _stub:true};
+  });
+
+  var merged = Object.keys(allNames).map(function(k){ return allNames[k]; });
+  var now = new Date();
+  var cut60Date = new Date(); cut60Date.setDate(cut60Date.getDate() - 60);
+  var cut60 = cut60Date.toISOString().slice(0, 10);
+  var curMonth = now.getMonth() + 1;
+  var curYear = now.getFullYear();
+  var monthStart = curYear + '-' + String(curMonth).padStart(2,'0') + '-01';
+
+  // Compute counters
+  var totalC = merged.length;
+  var activeC = 0, vipC = 0, newC = 0, emailC = 0, bdayC = 0;
+  var tierCount = { 'Gold VIP':0, 'Silver':0, 'Bronze':0, 'New':0 };
+  var missingEmailC = 0, missingPhoneC = 0, missingBdayC = 0;
+
+  merged.forEach(function(c){
+    var n = String(c.fbName||'').toLowerCase().trim();
+    var sessions = regsByName[n] || 0;
+    var spent = (txnByName[n] && txnByName[n].spent) || 0;
+    var lv = lastVisit[n] || '';
+
+    if(lv && lv >= cut60) activeC++;
+    if(sessions >= 5 || spent >= 10000) vipC++;
+
+    // New this month = first reg/txn this month
+    var firstSeen = lv || c.added || '';
+    if(firstSeen && firstSeen >= monthStart) newC++;
+
+    if(c.email && String(c.email).indexOf('@') > -1) emailC++;
+    else if(!c._stub) missingEmailC++;
+
+    if(!c.phone && !c._stub) missingPhoneC++;
+    if(!c.birthday && !c._stub) missingBdayC++;
+
+    // Birthday this month
+    if(c.birthday){
+      var bd = new Date(c.birthday);
+      if(!isNaN(bd.getTime()) && (bd.getMonth() + 1) === curMonth) bdayC++;
+    }
+
+    // Tier
+    var pts = parseInt(c.points) || Math.floor(spent / 100);
+    var tier = 'New';
+    if(sessions > 0 || spent > 0){
+      tier = 'Bronze';
+      if(pts >= 200) tier = 'Silver';
+      if(pts >= 500) tier = 'Gold VIP';
+    }
+    if(tierCount[tier] !== undefined) tierCount[tier]++;
+  });
+
+  // ── Render KPI values ─────────────────────────────
+  document.getElementById('cl-kpi-total').textContent = totalC.toLocaleString();
+  document.getElementById('cl-kpi-active').textContent = activeC.toLocaleString();
+  document.getElementById('cl-kpi-active-sub').textContent = (activeC && totalC) ? (Math.round(activeC/totalC*100) + '% of total') : 'visited recently';
+  document.getElementById('cl-kpi-vip').textContent = vipC.toLocaleString();
+  document.getElementById('cl-kpi-new').textContent = newC.toLocaleString();
+  document.getElementById('cl-kpi-new-sub').textContent = 'in ' + now.toLocaleDateString('en-PH', {month:'long'});
+  document.getElementById('cl-kpi-email').textContent = emailC.toLocaleString();
+  document.getElementById('cl-kpi-email-sub').textContent = (emailC && totalC) ? (Math.round(emailC/totalC*100) + '% reachable') : 'have email on file';
+  document.getElementById('cl-kpi-bday').textContent = bdayC.toLocaleString();
+
+  // ── Tier distribution bar ─────────────────────────
+  var tierColors = { 'Gold VIP':'#d79068', 'Silver':'#9c9c9c', 'Bronze':'#a17a4a', 'New':'#6b8c8c' };
+  var sumTiers = tierCount['Gold VIP'] + tierCount['Silver'] + tierCount['Bronze'] + tierCount['New'];
+  var tierHtml = '';
+  ['Gold VIP','Silver','Bronze','New'].forEach(function(t){
+    var n = tierCount[t];
+    var pct = sumTiers ? Math.round(n/sumTiers*100) : 0;
+    tierHtml += '<div style="margin-bottom:10px;">' +
+      '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;">' +
+        '<span style="color:'+tierColors[t]+';font-weight:700;">'+t+'</span>' +
+        '<span style="color:var(--muted);">'+n+' · '+pct+'%</span>' +
+      '</div>' +
+      '<div style="background:var(--light,#f4f7f6);border-radius:4px;height:6px;overflow:hidden;">' +
+        '<div style="background:'+tierColors[t]+';width:'+pct+'%;height:100%;"></div>' +
+      '</div>' +
+    '</div>';
+  });
+  document.getElementById('cl-tier-chart').innerHTML = tierHtml;
+
+  // ── Attention needed ──────────────────────────────
+  var attHtml = '';
+  if(missingEmailC) attHtml += '<div style="padding:7px 0;border-bottom:1px solid var(--light2,#e8edee);display:flex;justify-content:space-between;font-size:12px;"><span>📭 Missing email</span><strong style="color:var(--danger);">'+missingEmailC+'</strong></div>';
+  if(missingPhoneC) attHtml += '<div style="padding:7px 0;border-bottom:1px solid var(--light2,#e8edee);display:flex;justify-content:space-between;font-size:12px;"><span>📱 Missing phone</span><strong style="color:var(--danger);">'+missingPhoneC+'</strong></div>';
+  if(missingBdayC)  attHtml += '<div style="padding:7px 0;border-bottom:1px solid var(--light2,#e8edee);display:flex;justify-content:space-between;font-size:12px;"><span>🎂 Missing birthday</span><strong style="color:var(--danger);">'+missingBdayC+'</strong></div>';
+  // At-risk: visited 60-120 days ago, no recent visit
+  var atriskC = 0;
+  var cut120Date = new Date(); cut120Date.setDate(cut120Date.getDate() - 120);
+  var cut120 = cut120Date.toISOString().slice(0, 10);
+  merged.forEach(function(c){
+    var n = String(c.fbName||'').toLowerCase().trim();
+    var lv = lastVisit[n] || '';
+    if(lv && lv < cut60 && lv >= cut120) atriskC++;
+  });
+  if(atriskC) attHtml += '<div style="padding:7px 0;border-bottom:1px solid var(--light2,#e8edee);display:flex;justify-content:space-between;font-size:12px;"><span>⚠ At risk (60-120d)</span><strong style="color:var(--gold);">'+atriskC+'</strong></div>';
+
+  attHtml += '<div style="margin-top:10px;font-size:11px;color:var(--muted);">Fix these in the CRM → <a href="https://hellotalentff-max.github.io/clicklounge-clickcard/" target="_blank" style="color:var(--teal);">Open Cleanup tab →</a></div>';
+  document.getElementById('cl-attention').innerHTML = attHtml || '<div style="color:var(--success);font-size:13px;">✅ All clean! No missing info.</div>';
+
+  // ── Recent additions ──────────────────────────────
+  var recent = merged
+    .filter(function(c){ return c.added || lastVisit[String(c.fbName||'').toLowerCase().trim()]; })
+    .map(function(c){
+      var n = String(c.fbName||'').toLowerCase().trim();
+      return {
+        fbName: c.fbName,
+        email: c.email,
+        added: c.added || lastVisit[n] || '',
+        sessions: regsByName[n] || 0
+      };
+    })
+    .sort(function(a,b){ return String(b.added).localeCompare(String(a.added)); })
+    .slice(0, 6);
+
+  var recHtml = recent.map(function(c){
+    return '<div style="padding:7px 0;border-bottom:1px solid var(--light2,#e8edee);display:flex;justify-content:space-between;align-items:center;font-size:12px;">' +
+      '<div><strong>'+escHtmlSafe(c.fbName)+'</strong><br><span style="color:var(--muted);font-size:10px;">'+(c.email||'no email')+'</span></div>' +
+      '<div style="text-align:right;font-size:10px;color:var(--muted);">'+(c.added||'').slice(0,10)+'<br>'+c.sessions+' visit'+(c.sessions!==1?'s':'')+'</div>' +
+    '</div>';
   }).join('');
-  document.getElementById('em-tpl-list').innerHTML = html || '<div style="padding:14px 16px;font-size:12px;color:var(--muted);">No templates loaded.</div>';
+  document.getElementById('cl-recent').innerHTML = recHtml || '<div style="color:var(--muted);font-size:13px;">No recent additions.</div>';
 }
 
-function em_select(key){
-  EM_SELECTED = EM_TEMPLATES.find(function(t){ return t.key === key; });
-  if(!EM_SELECTED) return;
-  document.querySelectorAll('.em-tpl-item').forEach(function(el){
-    var isActive = el.dataset.emKey === key;
-    el.style.borderLeftColor = isActive ? 'var(--teal)' : 'transparent';
-    el.style.background = isActive ? 'rgba(81,137,125,0.06)' : '';
-    el.style.color = isActive ? 'var(--teal-dk, #3d6b61)' : 'var(--text)';
-    el.style.fontWeight = isActive ? '600' : '500';
-  });
-  document.getElementById('em-empty-state').style.display = 'none';
-  document.getElementById('em-config').style.display = '';
-  document.getElementById('em-tpl-title').textContent = EM_SELECTED.icon + ' ' + EM_SELECTED.title;
-  document.getElementById('em-tpl-subject').textContent = 'Subject: ' + EM_SELECTED.subject;
-  em_renderVars();
-  em_loadRecipients();
-  em_preview();
-}
-
-function em_renderVars(){
-  // Variables that come from CRM (auto-filled, not shown as inputs)
-  var auto = ['firstName','currentPoints','tier','pointsToNextTier','nextTierName','availablePerks','lastVisitDate','monthsSinceLastVisit','lastPackage','birthdayMonth','expiringPoints','newPointsBalance'];
-  var custom = (EM_SELECTED.variables || []).filter(function(v){ return auto.indexOf(v) === -1; });
-  if(!custom.length){
-    document.getElementById('em-vars-form').innerHTML = '<div style="font-size:12px;color:var(--muted);font-style:italic;">No campaign-specific values needed — everything pulls from CRM automatically.</div>';
-    return;
-  }
-  var html = custom.map(function(v){
-    return '<div style="display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center;margin-bottom:8px;">' +
-      '<label style="font-size:11px;font-family:Courier,monospace;color:var(--muted);">{{'+v+'}}</label>' +
-      '<input type="text" data-em-var="'+v+'" placeholder="enter value..." style="padding:7px 10px;border:1px solid var(--border);border-radius:4px;font-size:12px;font-family:inherit;">' +
-      '</div>';
-  }).join('');
-  document.getElementById('em-vars-form').innerHTML = html;
-}
-
-function em_getExtras(){
-  var extras = {};
-  document.querySelectorAll('[data-em-var]').forEach(function(el){
-    if(el.value.trim()) extras[el.dataset.emVar] = el.value.trim();
-  });
-  return extras;
-}
-
-async function em_loadRecipients(){
-  var filter = document.getElementById('em-filter').value;
-  document.getElementById('em-single-field').style.display = filter === 'one' ? '' : 'none';
-  if(filter === 'one'){
-    document.getElementById('em-recip-count').textContent = '📧 Sending to one specific client';
-    document.getElementById('em-recip-list').style.display = 'none';
-    EM_RECIPIENTS = [];
-    return;
-  }
-  try{
-    var r = await gasCall('getEmailRecipients', {filter: filter});
-    if(!r.ok) throw new Error(r.error);
-    EM_RECIPIENTS = r.recipients || [];
-    var n = r.count || 0;
-    document.getElementById('em-recip-count').textContent = '👥 ' + n + ' recipient' + (n !== 1 ? 's' : '') + ' match this filter';
-    if(n){
-      var listHtml = EM_RECIPIENTS.slice(0, 50).map(function(rc){
-        return '<div style="padding:8px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;">' +
-          '<div><strong>' + (rc.name||'(no name)') + '</strong><br><span style="color:var(--muted);font-size:11px;">' + rc.email + '</span></div>' +
-          '<div style="font-size:10px;color:var(--gold);text-align:right;">' + (rc.tier||'-') + '<br><span style="color:var(--muted);">' + (rc.points||0) + 'pts</span></div>' +
-          '</div>';
-      }).join('');
-      if(EM_RECIPIENTS.length > 50) listHtml += '<div style="padding:8px 12px;font-style:italic;color:var(--muted);font-size:11px;text-align:center;">… and ' + (EM_RECIPIENTS.length - 50) + ' more</div>';
-      document.getElementById('em-recip-list').innerHTML = listHtml;
-      document.getElementById('em-recip-list').style.display = '';
-    } else {
-      document.getElementById('em-recip-list').style.display = 'none';
-    }
-  }catch(e){
-    document.getElementById('em-recip-count').textContent = '⚠ Error: ' + e.message;
-  }
-}
-
-async function em_preview(){
-  if(!EM_SELECTED) return;
-  try{
-    var clientId = '';
-    var filter = document.getElementById('em-filter').value;
-    if(filter === 'one'){
-      clientId = (document.getElementById('em-single-client').value || '').trim();
-    } else if(EM_RECIPIENTS.length){
-      clientId = EM_RECIPIENTS[0].id;
-    }
-    var r = await gasCall('previewEmail', {
-      templateKey: EM_SELECTED.key,
-      clientId: clientId,
-      extras: em_getExtras()
-    });
-    if(!r.ok) throw new Error(r.error);
-    document.getElementById('em-preview-subj').textContent = r.subject;
-    var iframe = document.getElementById('em-preview-iframe');
-    var doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(r.html);
-    doc.close();
-  }catch(e){
-    document.getElementById('em-preview-subj').textContent = 'Preview error: ' + e.message;
-  }
-}
-
-async function em_sendNow(){
-  if(!EM_SELECTED){ notify('Pick a template first','error'); return; }
-  var filter = document.getElementById('em-filter').value;
-  var btn = document.getElementById('em-send-btn');
-  var status = document.getElementById('em-send-status');
-  btn.disabled = true; btn.textContent = '🚀 Sending…';
-  status.textContent = '';
-  try{
-    if(filter === 'one'){
-      var email = (document.getElementById('em-single-client').value || '').trim();
-      if(!email){ throw new Error('Enter a client email/ID'); }
-      var r = await gasCall('sendOneEmail', {
-        templateKey: EM_SELECTED.key,
-        clientId: email,
-        extras: em_getExtras(),
-        sentBy: (DB && DB.currentUser) || 'admin'
-      });
-      if(!r.ok) throw new Error(r.error);
-      status.innerHTML = '<span style="color:var(--success);font-weight:600;">✓ Sent to ' + r.sentTo + '</span>';
-      notify('Email sent ✓','success');
-    } else {
-      if(!EM_RECIPIENTS.length){ throw new Error('No recipients in filter'); }
-      if(!confirm('Send "' + EM_SELECTED.title + '" to ' + EM_RECIPIENTS.length + ' recipients?\n\nThis cannot be undone.')){
-        btn.disabled = false; btn.textContent = '🚀 Send Now'; return;
-      }
-      var r2 = await gasCall('sendBulkEmail', {
-        templateKey: EM_SELECTED.key,
-        filter: filter,
-        extras: em_getExtras(),
-        sentBy: (DB && DB.currentUser) || 'admin'
-      });
-      if(!r2.ok) throw new Error(r2.error);
-      status.innerHTML = '<span style="color:var(--success);font-weight:600;">✓ Sent ' + r2.sent + ' of ' + r2.total + '</span>' + (r2.failed ? ' <span style="color:var(--danger);">(' + r2.failed + ' failed)</span>' : '');
-      notify('Sent ' + r2.sent + ' email' + (r2.sent !== 1 ? 's' : ''),'success');
-    }
-  }catch(e){
-    status.innerHTML = '<span style="color:var(--danger);">❌ ' + e.message + '</span>';
-    notify('Send failed: ' + e.message, 'error');
-  }
-  btn.disabled = false; btn.textContent = '🚀 Send Now';
-}
-
-async function em_sendTest(){
-  if(!EM_SELECTED){ notify('Pick a template first','error'); return; }
-  var email = prompt('Send a test of this template to which client (email or ID)?', '');
-  if(!email) return;
-  try{
-    var r = await gasCall('sendOneEmail', {
-      templateKey: EM_SELECTED.key,
-      clientId: email,
-      extras: em_getExtras(),
-      sentBy: 'test'
-    });
-    if(!r.ok) throw new Error(r.error);
-    notify('Test sent to ' + r.sentTo,'success');
-  }catch(e){
-    notify('Test failed: ' + e.message,'error');
-  }
-}
-
-async function em_loadHistory(){
-  var box = document.getElementById('em-history-content');
-  box.textContent = 'Loading…';
-  try{
-    var r = await gasCall('getEmailHistory', {limit: 100});
-    if(!r.ok) throw new Error(r.error);
-    if(!r.history.length){
-      box.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:20px;">No emails sent yet.</div>';
-      return;
-    }
-    var html = '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;display:grid;grid-template-columns:140px 1fr 110px 80px;gap:10px;border-bottom:2px solid var(--border);">' +
-      '<div>Sent At</div><div>Recipient · Subject</div><div>Template</div><div>Status</div></div>';
-    html += r.history.map(function(h){
-      var statusColor = h.status === 'sent' ? 'var(--success)' : 'var(--danger)';
-      var statusIcon = h.status === 'sent' ? '✓ sent' : '❌ failed';
-      var sentAt = h.sentAt ? String(h.sentAt).split('T').join(' ').slice(0,16) : '';
-      return '<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:140px 1fr 110px 80px;gap:10px;align-items:center;font-size:12px;">' +
-        '<div style="color:var(--muted);">' + sentAt + '</div>' +
-        '<div><strong>' + (h.clientName||'(unknown)') + '</strong><br><span style="color:var(--muted);font-size:11px;">' + (h.email||'') + ' · ' + (h.subject||'').slice(0,60) + '</span></div>' +
-        '<div style="font-size:11px;color:var(--teal);">' + h.template + '</div>' +
-        '<div><span style="color:' + statusColor + ';font-weight:600;font-size:11px;">' + statusIcon + '</span></div>' +
-      '</div>';
-    }).join('');
-    box.innerHTML = html;
-  }catch(e){
-    box.innerHTML = '<div style="color:var(--danger);padding:14px;">' + e.message + '</div>';
-  }
+function escHtmlSafe(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 </script>
