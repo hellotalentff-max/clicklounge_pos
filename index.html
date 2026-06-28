@@ -2108,9 +2108,9 @@ tr:hover td { background:var(--light); }
         <div class="field mb16"><label for="set-addr">Address</label><input type="text" id="set-addr" placeholder="Studio address"></div>
         <div class="field mb16"><label for="set-contact">Contact / FB Page</label><input type="text" id="set-contact" placeholder="FB page or phone"></div>
         <div class="field mb16">
-          <label for="set-eod-email">EOD Report Email</label>
-          <input type="email" id="set-eod-email" placeholder="owner@gmail.com">
-          <div style="font-size:10px;color:var(--muted);margin-top:4px;">End of Shift reports will be emailed here after each submission.</div>
+          <label for="set-eod-email">EOD Report Email <span style="font-size:10px;color:var(--muted);font-weight:400;">(optional)</span></label>
+          <input type="email" id="set-eod-email" placeholder="clickloungestudio@gmail.com">
+          <div style="font-size:10px;color:var(--muted);margin-top:4px;">End of Shift reports auto-send to <strong>clickloungestudio@gmail.com</strong>. Override here only if you want them sent elsewhere.</div>
         <div class="field mb16">
           <label for="set-tasks-url">Tasks App URL</label>
           <input type="url" id="set-tasks-url" placeholder="https://your-tasks-app-url.com">
@@ -2996,8 +2996,9 @@ async function genEOD(){
 
   if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='📤 Submit & Email Report'; }
 
-  // Send email report
-  var toEmail = (DB.studioInfo?.eodEmail||'').trim();
+  // Send email report — defaults to clickloungestudio@gmail.com if no
+  // custom EOD email is configured in Settings
+  var toEmail = (DB.studioInfo?.eodEmail||'').trim() || 'clickloungestudio@gmail.com';
   if(toEmail && hasUrl()){
     notify('Sending EOD report to '+toEmail+'…','info');
     var emailPayload = {
@@ -3026,8 +3027,6 @@ async function genEOD(){
         else notify('EOD saved — email failed: '+(res.error||'check Apps Script'),'error');
       })
       .catch(function(e){ notify('EOD saved — email error: '+e.message,'error'); });
-  } else if(!toEmail){
-    notify('EOD saved. Set EOD Report Email in Settings to receive email reports.','info');
   }
 }
 
@@ -5198,9 +5197,12 @@ async function promptEmail(txnId) {
   const t = DB.transactions.find(x => x.id === txnId);
   if (!t) { printInvoice(txnId); return; }
 
-  // Find client email
+  // Find client email — check BOTH registrations AND clients sheet
+  // (whichever has it; registrations is checked first since it's the
+  // most recent point-of-contact data)
   const reg = DB.registrations.find(r => r.fbName === t.clientName);
-  const email = reg ? reg.email : '';
+  const cl  = DB.clients.find(c => c.fbName === t.clientName);
+  const email = (reg && reg.email) || (cl && cl.email) || '';
 
   openModal(`
     <h3>Invoice Saved ✓</h3>
@@ -5231,13 +5233,48 @@ async function sendEmailNow(txnId) {
   const t = DB.transactions.find(x => x.id === txnId);
   if (!t) return;
   const email = document.getElementById('email-to').value.trim();
-  // Save email back to registration and client records if it was entered here
+  // Always capture & save the email to both registration and client records
+  // (so future invoices/CRM/email-center automatically find it)
   if (email) {
-    const reg = DB.registrations.find(r => r.fbName === t.clientName);
-    if (reg && !reg.email) { reg.email = email; push('saveRegistration', reg); }
-    const cl = DB.clients.find(c => c.fbName === t.clientName);
-    if (cl && !cl.email) { cl.email = email; push('saveClient', cl); }
+    let regUpdated = false, clUpdated = false;
+    let reg = DB.registrations.find(r => r.fbName === t.clientName);
+    if (reg) {
+      if (reg.email !== email) { reg.email = email; regUpdated = true; }
+    } else {
+      // No registration row yet — create one so the email is captured
+      reg = {
+        id: 'reg_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        date: t.date,
+        fbName: t.clientName,
+        email: email,
+        package: (t.items && t.items[0]) ? t.items[0].name : '',
+        source: 'Invoice email capture',
+        notes: 'Auto-created from invoice ' + t.invoiceNum
+      };
+      DB.registrations.push(reg);
+      regUpdated = true;
+    }
+    if (regUpdated) push('saveRegistration', reg);
+
+    let cl = DB.clients.find(c => c.fbName === t.clientName);
+    if (cl) {
+      if (cl.email !== email) { cl.email = email; clUpdated = true; }
+    } else {
+      // No client row yet — create one too
+      cl = {
+        id: 'cl_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+        fbName: t.clientName,
+        email: email,
+        added: t.date,
+        notes: 'Auto-created from invoice ' + t.invoiceNum
+      };
+      DB.clients.push(cl);
+      clUpdated = true;
+    }
+    if (clUpdated) push('saveClient', cl);
+
     saveLocal();
+    if (regUpdated || clUpdated) logActivity('Email captured', t.clientName + ' → ' + email, 'success');
   }
   const status = document.getElementById('email-status');
   if (!email) { status.style.display=''; status.style.color='var(--danger)'; status.textContent='Please enter a valid email address.'; return; }
