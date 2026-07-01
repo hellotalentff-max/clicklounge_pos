@@ -5232,12 +5232,14 @@ async function promptEmail(txnId) {
   const t = DB.transactions.find(x => x.id === txnId);
   if (!t) { printInvoice(txnId); return; }
 
-  // Find client email — check BOTH registrations AND clients sheet
-  // (whichever has it; registrations is checked first since it's the
-  // most recent point-of-contact data)
-  const reg = DB.registrations.find(r => r.fbName === t.clientName);
-  const cl  = DB.clients.find(c => c.fbName === t.clientName);
-  const email = (reg && reg.email) || (cl && cl.email) || '';
+  // Find client email — case-insensitive search across ALL sources
+  const nameL = (t.clientName||'').toLowerCase().trim();
+  const reg = DB.registrations.find(r => (r.fbName||'').toLowerCase().trim() === nameL);
+  const cl  = DB.clients.find(c => (c.fbName||'').toLowerCase().trim() === nameL);
+  // Also check acknowledgements (booking may have captured email)
+  const ack = (DB.acknowledgements||[]).find(a => (a.fbName||'').toLowerCase().trim() === nameL);
+  // Check transaction itself (some flows store email directly)
+  const email = t.email || (reg && reg.email) || (cl && cl.email) || (ack && ack.email) || '';
 
   openModal(`
     <h3>Invoice Saved ✓</h3>
@@ -5272,7 +5274,8 @@ async function sendEmailNow(txnId) {
   // (so future invoices/CRM/email-center automatically find it)
   if (email) {
     let regUpdated = false, clUpdated = false;
-    let reg = DB.registrations.find(r => r.fbName === t.clientName);
+    const nameL = (t.clientName||'').toLowerCase().trim();
+    let reg = DB.registrations.find(r => (r.fbName||'').toLowerCase().trim() === nameL);
     if (reg) {
       if (reg.email !== email) { reg.email = email; regUpdated = true; }
     } else {
@@ -5291,7 +5294,7 @@ async function sendEmailNow(txnId) {
     }
     if (regUpdated) push('saveRegistration', reg);
 
-    let cl = DB.clients.find(c => c.fbName === t.clientName);
+    let cl = DB.clients.find(c => (c.fbName||'').toLowerCase().trim() === nameL);
     if (cl) {
       if (cl.email !== email) { cl.email = email; clUpdated = true; }
     } else {
