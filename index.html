@@ -1861,6 +1861,7 @@ tr:hover td { background:var(--light); }
   <!-- Report Category Tabs -->
   <div style="display:flex;gap:0;border-bottom:2px solid var(--light2);margin-bottom:24px;overflow-x:auto;">
     <button class="rep-cat-btn active" id="rcat-financial" onclick="setRepCat('financial')">💰 Financial</button>
+    <button class="rep-cat-btn" id="rcat-bookings" onclick="setRepCat('bookings')">📅 Bookings</button>
     <button class="rep-cat-btn" id="rcat-clients" onclick="setRepCat('clients')">👥 Clients</button>
     <button class="rep-cat-btn" id="rcat-packages" onclick="setRepCat('packages')">📦 Packages</button>
     <button class="rep-cat-btn" id="rcat-operations" onclick="setRepCat('operations')">⚙ Operations</button>
@@ -1973,6 +1974,39 @@ tr:hover td { background:var(--light); }
         <div class="ct" style="margin:0;">💸 Expenses Report</div>
       </div>
       <div id="fin-exp-table"></div>
+    </div>
+  </div>
+
+  <!-- ══ BOOKINGS ══ -->
+  <div id="rep-cat-bookings" class="rep-cat" style="display:none;">
+    <div class="rep-section-grid">
+      <div class="rep-card-stat" id="bk-total"><div class="rs-label">Total Bookings</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="bk-confirmed"><div class="rs-label">Confirmed</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="bk-pending"><div class="rs-label">Pending Payment</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="bk-cancelled"><div class="rs-label">Cancelled</div><div class="rs-val">—</div></div>
+    </div>
+    <div class="rep-section-grid" style="margin-top:16px;">
+      <div class="rep-card-stat" id="bk-revenue"><div class="rs-label">Booking Revenue</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="bk-avg-dp"><div class="rs-label">Avg Downpayment</div><div class="rs-val">—</div></div>
+    </div>
+
+    <!-- Timeslot heatmap -->
+    <div class="card" style="margin-top:16px;">
+      <div class="ct">📊 Bookings by Time Slot</div>
+      <div id="bk-slot-chart" style="font-size:12px;"></div>
+    </div>
+
+    <!-- Bookings by Day of Week -->
+    <div class="card" style="margin-top:16px;">
+      <div class="ct">📅 Bookings by Day of Week</div>
+      <div id="bk-day-chart" style="font-size:12px;"></div>
+    </div>
+
+    <!-- Peak hours heatmap -->
+    <div class="card" style="margin-top:16px;">
+      <div class="ct">🔥 Peak Booking Slots by Day</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Darker = more bookings at that slot. Helps identify when clients prefer to book.</div>
+      <div id="bk-heatmap" style="overflow-x:auto;"></div>
     </div>
   </div>
 
@@ -2236,6 +2270,7 @@ tr:hover td { background:var(--light); }
       <button class="btn btn-teal btn-sm" onclick="calNavToday()">Today</button>
       <button class="btn btn-outline btn-sm" onclick="calNav(1)">Next →</button>
       <button class="btn btn-danger btn-sm" onclick="openBlockDialog()">🚫 Block Date/Time</button>
+      <button class="btn btn-gold btn-sm" onclick="openQuickBook()">➕ New Booking</button>
     </div>
   </div>
 
@@ -7045,6 +7080,121 @@ async function sendCampaign(){
 let REP_MODE = 'single';
 let CUR_REP_CAT = 'financial';
 
+// ════════════════════════════════════════
+//  BOOKINGS REPORT
+// ════════════════════════════════════════
+function renderBookingsReport(){
+  var pp = getRepPrefixes();
+  var prefixes = pp.prefixes;
+  if(!prefixes.length) return;
+
+  var acks = (DB.acknowledgements||[]).filter(function(a){
+    var d = dateOnly(a.bookDate || a.date || '');
+    if(!d) return false;
+    var prefix = d.slice(0,7); // YYYY-MM
+    return prefixes.indexOf(prefix) > -1;
+  });
+
+  var confirmed = acks.filter(function(a){ return (a.status||'').toLowerCase() === 'confirmed'; });
+  var pending   = acks.filter(function(a){ var s=(a.status||'').toLowerCase(); return s==='pending'||s==='pending payment'; });
+  var cancelled = acks.filter(function(a){ return (a.status||'').toLowerCase() === 'cancelled'; });
+
+  // KPI cards
+  setText('bk-total',     acks.length);
+  setText('bk-confirmed', confirmed.length);
+  setText('bk-pending',   pending.length);
+  setText('bk-cancelled', cancelled.length);
+
+  var totalRev = confirmed.reduce(function(s,a){ return s + (parseFloat(a.downpayment||a.totalPrice)||0); }, 0);
+  var avgDp = confirmed.length > 0 ? totalRev / confirmed.length : 0;
+  setText('bk-revenue',  '₱' + Math.round(totalRev).toLocaleString());
+  setText('bk-avg-dp',   '₱' + Math.round(avgDp).toLocaleString());
+
+  // Timeslot breakdown
+  var slotMap = {};
+  ALL_TIME_SLOTS.forEach(function(s){ slotMap[s] = 0; });
+  acks.forEach(function(a){
+    var slot = a.timeSlot || '';
+    if(slot && slotMap[slot] !== undefined) slotMap[slot]++;
+    else if(slot) slotMap[slot] = (slotMap[slot]||0) + 1;
+  });
+  var maxSlot = Math.max.apply(null, Object.values(slotMap).concat([1]));
+  var slotHtml = Object.keys(slotMap).map(function(slot){
+    var c = slotMap[slot];
+    var pct = (c / maxSlot) * 100;
+    return '<div style="display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--light2);">' +
+      '<div style="font-weight:500;color:var(--slate);font-size:11px;">'+slot+'</div>' +
+      '<div style="height:8px;background:var(--light2);border-radius:4px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,var(--teal),var(--gold));border-radius:4px;"></div></div>' +
+      '<div style="text-align:right;font-weight:700;color:'+(c>0?'var(--slate)':'var(--muted)')+';font-size:12px;">'+c+'</div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('bk-slot-chart').innerHTML = slotHtml || '<div class="tm">No time slot data</div>';
+
+  // ── Day of Week frequency ──
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var dayCount = [0,0,0,0,0,0,0];
+  acks.forEach(function(a){
+    var d = a.bookDate || a.date || '';
+    if(!d) return;
+    var dt = new Date(d + 'T00:00:00');
+    if(!isNaN(dt.getTime())) dayCount[dt.getDay()]++;
+  });
+  var maxDay = Math.max.apply(null, dayCount.concat([1]));
+  // Reorder Mon-Sun
+  var dayOrder = [1,2,3,4,5,6,0];
+  var dayHtml = dayOrder.map(function(di){
+    var c = dayCount[di];
+    var pct = (c / maxDay) * 100;
+    var isTop = c === maxDay && c > 0;
+    return '<div style="display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--light2);">' +
+      '<div style="font-weight:'+(isTop?'700':'500')+';color:'+(isTop?'var(--gold)':'var(--slate)')+';font-size:11px;">'+dayNames[di]+(isTop?' 🔥':'')+'</div>' +
+      '<div style="height:8px;background:var(--light2);border-radius:4px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:'+(di===0?'rgba(192,84,74,.4)':'linear-gradient(90deg,var(--teal),var(--gold))')+';border-radius:4px;"></div></div>' +
+      '<div style="text-align:right;font-weight:700;color:'+(c>0?'var(--slate)':'var(--muted)')+';font-size:12px;">'+c+'</div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('bk-day-chart').innerHTML = dayHtml;
+
+  // ── Heatmap: Day × Timeslot ──
+  var heatData = {};
+  dayOrder.forEach(function(di){ heatData[di] = {}; ALL_TIME_SLOTS.forEach(function(s){ heatData[di][s] = 0; }); });
+  acks.forEach(function(a){
+    var d = a.bookDate || a.date || '';
+    var slot = a.timeSlot || '';
+    if(!d || !slot) return;
+    var dt = new Date(d + 'T00:00:00');
+    if(isNaN(dt.getTime())) return;
+    var di = dt.getDay();
+    if(heatData[di] && heatData[di][slot] !== undefined) heatData[di][slot]++;
+  });
+  var heatMax = 1;
+  dayOrder.forEach(function(di){ ALL_TIME_SLOTS.forEach(function(s){ heatMax = Math.max(heatMax, heatData[di][s]); }); });
+
+  var shortDays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  var hmHtml = '<table style="width:100%;border-collapse:collapse;font-size:10px;min-width:500px;">' +
+    '<thead><tr><th style="padding:6px 4px;text-align:left;font-size:9px;color:var(--muted);"></th>' +
+    ALL_TIME_SLOTS.map(function(s){ return '<th style="padding:6px 2px;text-align:center;font-size:9px;color:var(--muted);white-space:nowrap;">'+s.replace(' AM','a').replace(' PM','p')+'</th>'; }).join('') +
+    '</tr></thead><tbody>' +
+    dayOrder.map(function(di, idx){
+      return '<tr>' +
+        '<td style="padding:5px 6px;font-weight:600;color:var(--slate);font-size:10px;">'+shortDays[idx]+'</td>' +
+        ALL_TIME_SLOTS.map(function(s){
+          var v = heatData[di][s];
+          var intensity = v > 0 ? Math.max(0.15, v / heatMax) : 0;
+          var bg = v > 0 ? 'rgba(45,110,95,' + intensity.toFixed(2) + ')' : 'var(--light2)';
+          var txt = v > 0 ? '#fff' : 'transparent';
+          return '<td style="padding:4px 2px;text-align:center;"><div style="background:'+bg+';color:'+txt+';border-radius:4px;padding:4px 0;font-weight:700;font-size:10px;min-width:22px;">'+(v>0?v:'')+'</div></td>';
+        }).join('') +
+      '</tr>';
+    }).join('') +
+    '</tbody></table>';
+  document.getElementById('bk-heatmap').innerHTML = hmHtml;
+}
+
+function setText(id, val){
+  var el = document.getElementById(id);
+  if(el){ var v = el.querySelector('.rs-val'); if(v) v.textContent = val; }
+}
+
 function renderReports(){
   const yr = parseInt(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'}).split('-')[0]);
   const mo = parseInt(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'}).split('-')[1]) - 1;
@@ -7078,12 +7228,13 @@ function setRepMode(mode){
 
 function setRepCat(cat){
   CUR_REP_CAT = cat;
-  ['financial','clients','packages','operations'].forEach(c=>{
+  ['financial','bookings','clients','packages','operations'].forEach(c=>{
     const el  = document.getElementById('rep-cat-'+c);
     const btn = document.getElementById('rcat-'+c);
     if(el)  el.style.display = c===cat ? '' : 'none';
     if(btn) btn.classList.toggle('active', c===cat);
   });
+  if(cat === 'bookings') renderBookingsReport();
 }
 
 // ================================================================
@@ -7100,13 +7251,14 @@ function openPrintCenter(){
     {id:'pc-mop',           label:'Payment Method Detail',    desc:'Cash, GCash, Maya, BPI breakdown',                 cat:'financial', checked:true },
     {id:'pc-packages',      label:'Package Performance',      desc:'Revenue and sessions per package',                 cat:'packages',  checked:true },
     {id:'pc-pkg-chart',     label:'Package Bar Chart',        desc:'Visual revenue comparison',                        cat:'packages',  checked:false},
+    {id:'pc-bookings',      label:'Bookings Report',          desc:'All bookings with time slots and status',           cat:'bookings',  checked:true },
     {id:'pc-registrations', label:'Registration List',        desc:'All check-ins with time and SM consent',           cat:'clients',   checked:false},
     {id:'pc-arrival',       label:'Arrival Type Summary',     desc:'Walk-in vs booked breakdown',                      cat:'clients',   checked:false},
     {id:'pc-heatmap',       label:'Time Heatmap',             desc:'Peak session hours in PHT',                        cat:'clients',   checked:false},
     {id:'pc-tasks',         label:'Task Summary',             desc:'Delivered, pending, EOD count',                    cat:'operations',checked:false},
     {id:'pc-transfers',     label:'Fund Transfers & Refunds', desc:'Cash to bank and client refunds',                  cat:'operations',checked:false},
   ];
-  const catLabels = {financial:'💰 Financial', packages:'📦 Packages', clients:'👥 Clients', operations:'⚙ Operations'};
+  const catLabels = {financial:'💰 Financial', bookings:'📅 Bookings', packages:'📦 Packages', clients:'👥 Clients', operations:'⚙ Operations'};
   let lastCat='', gridHtml='';
   OPTS.forEach(opt=>{
     if(opt.cat!==lastCat){ gridHtml+='<div class="print-group-label">'+catLabels[opt.cat]+'</div>'; lastCat=opt.cat; }
@@ -7462,6 +7614,7 @@ function _buildReports(prefixes, label){
   renderClientsReport(regs, txnMap, ackMap, label, prefixes);
   renderPackagesReport(txns, regs, txnMap, ackMap, label);
   renderOperationsReport(txns, eods, allFT, gifts, label);
+  renderBookingsReport();
   notify('Reports generated for '+label,'success');
 }
 
@@ -8380,6 +8533,127 @@ function loadBlocked(){
   }catch(e){ return []; }
 }
 function saveBlocked(arr){ localStorage.setItem('cl_blocked', JSON.stringify(arr)); }
+
+// ════════════════════════════════════════
+//  QUICK BOOK — Add a booking from the calendar page
+// ════════════════════════════════════════
+function openQuickBook(){
+  var today = todayStr();
+  var slotOpts = ALL_TIME_SLOTS.map(function(s){
+    return '<option value="'+s+'">'+s+'</option>';
+  }).join('');
+  var pkgOpts =
+    '<optgroup label="Self-Shoot">' +
+      '<option value="Snapshot Selfie">Snapshot Selfie (₱500)</option>' +
+      '<option value="Tribe Time">Tribe Time (₱800)</option>' +
+      '<option value="Crowd Cam">Crowd Cam (₱1,000)</option>' +
+      '<option value="Crew Captures">Crew Captures (₱1,200)</option>' +
+      '<option value="Frenzy Snaps Birthday">Frenzy Snaps Birthday (₱700)</option>' +
+      '<option value="Party Clicks Birthday">Party Clicks Birthday (₱1,000)</option>' +
+      '<option value="Click Capture Birthday">Click Capture Birthday (₱1,500)</option>' +
+    '</optgroup>' +
+    '<optgroup label="Photographer">' +
+      '<option value="Photographer Session">Photographer Session</option>' +
+      '<option value="Studio Rental">Studio Rental</option>' +
+    '</optgroup>' +
+    '<optgroup label="Events">' +
+      '<option value="Event Booking">Event Booking</option>' +
+      '<option value="Booth Rental">Booth Rental</option>' +
+    '</optgroup>';
+
+  showModal('➕ New Booking',
+    '<div style="display:grid;gap:12px;">' +
+      '<div class="field"><label>Client Name</label><input class="sinput" id="qb-name" placeholder="Full name or FB name"></div>' +
+      '<div class="field"><label>Email</label><input class="sinput" type="email" id="qb-email" placeholder="email@example.com"></div>' +
+      '<div class="field"><label>Package / Service</label><select class="sinput" id="qb-service"><option value="">— Select —</option>'+pkgOpts+'</select></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<div class="field"><label>Booking Date</label><input class="sinput" type="date" id="qb-date" min="'+today+'"></div>' +
+        '<div class="field"><label>Time Slot</label><select class="sinput" id="qb-time"><option value="">— Select —</option>'+slotOpts+'</select></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<div class="field"><label>Payment Method</label><select class="sinput" id="qb-mop"><option>GCash</option><option>Cash</option><option>Maya</option><option>BPI</option><option>Card</option></select></div>' +
+        '<div class="field"><label>Downpayment (₱)</label><input class="sinput" type="number" id="qb-dp" value="0" min="0"></div>' +
+      '</div>' +
+      '<div class="field"><label>Notes (optional)</label><input class="sinput" id="qb-notes" placeholder="Special requests, HMU, etc."></div>' +
+    '</div>',
+    '<button class="btn btn-gold" onclick="submitQuickBook()" id="qb-submit-btn">📅 Book & Confirm</button>' +
+    '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>'
+  );
+  document.getElementById('qb-date').value = today;
+}
+
+async function submitQuickBook(){
+  var name    = (document.getElementById('qb-name').value||'').trim();
+  var email   = (document.getElementById('qb-email').value||'').trim();
+  var service = document.getElementById('qb-service').value;
+  var bookDate= document.getElementById('qb-date').value;
+  var timeSlot= document.getElementById('qb-time').value;
+  var mop     = document.getElementById('qb-mop').value;
+  var dp      = parseFloat(document.getElementById('qb-dp').value)||0;
+  var notes   = (document.getElementById('qb-notes').value||'').trim();
+
+  if(!name)    { notify('⚠ Enter client name','error'); return; }
+  if(!service) { notify('⚠ Select a package','error'); return; }
+  if(!bookDate){ notify('⚠ Select a booking date','error'); return; }
+  if(!timeSlot){ notify('⚠ Select a time slot','error'); return; }
+
+  var btn = document.getElementById('qb-submit-btn');
+  btn.disabled = true; btn.textContent = '⏳ Booking…';
+
+  try{
+    // Create the acknowledgement
+    var ackId = uid();
+    var ackNum = 'ACK-' + bookDate.replace(/-/g,'').slice(2) + '-' + ackId.slice(0,4).toUpperCase();
+    var ack = {
+      id: ackId,
+      ackNum: ackNum,
+      date: todayStr(),
+      fbName: name,
+      email: email,
+      service: service,
+      bookDate: bookDate,
+      timeSlot: timeSlot,
+      mop: mop,
+      downpayment: dp,
+      status: 'Confirmed',
+      notes: notes,
+      source: 'Quick Book (POS)'
+    };
+
+    // Save to GAS
+    if(hasUrl()){
+      var r = await gasCall('confirmBooking', {
+        fbName: name, email: email, service: service,
+        bookDate: bookDate, timeSlot: timeSlot,
+        mop: mop, downpayment: dp, notes: notes
+      });
+      if(r.ok){
+        ack.ackNum = r.ackNum || ackNum;
+        if(r.ack) Object.assign(ack, r.ack);
+      }
+    }
+
+    // Save locally
+    if(!DB.acknowledgements) DB.acknowledgements = [];
+    DB.acknowledgements.push(ack);
+
+    // Also add client if new
+    if(!DB.clients.find(function(c){ return (c.fbName||'').toLowerCase() === name.toLowerCase(); })){
+      var cl = { id:uid(), fbName:name, email:email, type:'booked', added:todayStr() };
+      DB.clients.push(cl);
+      push('saveClient', cl);
+    }
+
+    saveLocal();
+    closeModal();
+    notify('✅ Booked! '+name+' on '+bookDate+' at '+timeSlot, 'success');
+    logActivity('Quick Booked', ackNum + ' — ' + name + ' / ' + service + ' / ' + timeSlot, 'success');
+    renderCalendar();
+  }catch(e){
+    notify('❌ '+e.message, 'error');
+    btn.disabled = false; btn.textContent = '📅 Book & Confirm';
+  }
+}
 
 function openBlockDialog(){
   const today = todayStr();
