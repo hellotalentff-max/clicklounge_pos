@@ -8561,25 +8561,29 @@ function openQuickBook(){
       '<option value="Booth Rental">Booth Rental</option>' +
     '</optgroup>';
 
-  showModal('➕ New Booking',
-    '<div style="display:grid;gap:12px;">' +
-      '<div class="field"><label>Client Name</label><input class="sinput" id="qb-name" placeholder="Full name or FB name"></div>' +
-      '<div class="field"><label>Email</label><input class="sinput" type="email" id="qb-email" placeholder="email@example.com"></div>' +
-      '<div class="field"><label>Package / Service</label><select class="sinput" id="qb-service"><option value="">— Select —</option>'+pkgOpts+'</select></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-        '<div class="field"><label>Booking Date</label><input class="sinput" type="date" id="qb-date" min="'+today+'"></div>' +
-        '<div class="field"><label>Time Slot</label><select class="sinput" id="qb-time"><option value="">— Select —</option>'+slotOpts+'</select></div>' +
+  openModal(
+    '<div style="max-width:480px;margin:0 auto;padding:20px;">' +
+      '<h3 style="margin:0 0 16px;font-size:16px;color:var(--slate);">➕ New Booking</h3>' +
+      '<div style="display:grid;gap:12px;">' +
+        '<div class="field"><label>Client Name</label><input class="sinput" id="qb-name" placeholder="Full name or FB name"></div>' +
+        '<div class="field"><label>Email</label><input class="sinput" type="email" id="qb-email" placeholder="email@example.com"></div>' +
+        '<div class="field"><label>Package / Service</label><select class="sinput" id="qb-service"><option value="">— Select —</option>'+pkgOpts+'</select></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+          '<div class="field"><label>Booking Date</label><input class="sinput" type="date" id="qb-date" min="'+today+'" value="'+today+'"></div>' +
+          '<div class="field"><label>Time Slot</label><select class="sinput" id="qb-time"><option value="">— Select —</option>'+slotOpts+'</select></div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+          '<div class="field"><label>Payment Method</label><select class="sinput" id="qb-mop"><option>GCash</option><option>Cash</option><option>Maya</option><option>BPI</option><option>Card</option></select></div>' +
+          '<div class="field"><label>Downpayment (₱)</label><input class="sinput" type="number" id="qb-dp" value="0" min="0"></div>' +
+        '</div>' +
+        '<div class="field"><label>Notes (optional)</label><input class="sinput" id="qb-notes" placeholder="Special requests, HMU, etc."></div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-        '<div class="field"><label>Payment Method</label><select class="sinput" id="qb-mop"><option>GCash</option><option>Cash</option><option>Maya</option><option>BPI</option><option>Card</option></select></div>' +
-        '<div class="field"><label>Downpayment (₱)</label><input class="sinput" type="number" id="qb-dp" value="0" min="0"></div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">' +
+        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+        '<button class="btn btn-gold" onclick="submitQuickBook()" id="qb-submit-btn">📅 Book & Confirm</button>' +
       '</div>' +
-      '<div class="field"><label>Notes (optional)</label><input class="sinput" id="qb-notes" placeholder="Special requests, HMU, etc."></div>' +
-    '</div>',
-    '<button class="btn btn-gold" onclick="submitQuickBook()" id="qb-submit-btn">📅 Book & Confirm</button>' +
-    '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>'
+    '</div>'
   );
-  document.getElementById('qb-date').value = today;
 }
 
 async function submitQuickBook(){
