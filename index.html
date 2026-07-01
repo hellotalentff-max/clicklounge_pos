@@ -8542,51 +8542,165 @@ function openQuickBook(){
   var slotOpts = ALL_TIME_SLOTS.map(function(s){
     return '<option value="'+s+'">'+s+'</option>';
   }).join('');
-  var pkgOpts =
-    '<optgroup label="Self-Shoot">' +
-      '<option value="Snapshot Selfie">Snapshot Selfie (₱500)</option>' +
-      '<option value="Tribe Time">Tribe Time (₱800)</option>' +
-      '<option value="Crowd Cam">Crowd Cam (₱1,000)</option>' +
-      '<option value="Crew Captures">Crew Captures (₱1,200)</option>' +
-      '<option value="Frenzy Snaps Birthday">Frenzy Snaps Birthday (₱700)</option>' +
-      '<option value="Party Clicks Birthday">Party Clicks Birthday (₱1,000)</option>' +
-      '<option value="Click Capture Birthday">Click Capture Birthday (₱1,500)</option>' +
-    '</optgroup>' +
-    '<optgroup label="Photographer">' +
-      '<option value="Photographer Session">Photographer Session</option>' +
-      '<option value="Studio Rental">Studio Rental</option>' +
-    '</optgroup>' +
-    '<optgroup label="Events">' +
-      '<option value="Event Booking">Event Booking</option>' +
-      '<option value="Booth Rental">Booth Rental</option>' +
-    '</optgroup>';
 
-  openModal(
-    '<div style="max-width:480px;margin:0 auto;padding:20px;">' +
-      '<h3 style="margin:0 0 16px;font-size:16px;color:var(--slate);">➕ New Booking</h3>' +
-      '<div style="display:grid;gap:12px;">' +
-        '<div class="field"><label>Client Name</label><input class="sinput" id="qb-name" placeholder="Full name or FB name"></div>' +
-        '<div class="field"><label>Email</label><input class="sinput" type="email" id="qb-email" placeholder="email@example.com"></div>' +
-        '<div class="field"><label>Package / Service</label><select class="sinput" id="qb-service"><option value="">— Select —</option>'+pkgOpts+'</select></div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-          '<div class="field"><label>Booking Date</label><input class="sinput" type="date" id="qb-date" min="'+today+'" value="'+today+'"></div>' +
-          '<div class="field"><label>Time Slot</label><select class="sinput" id="qb-time"><option value="">— Select —</option>'+slotOpts+'</select></div>' +
-        '</div>' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-          '<div class="field"><label>Payment Method</label><select class="sinput" id="qb-mop"><option>GCash</option><option>Cash</option><option>Maya</option><option>BPI</option><option>Card</option></select></div>' +
-          '<div class="field"><label>Downpayment (₱)</label><input class="sinput" type="number" id="qb-dp" value="0" min="0"></div>' +
-        '</div>' +
-        '<div class="field"><label>Notes (optional)</label><input class="sinput" id="qb-notes" placeholder="Special requests, HMU, etc."></div>' +
-      '</div>' +
-      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">' +
-        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn btn-gold" onclick="submitQuickBook()" id="qb-submit-btn">📅 Book & Confirm</button>' +
-      '</div>' +
-    '</div>'
-  );
+  // Build client datalist for autocomplete
+  var clientNames = (DB.clients||[]).map(function(c){ return c.fbName||''; }).filter(Boolean);
+  var datalist = '<datalist id="qb-client-list">' + clientNames.map(function(n){ return '<option value="'+escHtml(n)+'">'; }).join('') + '</datalist>';
+
+  var html =
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
+      '<div>'+
+        '<h3 style="margin:0;font-size:18px;">📅 Quick Book — Same Day</h3>'+
+        '<p style="color:var(--muted);font-size:12px;margin:4px 0 0;">Create a walk-in booking for today or a specific date</p>'+
+      '</div>'+
+      '<button onclick="closeModal()" style="background:none;border:1px solid var(--border);border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer;color:var(--muted);display:flex;align-items:center;justify-content:center;">✕</button>'+
+    '</div>'+
+    datalist+
+    '<div style="margin-top:20px;display:grid;gap:14px;">'+
+      '<div class="field" style="margin:0;">'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Client Name *</label>'+
+        '<input type="text" id="qb-name" class="sinput" placeholder="Start typing…" list="qb-client-list" autocomplete="off" style="width:100%;" oninput="qbCheckRepeat()">'+
+        '<div id="qb-repeat-badge" style="display:none;margin-top:4px;font-size:11px;"></div>'+
+      '</div>'+
+      '<div class="field" style="margin:0;">'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Package / Service *</label>'+
+        '<select id="qb-service" class="sinput" style="width:100%;" onchange="qbAutoPrice()">'+
+          '<option value="">— Select Service —</option>'+
+          '<optgroup label="Self-Shoot">'+
+            '<option value="Snapshot Selfie" data-price="500" data-pax="1">Snapshot Selfie (₱500)</option>'+
+            '<option value="Tribe Time" data-price="800" data-pax="4">Tribe Time (₱800)</option>'+
+            '<option value="Crowd Cam" data-price="1000" data-pax="6">Crowd Cam (₱1,000)</option>'+
+            '<option value="Crew Captures" data-price="1200" data-pax="8">Crew Captures (₱1,200)</option>'+
+            '<option value="Frenzy Snaps Birthday" data-price="700" data-pax="4">Frenzy Snaps Birthday (₱700)</option>'+
+            '<option value="Party Clicks Birthday" data-price="1000" data-pax="6">Party Clicks Birthday (₱1,000)</option>'+
+            '<option value="Click Capture Birthday" data-price="1500" data-pax="10">Click Capture Birthday (₱1,500)</option>'+
+          '</optgroup>'+
+          '<optgroup label="Photographer">'+
+            '<option value="Photographer Session" data-price="0" data-pax="1">Photographer Session</option>'+
+            '<option value="Studio Rental" data-price="0" data-pax="1">Studio Rental</option>'+
+          '</optgroup>'+
+          '<optgroup label="Events">'+
+            '<option value="Event Booking" data-price="0" data-pax="1">Event Booking</option>'+
+            '<option value="Booth Rental" data-price="0" data-pax="1">Booth Rental</option>'+
+          '</optgroup>'+
+        '</select>'+
+      '</div>'+
+      '<div class="frow c2" style="gap:10px;">'+
+        '<div class="field" style="margin:0;">'+
+          '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Date *</label>'+
+          '<input type="date" id="qb-date" class="sinput" min="'+today+'" value="'+today+'" style="width:100%;" onchange="qbCheckSlots()">'+
+        '</div>'+
+        '<div class="field" style="margin:0;">'+
+          '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Time Slot *</label>'+
+          '<select id="qb-time" class="sinput" style="width:100%;"><option value="">— Select Time Slot —</option>'+slotOpts+'</select>'+
+        '</div>'+
+      '</div>'+
+      '<div id="qb-slots-info" style="background:rgba(81,137,125,.06);border:1px solid rgba(81,137,125,.15);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--teal);">11 slots available — 0 booked</div>'+
+      '<div class="frow c2" style="gap:10px;">'+
+        '<div class="field" style="margin:0;">'+
+          '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Price (₱)</label>'+
+          '<input type="number" id="qb-price" class="sinput" value="0" min="0" style="width:100%;">'+
+        '</div>'+
+        '<div class="field" style="margin:0;">'+
+          '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Guests (Pax)</label>'+
+          '<input type="number" id="qb-pax" class="sinput" value="1" min="1" style="width:100%;">'+
+        '</div>'+
+      '</div>'+
+      '<div class="field" style="margin:0;">'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Client Email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></label>'+
+        '<input type="email" id="qb-email" class="sinput" placeholder="For booking confirmation email" style="width:100%;">'+
+      '</div>'+
+      '<div class="field" style="margin:0;">'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Notes</label>'+
+        '<input type="text" id="qb-notes" class="sinput" placeholder="e.g. Birthday, special request, add-ons…" style="width:100%;">'+
+      '</div>'+
+      '<div style="background:rgba(81,137,125,.04);border:1px solid rgba(81,137,125,.12);border-radius:10px;padding:14px;">'+
+        '<div style="font-size:13px;font-weight:700;color:var(--slate);margin-bottom:4px;">📋 Acknowledgement Receipt — Auto-generated</div>'+
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">An AR number will be created automatically for this booking.</div>'+
+        '<div class="frow c2" style="gap:10px;">'+
+          '<div class="field" style="margin:0;"><label style="font-size:11px;font-weight:600;color:var(--slate);">Downpayment (₱)</label>'+
+          '<input type="number" id="qb-dp" class="sinput" value="0" min="0" style="width:100%;"></div>'+
+          '<div class="field" style="margin:0;"><label style="font-size:11px;font-weight:600;color:var(--slate);">Payment Method</label>'+
+          '<select id="qb-mop" class="sinput" style="width:100%;"><option>Cash</option><option>GCash</option><option>Maya</option><option>BPI</option><option>Card</option></select></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-top:18px;">'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
+        '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>'+
+        '<button class="btn btn-teal" onclick="submitQuickBook(false)" id="qb-submit-btn">📅 Create Booking</button>'+
+      '</div>'+
+      '<button class="btn btn-gold" onclick="submitQuickBook(true)" style="width:100%;">✉ Create & Send Confirmation</button>'+
+    '</div>';
+
+  openModal(html);
+  qbCheckSlots();
 }
 
-async function submitQuickBook(){
+// Check if client is a repeat visitor
+function qbCheckRepeat(){
+  var name = (document.getElementById('qb-name').value||'').trim().toLowerCase();
+  var badge = document.getElementById('qb-repeat-badge');
+  if(!name || name.length < 2){ badge.style.display='none'; return; }
+  var client = (DB.clients||[]).find(function(c){ return (c.fbName||'').toLowerCase() === name; });
+  if(client){
+    var visits = (DB.registrations||[]).filter(function(r){ return (r.fbName||'').toLowerCase() === name; }).length;
+    var spent = (DB.transactions||[]).filter(function(t){ return (t.clientName||'').toLowerCase() === name; }).reduce(function(s,t){ return s+(parseFloat(t.total)||0); }, 0);
+    badge.style.display = '';
+    badge.innerHTML = '<span style="background:rgba(81,137,125,.1);color:var(--teal);padding:3px 10px;border-radius:10px;font-weight:600;">🔄 Repeat client — '+visits+' visit'+(visits!==1?'s':'')+' · ₱'+Math.round(spent).toLocaleString()+' lifetime</span>';
+    // Auto-fill email if we have it
+    var emailEl = document.getElementById('qb-email');
+    if(client.email && !emailEl.value) emailEl.value = client.email;
+  } else {
+    badge.style.display = '';
+    badge.innerHTML = '<span style="background:rgba(218,175,52,.1);color:var(--gold);padding:3px 10px;border-radius:10px;font-weight:600;">🆕 New client</span>';
+  }
+}
+
+// Auto-fill price and pax from package selection
+function qbAutoPrice(){
+  var sel = document.getElementById('qb-service');
+  var opt = sel.options[sel.selectedIndex];
+  if(opt && opt.dataset.price) document.getElementById('qb-price').value = opt.dataset.price;
+  if(opt && opt.dataset.pax)   document.getElementById('qb-pax').value = opt.dataset.pax;
+}
+
+// Check slot availability for selected date
+async function qbCheckSlots(){
+  var date = document.getElementById('qb-date').value;
+  var info = document.getElementById('qb-slots-info');
+  if(!date){ info.textContent = ''; return; }
+  info.textContent = '⏳ Checking availability…';
+  info.style.color = 'var(--muted)';
+  try{
+    if(hasUrl()){
+      var r = await gasCall('getBookedSlots', { date: date });
+      if(r.ok){
+        var taken = (r.takenSlots||[]).length;
+        var avail = ALL_TIME_SLOTS.length - taken;
+        info.textContent = avail + ' slot'+(avail!==1?'s':'')+' available — ' + taken + ' booked';
+        info.style.color = avail > 0 ? 'var(--teal)' : 'var(--danger)';
+        // Disable taken slots in dropdown
+        var timeEl = document.getElementById('qb-time');
+        Array.from(timeEl.options).forEach(function(o){
+          if(o.value && (r.takenSlots||[]).indexOf(o.value) > -1){
+            o.disabled = true; o.textContent = o.value + ' (taken)';
+          } else if(o.value){
+            o.disabled = false; o.textContent = o.value;
+          }
+        });
+        return;
+      }
+    }
+    info.textContent = ALL_TIME_SLOTS.length + ' slots available';
+    info.style.color = 'var(--teal)';
+  }catch(e){
+    info.textContent = ALL_TIME_SLOTS.length + ' slots available';
+    info.style.color = 'var(--teal)';
+  }
+}
+
+async function submitQuickBook(sendEmail){
   var name    = (document.getElementById('qb-name').value||'').trim();
   var email   = (document.getElementById('qb-email').value||'').trim();
   var service = document.getElementById('qb-service').value;
@@ -8594,42 +8708,38 @@ async function submitQuickBook(){
   var timeSlot= document.getElementById('qb-time').value;
   var mop     = document.getElementById('qb-mop').value;
   var dp      = parseFloat(document.getElementById('qb-dp').value)||0;
+  var price   = parseFloat(document.getElementById('qb-price').value)||0;
+  var pax     = parseInt(document.getElementById('qb-pax').value)||1;
   var notes   = (document.getElementById('qb-notes').value||'').trim();
 
   if(!name)    { notify('⚠ Enter client name','error'); return; }
   if(!service) { notify('⚠ Select a package','error'); return; }
   if(!bookDate){ notify('⚠ Select a booking date','error'); return; }
   if(!timeSlot){ notify('⚠ Select a time slot','error'); return; }
+  if(sendEmail && !email){ notify('⚠ Email required to send confirmation','error'); return; }
 
   var btn = document.getElementById('qb-submit-btn');
   btn.disabled = true; btn.textContent = '⏳ Booking…';
 
   try{
-    // Create the acknowledgement
     var ackId = uid();
-    var ackNum = 'ACK-' + bookDate.replace(/-/g,'').slice(2) + '-' + ackId.slice(0,4).toUpperCase();
+    var ackNum = 'AR-' + bookDate.replace(/-/g,'').slice(2) + '-' + ackId.slice(0,4).toUpperCase();
     var ack = {
-      id: ackId,
-      ackNum: ackNum,
-      date: todayStr(),
-      fbName: name,
-      email: email,
-      service: service,
-      bookDate: bookDate,
-      timeSlot: timeSlot,
-      mop: mop,
-      downpayment: dp,
-      status: 'Confirmed',
-      notes: notes,
-      source: 'Quick Book (POS)'
+      id: ackId, ackNum: ackNum, date: todayStr(),
+      fbName: name, email: email, service: service,
+      bookDate: bookDate, timeSlot: timeSlot,
+      mop: mop, downpayment: dp, totalPrice: price,
+      pax: pax, status: 'Confirmed',
+      notes: notes, source: 'Quick Book (POS)'
     };
 
-    // Save to GAS
     if(hasUrl()){
-      var r = await gasCall('confirmBooking', {
+      var action = sendEmail ? 'confirmBooking' : 'saveAcknowledgement';
+      var r = await gasCall(action, {
         fbName: name, email: email, service: service,
         bookDate: bookDate, timeSlot: timeSlot,
-        mop: mop, downpayment: dp, notes: notes
+        mop: mop, downpayment: dp, totalPrice: price,
+        pax: pax, notes: notes
       });
       if(r.ok){
         ack.ackNum = r.ackNum || ackNum;
@@ -8637,12 +8747,14 @@ async function submitQuickBook(){
       }
     }
 
-    // Save locally
     if(!DB.acknowledgements) DB.acknowledgements = [];
     DB.acknowledgements.push(ack);
 
-    // Also add client if new
-    if(!DB.clients.find(function(c){ return (c.fbName||'').toLowerCase() === name.toLowerCase(); })){
+    // Add/update client record
+    var existingClient = DB.clients.find(function(c){ return (c.fbName||'').toLowerCase() === name.toLowerCase(); });
+    if(existingClient){
+      if(email && !existingClient.email){ existingClient.email = email; push('saveClient', existingClient); }
+    } else {
       var cl = { id:uid(), fbName:name, email:email, type:'booked', added:todayStr() };
       DB.clients.push(cl);
       push('saveClient', cl);
@@ -8650,12 +8762,15 @@ async function submitQuickBook(){
 
     saveLocal();
     closeModal();
-    notify('✅ Booked! '+name+' on '+bookDate+' at '+timeSlot, 'success');
-    logActivity('Quick Booked', ackNum + ' — ' + name + ' / ' + service + ' / ' + timeSlot, 'success');
+    var msg = sendEmail
+      ? '✅ Booked & confirmation sent to '+email
+      : '✅ Booking created for '+name+' on '+bookDate+' at '+timeSlot;
+    notify(msg, 'success');
+    logActivity('Quick Booked', ack.ackNum + ' — ' + name + ' / ' + service + ' / ' + timeSlot + (sendEmail ? ' (email sent)' : ''), 'success');
     renderCalendar();
   }catch(e){
     notify('❌ '+e.message, 'error');
-    btn.disabled = false; btn.textContent = '📅 Book & Confirm';
+    btn.disabled = false; btn.textContent = '📅 Create Booking';
   }
 }
 
