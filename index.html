@@ -2008,6 +2008,27 @@ tr:hover td { background:var(--light); }
       <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Darker = more bookings at that slot. Helps identify when clients prefer to book.</div>
       <div id="bk-heatmap" style="overflow-x:auto;"></div>
     </div>
+
+    <!-- When clients submit bookings -->
+    <div class="card" style="margin-top:16px;">
+      <div class="ct">🕐 When Clients Submit Bookings</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Shows what hour of the day clients are filling out the booking form — helps you know when to be online for inquiries.</div>
+      <div id="bk-submit-hour" style="font-size:12px;"></div>
+    </div>
+
+    <!-- What day clients submit bookings -->
+    <div class="card" style="margin-top:16px;">
+      <div class="ct">📅 What Day Clients Submit Bookings</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">Which days of the week see the most online booking submissions.</div>
+      <div id="bk-submit-day" style="font-size:12px;"></div>
+    </div>
+
+    <!-- Lead time: how far in advance -->
+    <div class="card" style="margin-top:16px;">
+      <div class="ct">⏳ Booking Lead Time</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:10px;">How many days before the session do clients book? Helps with planning and staffing.</div>
+      <div id="bk-lead-time" style="font-size:12px;"></div>
+    </div>
   </div>
 
   <!-- ══ CLIENTS ══ -->
@@ -2607,6 +2628,7 @@ async function syncAll(){
     if(Array.isArray(d.clients))          DB.clients          =d.clients;
     if(Array.isArray(d.registrations))    DB.registrations    =d.registrations;
     if(Array.isArray(d.acknowledgements)) DB.acknowledgements =d.acknowledgements;
+    if(Array.isArray(d.bookings))         DB.bookings         =d.bookings;
     if(Array.isArray(d.transactions))     DB.transactions     =d.transactions;
     if(Array.isArray(d.eodReports))       DB.eodReports       =d.eodReports;
     if(Array.isArray(d.expenses))         DB.expenses         =d.expenses;
@@ -7191,6 +7213,100 @@ function renderBookingsReport(){
     }).join('') +
     '</tbody></table>';
   document.getElementById('bk-heatmap').innerHTML = hmHtml;
+
+  // ══════════════════════════════════════════════════
+  //  BOOKING SUBMISSION TIME ANALYSIS
+  //  Uses the Bookings sheet which has exact submission timestamps
+  // ══════════════════════════════════════════════════
+  var bookings = (DB.bookings||[]).filter(function(b){
+    // "submitted" field has the timestamp; "date" is the session date
+    var sub = String(b.submitted || b.Submitted || '').slice(0,10);
+    if(!sub) return false;
+    var prefix = sub.slice(0,7);
+    return prefixes.indexOf(prefix) > -1;
+  });
+
+  // ── Hour of day analysis ──
+  var hourCounts = {};
+  for(var h=0; h<24; h++) hourCounts[h] = 0;
+  bookings.forEach(function(b){
+    var raw = b.submitted || b.Submitted || '';
+    if(!raw) return;
+    var d = new Date(raw);
+    if(isNaN(d.getTime())) return;
+    // Get hour in PHT
+    var phtStr = d.toLocaleString('en-PH', {timeZone:'Asia/Manila', hour:'numeric', hour12:false});
+    var hr = parseInt(phtStr) || d.getHours();
+    hourCounts[hr] = (hourCounts[hr]||0) + 1;
+  });
+  var maxHour = Math.max.apply(null, Object.values(hourCounts).concat([1]));
+
+  var hourHtml = '';
+  // Show 6 AM to 11 PM (most relevant hours)
+  for(var hh=6; hh<=23; hh++){
+    var c = hourCounts[hh] || 0;
+    var pct = (c / maxHour) * 100;
+    var isPeak = c === maxHour && c > 0;
+    var label = (hh === 0 ? '12 AM' : hh < 12 ? hh+' AM' : hh === 12 ? '12 PM' : (hh-12)+' PM');
+    hourHtml += '<div style="display:grid;grid-template-columns:60px 1fr 40px;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--light2);">' +
+      '<div style="font-weight:'+(isPeak?'700':'500')+';color:'+(isPeak?'var(--gold)':'var(--slate)')+';font-size:11px;">'+label+(isPeak?' 🔥':'')+'</div>' +
+      '<div style="height:7px;background:var(--light2);border-radius:4px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#4a7fb5,var(--teal));border-radius:4px;"></div></div>' +
+      '<div style="text-align:right;font-weight:700;color:'+(c>0?'var(--slate)':'var(--muted)')+';font-size:12px;">'+c+'</div>' +
+    '</div>';
+  }
+  document.getElementById('bk-submit-hour').innerHTML = hourHtml || '<div class="tm">No booking submission data</div>';
+
+  // ── Day of week submission analysis ──
+  var subDayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var subDayCount = [0,0,0,0,0,0,0];
+  bookings.forEach(function(b){
+    var raw = b.submitted || b.Submitted || '';
+    if(!raw) return;
+    var d = new Date(raw);
+    if(!isNaN(d.getTime())) subDayCount[d.getDay()]++;
+  });
+  var maxSubDay = Math.max.apply(null, subDayCount.concat([1]));
+  var subDayOrder = [1,2,3,4,5,6,0]; // Mon→Sun
+  var subDayHtml = subDayOrder.map(function(di){
+    var c = subDayCount[di];
+    var pct = (c / maxSubDay) * 100;
+    var isPeak = c === maxSubDay && c > 0;
+    return '<div style="display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--light2);">' +
+      '<div style="font-weight:'+(isPeak?'700':'500')+';color:'+(isPeak?'var(--gold)':'var(--slate)')+';font-size:11px;">'+subDayNames[di]+(isPeak?' 🔥':'')+'</div>' +
+      '<div style="height:7px;background:var(--light2);border-radius:4px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#d79068,var(--gold));border-radius:4px;"></div></div>' +
+      '<div style="text-align:right;font-weight:700;color:'+(c>0?'var(--slate)':'var(--muted)')+';font-size:12px;">'+c+'</div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('bk-submit-day').innerHTML = subDayHtml;
+
+  // ── Lead time analysis ──
+  var leadBuckets = {'Same day':0, '1 day':0, '2-3 days':0, '4-7 days':0, '1-2 weeks':0, '2+ weeks':0};
+  bookings.forEach(function(b){
+    var subRaw = b.submitted || b.Submitted || '';
+    var sessDate = b.date || b.Date || '';
+    if(!subRaw || !sessDate) return;
+    var sub = new Date(subRaw);
+    var sess = new Date(String(sessDate).slice(0,10)+'T00:00:00');
+    if(isNaN(sub.getTime()) || isNaN(sess.getTime())) return;
+    var days = Math.max(0, Math.round((sess - sub) / 86400000));
+    if(days === 0) leadBuckets['Same day']++;
+    else if(days === 1) leadBuckets['1 day']++;
+    else if(days <= 3) leadBuckets['2-3 days']++;
+    else if(days <= 7) leadBuckets['4-7 days']++;
+    else if(days <= 14) leadBuckets['1-2 weeks']++;
+    else leadBuckets['2+ weeks']++;
+  });
+  var maxLead = Math.max.apply(null, Object.values(leadBuckets).concat([1]));
+  var leadHtml = Object.keys(leadBuckets).map(function(label){
+    var c = leadBuckets[label];
+    var pct = (c / maxLead) * 100;
+    return '<div style="display:grid;grid-template-columns:90px 1fr 40px;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--light2);">' +
+      '<div style="font-weight:500;color:var(--slate);font-size:11px;">'+label+'</div>' +
+      '<div style="height:7px;background:var(--light2);border-radius:4px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,var(--teal),var(--gold));border-radius:4px;"></div></div>' +
+      '<div style="text-align:right;font-weight:700;color:'+(c>0?'var(--slate)':'var(--muted)')+';font-size:12px;">'+c+'</div>' +
+    '</div>';
+  }).join('');
+  document.getElementById('bk-lead-time').innerHTML = leadHtml || '<div class="tm">No lead time data</div>';
 }
 
 function setText(id, val){
