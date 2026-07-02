@@ -3265,6 +3265,7 @@ function renderCalendarLists(acks, yr, mo){
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
           '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">✉ Confirm & Email</button>'+
           '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:4px 8px;" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="quickConfirmBooking(this)">⚡ Quick</button>'+
+          '<button class="btn btn-sm" style="background:var(--danger);color:#fff;font-size:10px;padding:4px 8px;" data-evid="'+encodeURIComponent(evId)+'" data-name="'+encodeURIComponent(clientName)+'" onclick="calCancelCalEvent(this)">✕ Cancel</button>'+
         '</div>'+
       '</div>';
     });
@@ -3283,11 +3284,12 @@ function ackListRow(a, type){
     '<div style="width:8px;height:8px;border-radius:50%;background:'+(isP?'var(--gold)':'var(--success)')+';flex-shrink:0;"></div>'+
     '<div style="flex:1;">'+
       '<div style="font-weight:600;font-size:13px;">'+escHtml(a.fbName||'')+'</div>'+
-      '<div style="font-size:11px;color:var(--muted);">'+a.bookDate+' · '+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);">'+a.bookDate+(a.timeSlot?' · 🕐 '+escHtml(a.timeSlot):'')+' · '+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
     '</div>'+
-    '<div style="display:flex;gap:6px;">'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
       (isP ? '<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)">✓ Confirm</button>' : '')+
       '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="viewAckDetail(this.dataset.aid)">View</button>'+
+      '<button class="btn btn-sm" style="background:var(--danger);color:#fff;font-size:10px;padding:4px 8px;" data-aid="'+a.id+'" onclick="calCancelAck(this)">✕ Cancel</button>'+
     '</div>'+
   '</div>';
 }
@@ -3329,6 +3331,38 @@ function calDayClick(dateStr){
 function calConfirmAck(btn){ var id=btn.dataset.aid; confirmAck(id); closeModal(); }
 function calPrintAck(btn)  { var id=btn.dataset.aid; printAck(id); }
 function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal(); }
+
+function calCancelAck(btn){
+  var id = btn.dataset.aid;
+  if(!confirm('Cancel this booking? The client will need to rebook.')) return;
+  var ack = DB.acknowledgements.find(function(a){ return a.id === id; });
+  if(ack){
+    ack.status = 'Cancelled';
+    saveLocal();
+    push('saveAcknowledgement', ack);
+    if(hasUrl()) gasCall('cancelBooking', { id: id }).catch(function(){});
+  }
+  notify('Booking cancelled', 'success');
+  logActivity('Booking Cancelled', (ack?ack.ackNum:'') + ' — ' + (ack?ack.fbName:''), 'danger');
+  renderCalendar();
+}
+
+function calCancelCalEvent(btn){
+  var evId = decodeURIComponent(btn.dataset.evid||'');
+  var name = decodeURIComponent(btn.dataset.name||'');
+  if(!confirm('Cancel booking for '+name+'? This will remove it from Google Calendar.')) return;
+  if(hasUrl() && evId){
+    gasCall('cancelBooking', { eventId: evId, clientName: name })
+      .then(function(r){
+        notify(r.ok ? 'Booking cancelled for '+name : 'Cancelled locally', r.ok?'success':'warn');
+        renderCalendar();
+      })
+      .catch(function(){ notify('Cancelled locally', 'warn'); renderCalendar(); });
+  } else {
+    notify('Booking cancelled locally', 'success');
+    renderCalendar();
+  }
+}
 
 // Quick confirm — no modal, directly calls confirmBooking with event data
 async function quickConfirmBooking(btn){
