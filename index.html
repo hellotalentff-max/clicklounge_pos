@@ -7147,12 +7147,45 @@ function renderBookingsReport(){
   var prefixes = pp.prefixes;
   if(!prefixes.length) return;
 
-  var acks = (DB.acknowledgements||[]).filter(function(a){
+  // Merge data from BOTH Acknowledgements AND Bookings sheets
+  // Acknowledgements = POS quick book + confirmed bookings
+  // Bookings = online booking form submissions
+  var allBookings = [];
+
+  // From acknowledgements
+  (DB.acknowledgements||[]).forEach(function(a){
     var d = dateOnly(a.bookDate || a.date || '');
-    if(!d) return false;
-    var prefix = d.slice(0,7); // YYYY-MM
-    return prefixes.indexOf(prefix) > -1;
+    if(!d) return;
+    if(prefixes.indexOf(d.slice(0,7)) === -1) return;
+    allBookings.push({
+      date: d,
+      timeSlot: a.timeSlot || a['Time Slot'] || '',
+      fbName: a.fbName || '',
+      service: a.service || '',
+      status: a.status || 'Confirmed',
+      downpayment: parseFloat(a.downpayment||a.totalPrice)||0,
+      source: 'POS'
+    });
   });
+
+  // From online bookings
+  (DB.bookings||[]).forEach(function(b){
+    var d = dateOnly(b.date || b.Date || b.bookDate || '');
+    if(!d) return;
+    if(prefixes.indexOf(d.slice(0,7)) === -1) return;
+    allBookings.push({
+      date: d,
+      timeSlot: b.timeSlot || b['Time Slot'] || b.time || '',
+      fbName: b.fbName || b['FB Name'] || b.name || '',
+      service: b.service || b.package || b.Package || '',
+      status: b.status || b.Status || 'Submitted',
+      downpayment: parseFloat(b.price||b.Price||b.downpayment)||0,
+      submitted: b.submitted || b.Submitted || '',
+      source: 'Online'
+    });
+  });
+
+  var acks = allBookings;
 
   var confirmed = acks.filter(function(a){ return (a.status||'').toLowerCase() === 'confirmed'; });
   var pending   = acks.filter(function(a){ var s=(a.status||'').toLowerCase(); return s==='pending'||s==='pending payment'; });
@@ -7250,20 +7283,17 @@ function renderBookingsReport(){
 
   // ══════════════════════════════════════════════════
   //  BOOKING SUBMISSION TIME ANALYSIS
-  //  Uses the Bookings sheet which has exact submission timestamps
+  //  Uses both Bookings sheet timestamps AND ack dates
   // ══════════════════════════════════════════════════
-  var bookings = (DB.bookings||[]).filter(function(b){
-    // "submitted" field has the timestamp; "date" is the session date
-    var sub = String(b.submitted || b.Submitted || '').slice(0,10);
-    if(!sub) return false;
-    var prefix = sub.slice(0,7);
-    return prefixes.indexOf(prefix) > -1;
-  });
+  // Collect all records with submission timestamps
+  var bookingsWithTime = allBookings.filter(function(b){ return b.submitted; });
+  // If no explicit submission timestamps, fall back to ack dates
+  if(!bookingsWithTime.length) bookingsWithTime = allBookings;
 
   // ── Hour of day analysis ──
   var hourCounts = {};
   for(var h=0; h<24; h++) hourCounts[h] = 0;
-  bookings.forEach(function(b){
+  bookingsWithTime.forEach(function(b){
     var raw = b.submitted || b.Submitted || '';
     if(!raw) return;
     var d = new Date(raw);
@@ -7293,7 +7323,7 @@ function renderBookingsReport(){
   // ── Day of week submission analysis ──
   var subDayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var subDayCount = [0,0,0,0,0,0,0];
-  bookings.forEach(function(b){
+  bookingsWithTime.forEach(function(b){
     var raw = b.submitted || b.Submitted || '';
     if(!raw) return;
     var d = new Date(raw);
@@ -7315,7 +7345,7 @@ function renderBookingsReport(){
 
   // ── Lead time analysis ──
   var leadBuckets = {'Same day':0, '1 day':0, '2-3 days':0, '4-7 days':0, '1-2 weeks':0, '2+ weeks':0};
-  bookings.forEach(function(b){
+  bookingsWithTime.forEach(function(b){
     var subRaw = b.submitted || b.Submitted || '';
     var sessDate = b.date || b.Date || '';
     if(!subRaw || !sessDate) return;
