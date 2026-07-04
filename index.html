@@ -6280,7 +6280,7 @@ function renderClientsHub(){
   }).length;
 
   // Tier distribution (Bronze/Silver/Gold/New)
-  var tiers = { 'Gold VIP': 0, 'Silver': 0, 'Bronze': 0, 'New': 0 };
+  var tiers = { 'VIP': 0, 'Gold': 0, 'Silver': 0, 'Bronze': 0, 'New': 0 };
   allClients.forEach(function(c){
     var n = (c.fbName||'').toLowerCase();
     var spent = txnSpent[n] || 0;
@@ -6290,8 +6290,9 @@ function renderClientsHub(){
     var hasSession = sessions > 0;
     var tier;
     if(!hasSession && !c._booked) tier = 'New';
-    else if(pts >= 500) tier = 'Gold VIP';
-    else if(pts >= 200) tier = 'Silver';
+    else if(pts >= 300) tier = 'VIP';
+    else if(pts >= 150) tier = 'Gold';
+    else if(pts >= 50) tier = 'Silver';
     else tier = 'Bronze';
     tiers[tier]++;
   });
@@ -6325,8 +6326,8 @@ function renderClientsHub(){
   // ─── Tier chart ───
   var tierEl = document.getElementById('cl-tier-chart');
   if(tierEl){
-    var tierOrder = ['Gold VIP','Silver','Bronze','New'];
-    var tierColors = { 'Gold VIP':'#b8860b', 'Silver':'#5b63d9', 'Bronze':'#d79068', 'New':'#9aabab' };
+    var tierOrder = ['VIP','Gold','Silver','Bronze','New'];
+    var tierColors = { 'VIP':'#4a9082', 'Gold':'#b8860b', 'Silver':'#5b63d9', 'Bronze':'#d79068', 'New':'#9aabab' };
     tierEl.innerHTML = tierOrder.map(function(t){
       var count = tiers[t];
       var pct = total ? Math.round(count/total*100) : 0;
@@ -9385,7 +9386,7 @@ function renderClientsHub(){
   // Compute counters
   var totalC = merged.length;
   var activeC = 0, vipC = 0, newC = 0, emailC = 0, bdayC = 0;
-  var tierCount = { 'Gold VIP':0, 'Silver':0, 'Bronze':0, 'New':0 };
+  var tierCount = { 'VIP':0, 'Gold':0, 'Silver':0, 'Bronze':0, 'New':0 };
   var missingEmailC = 0, missingPhoneC = 0, missingBdayC = 0;
 
   merged.forEach(function(c){
@@ -9418,8 +9419,9 @@ function renderClientsHub(){
     var tier = 'New';
     if(sessions > 0 || spent > 0){
       tier = 'Bronze';
-      if(pts >= 200) tier = 'Silver';
-      if(pts >= 500) tier = 'Gold VIP';
+      if(pts >= 50) tier = 'Silver';
+      if(pts >= 150) tier = 'Gold';
+      if(pts >= 300) tier = 'VIP';
     }
     if(tierCount[tier] !== undefined) tierCount[tier]++;
   });
@@ -9436,10 +9438,10 @@ function renderClientsHub(){
   document.getElementById('cl-kpi-bday').textContent = bdayC.toLocaleString();
 
   // ── Tier distribution bar ─────────────────────────
-  var tierColors = { 'Gold VIP':'#d79068', 'Silver':'#9c9c9c', 'Bronze':'#a17a4a', 'New':'#6b8c8c' };
-  var sumTiers = tierCount['Gold VIP'] + tierCount['Silver'] + tierCount['Bronze'] + tierCount['New'];
+  var tierColors = { 'VIP':'#d79068', 'Silver':'#9c9c9c', 'Bronze':'#a17a4a', 'New':'#6b8c8c' };
+  var sumTiers = tierCount['VIP'] + tierCount['Silver'] + tierCount['Bronze'] + tierCount['New'];
   var tierHtml = '';
-  ['Gold VIP','Silver','Bronze','New'].forEach(function(t){
+  ['VIP','Silver','Bronze','New'].forEach(function(t){
     var n = tierCount[t];
     var pct = sumTiers ? Math.round(n/sumTiers*100) : 0;
     tierHtml += '<div style="margin-bottom:10px;">' +
