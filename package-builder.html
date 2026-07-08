@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📦 Package Builder — CLS Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --teal: #51897d;
+  --teal-dark: #3d6b62;
+  --gold: #d79068;
+  --slate: #2f4f4f;
+  --cream: #f5f0e8;
+  --light: #f4f7f6;
+  --white: #ffffff;
+  --border: #e8efee;
+  --muted: #8ba3a3;
+  --danger: #c0544a;
+  --success: #3d8c6e;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'IBM Plex Sans', sans-serif;
+  background: linear-gradient(135deg, #f4f7f6 0%, #e8efee 100%);
+  color: var(--slate);
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+.container { max-width: 1100px; margin: 0 auto; }
+header {
+  background: var(--slate);
+  color: var(--cream);
+  padding: 20px 24px;
+  border-radius: 14px 14px 0 0;
+}
+h1 { margin: 0; font-size: 20px; color: var(--gold); text-transform: uppercase; letter-spacing: 1.5px; }
+.subtitle { margin: 4px 0 0; font-size: 12px; opacity: 0.7; }
+main {
+  background: var(--white);
+  padding: 24px;
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.08);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+@media (max-width: 780px) { main { grid-template-columns: 1fr; } }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--teal); margin: 0 0 14px; }
+label { display: block; font-size: 11px; font-weight: 700; color: var(--slate); margin: 12px 0 4px; }
+input[type=text], input[type=number], select, textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--white);
+}
+textarea { min-height: 60px; resize: vertical; }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(81,137,125,.15);
+}
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.check-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px; background: var(--light); border-radius: 8px; }
+.check-row input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--teal); }
+.check-row label { margin: 0; font-size: 12px; }
+.btn {
+  display: inline-block;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: transform .1s, box-shadow .1s;
+}
+.btn-primary { background: var(--teal); color: white; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(81,137,125,.3); }
+.btn-gold { background: var(--gold); color: white; }
+.btn-outline { background: white; color: var(--slate); border: 1.5px solid var(--border); }
+.btn-danger { background: var(--danger); color: white; }
+.section { margin-bottom: 20px; }
+
+/* Package card preview — matches book.html styling */
+.preview-box {
+  background: var(--light);
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+}
+.pkg-card {
+  background: var(--white);
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+.pkg-card.gold { border-color: var(--gold); background: linear-gradient(135deg, #fff8f0, #fff); }
+.pkg-card.teal { border-color: var(--teal); background: linear-gradient(135deg, #f0f7f5, #fff); }
+.pkg-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,.08); }
+.pkg-name { font-weight: 700; font-size: 14px; color: var(--slate); margin-bottom: 4px; }
+.pkg-desc { font-size: 11px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+.pkg-book { font-size: 11px; color: var(--teal); font-weight: 700; }
+
+.code-block {
+  background: #2b3a3a;
+  color: #d0e8e0;
+  padding: 14px;
+  border-radius: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.copy-notice { font-size: 11px; color: var(--success); font-weight: 700; margin-top: 8px; display: none; }
+.tabs { display: flex; gap: 4px; border-bottom: 1.5px solid var(--border); margin-bottom: 14px; }
+.tab {
+  background: none;
+  border: none;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -1.5px;
+}
+.tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+
+/* Saved library */
+.saved-list { display: grid; gap: 8px; margin-top: 12px; }
+.saved-item {
+  background: var(--white);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.saved-actions button { padding: 4px 10px; font-size: 10px; }
+
+.help {
+  background: linear-gradient(135deg, #fff4e6, #ffe8cc);
+  border: 1.5px solid var(--gold);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 11px;
+  color: #5c3717;
+  line-height: 1.6;
+  margin-top: 14px;
+}
+.help strong { color: #8b4d1f; }
+kbd {
+  background: rgba(0,0,0,.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>📦 Package Builder</h1>
+    <p class="subtitle">Design a new booking package and generate ready-to-paste HTML for book.html</p>
+  </header>
+  <main>
+
+    <!-- LEFT: FORM -->
+    <div>
+      <h2>1. Package Details</h2>
+
+      <label>Package Name *</label>
+      <input type="text" id="pkg-name" placeholder="e.g. Bridal Prep Glam" oninput="updatePreview()">
+
+      <label>Category</label>
+      <select id="pkg-category" onchange="updatePreview()">
+        <option value="self">Self-Shoot (default 30 min)</option>
+        <option value="photographer">Photographer (60 min)</option>
+        <option value="hmu" data-style="gold">HMU Package (90 min) 💄</option>
+        <option value="event" data-style="teal">Event / Long Session (120 min)</option>
+        <option value="custom">Custom</option>
+      </select>
+
+      <label>Short Description *</label>
+      <input type="text" id="pkg-desc" placeholder="e.g. Bridal makeup + solo portrait" oninput="updatePreview()">
+
+      <div class="row">
+        <div>
+          <label>Price (₱) *</label>
+          <input type="number" id="pkg-price" min="0" step="1" placeholder="e.g. 3500" oninput="updatePreview()">
+        </div>
+        <div>
+          <label># of People</label>
+          <input type="number" id="pkg-pax" min="1" placeholder="e.g. 1" oninput="updatePreview()">
+        </div>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Duration (min)</label>
+          <select id="pkg-duration" onchange="updatePreview()">
+            <option value="30">30 minutes</option>
+            <option value="45">45 minutes</option>
+            <option value="60">60 minutes</option>
+            <option value="90" data-hmu="1">90 minutes (HMU)</option>
+            <option value="120">120 minutes</option>
+          </select>
+        </div>
+        <div>
+          <label>Card Style</label>
+          <select id="pkg-style" onchange="updatePreview()">
+            <option value="">Standard</option>
+            <option value="gold">Gold (HMU)</option>
+            <option value="teal">Teal (Photographer/Event)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="check-row">
+        <input type="checkbox" id="pkg-hmu" onchange="updatePreview()">
+        <label for="pkg-hmu">💄 This package includes Hair &amp; Makeup</label>
+      </div>
+
+      <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveToLibrary()">💾 Save to My Library</button>
+        <button class="btn btn-outline" onclick="clearForm()">✕ Clear</button>
+      </div>
+
+      <div class="help">
+        <strong>💡 Tip:</strong> Selecting <strong>HMU Package</strong> or <strong>Event</strong> auto-fills the duration and card style. Your saved packages are stored on this device — export the code below to keep permanent copies.
+      </div>
+    </div>
+
+    <!-- RIGHT: PREVIEW + CODE -->
+    <div>
+      <h2>2. Preview</h2>
+      <div class="preview-box">
+        <div id="pkg-preview" class="pkg-card">
+          <div class="pkg-name">Package Name</div>
+          <div class="pkg-desc">Description will appear here</div>
+          <div class="pkg-book">Book Now →</div>
+        </div>
+      </div>
+
+      <div class="tabs" style="margin-top:20px;">
+        <button class="tab active" onclick="showTab('html')">HTML Card</button>
+        <button class="tab" onclick="showTab('hmu')">HMU Regex Update</button>
+        <button class="tab" onclick="showTab('where')">Where to Paste</button>
+      </div>
+
+      <div id="tab-html">
+        <label>Copy this HTML → paste into <kbd>book.html</kbd></label>
+        <div class="code-block" id="code-html"></div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn btn-primary" onclick="copyCode('code-html', this)">📋 Copy HTML</button>
+        </div>
+        <div class="copy-notice" id="copy-notice-html">✓ Copied to clipboard!</div>
+      </div>
+
+      <div id="tab-hmu" style="display:none;">
+        <label>Only needed if this is a <strong>NEW HMU package</strong></label>
+        <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Replace both lines in <kbd>book.html</kbd> and the matching one in <kbd>pos.html</kbd>:</p>
+        <div class="code-block" id="code-hmu"></div>
+        <button class="btn btn-primary" onclick="copyCode('code-hmu', this)" style="margin-top:8px;">📋 Copy Regex</button>
+        <div class="copy-notice" id="copy-notice-hmu">✓ Copied to clipboard!</div>
+      </div>
+
+      <div id="tab-where" style="display:none;">
+        <p style="font-size:12px;line-height:1.7;">In <kbd>book.html</kbd>, search (Ctrl+F) for the section marker matching your category:</p>
+        <ul style="font-size:12px;line-height:1.9;padding-left:20px;">
+          <li><kbd>&lt;!-- HMU PROMO PACKAGES --&gt;</kbd> — for HMU packages</li>
+          <li><kbd>&lt;!-- SELF-SHOOT PACKAGES --&gt;</kbd> — self-shoot packages</li>
+          <li><kbd>&lt;!-- PHOTOGRAPHER PACKAGES --&gt;</kbd> — photographer sessions</li>
+          <li><kbd>&lt;!-- EVENT / GROUP PACKAGES --&gt;</kbd> — group/event</li>
+        </ul>
+        <p style="font-size:12px;line-height:1.7;">Paste your HTML <strong>inside</strong> the matching <kbd>&lt;div class="pkg-list"&gt;</kbd> container, next to the other cards.</p>
+        <p style="font-size:12px;line-height:1.7;">Save the file, push to GitHub, wait 30 seconds, hard-refresh the booking page.</p>
+      </div>
+
+      <!-- Saved library -->
+      <div id="library-section" style="margin-top:24px;display:none;">
+        <h2>📚 My Saved Packages</h2>
+        <div class="saved-list" id="saved-list"></div>
+        <button class="btn btn-outline" onclick="exportLibrary()" style="margin-top:10px;">📤 Export All as HTML</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _escAttr(s){ return String(s||'').replace(/'/g,"\\'"); }
+
+function updatePreview(){
+  var name = document.getElementById('pkg-name').value || 'Package Name';
+  var desc = document.getElementById('pkg-desc').value || 'Description will appear here';
+  var price = document.getElementById('pkg-price').value || '';
+  var duration = parseInt(document.getElementById('pkg-duration').value) || 30;
+  var style = document.getElementById('pkg-style').value;
+  var isHMU = document.getElementById('pkg-hmu').checked;
+
+  var preview = document.getElementById('pkg-preview');
+  preview.className = 'pkg-card' + (style ? ' '+style : '');
+  var hmuBadge = isHMU ? ' <span style="font-size:9px;background:rgba(215,144,104,0.2);color:var(--gold);padding:1px 6px;border-radius:10px;font-weight:600;vertical-align:middle;">HMU</span>' : '';
+  preview.innerHTML =
+    '<div class="pkg-name">'+esc(name)+hmuBadge+'</div>'+
+    '<div class="pkg-desc">'+esc(desc)+'</div>'+
+    '<div class="pkg-book">Book Now →</div>';
+
+  // Generate the code
+  var styleClass = style ? ' '+style : '';
+  var descAttr = _escAttr(desc);
+  var nameAttr = _escAttr(name);
+  var descHtml = esc(desc);
+  var nameHtml = esc(name);
+  var priceStr = price || '';
+  var codeHtml =
+    '<div class="pkg-card'+styleClass+'" onclick="selectPkg(\''+nameAttr+'\',\''+descAttr+'\',\''+priceStr+'\','+duration+')">\n'+
+    '  <div class="pkg-name">'+nameHtml+(isHMU ? ' <span style="font-size:9px;background:rgba(215,144,104,0.2);color:var(--gold);padding:1px 6px;border-radius:10px;font-weight:600;vertical-align:middle;">HMU</span>' : '')+'</div>\n'+
+    '  <div class="pkg-desc">'+descHtml+'</div>\n'+
+    '  <div class="pkg-book">Book Now →</div>\n'+
+    '</div>';
+  document.getElementById('code-html').textContent = codeHtml;
+
+  // HMU regex update
+  if(isHMU && name){
+    var kw = name.toLowerCase().trim();
+    document.getElementById('code-hmu').textContent =
+      '// In book.html — find hasHMU() and add this keyword:\n' +
+      "function hasHMU(pkg) {\n" +
+      "  return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|" + kw + ")/i.test(pkg||'');\n" +
+      "}\n\n" +
+      "// Also update the URL param handler right below:\n" +
+      "if (/(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|" + kw + ")/.test(pl)) dur = 90;\n\n" +
+      "// And in pos.html — update _hasHMU():\n" +
+      "function _hasHMU(pkgName){\n" +
+      "  return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama|" + kw + ")/i.test(pkgName||'');\n" +
+      "}";
+  } else {
+    document.getElementById('code-hmu').textContent = '// Not an HMU package — no regex update needed.\n// Just paste the HTML card above and save.';
+  }
+}
+
+// Category auto-configures other fields
+document.getElementById('pkg-category').addEventListener('change', function(){
+  var v = this.value;
+  var durSel = document.getElementById('pkg-duration');
+  var styleSel = document.getElementById('pkg-style');
+  var hmuChk = document.getElementById('pkg-hmu');
+  if(v === 'self'){ durSel.value = '30'; styleSel.value = ''; hmuChk.checked = false; }
+  else if(v === 'photographer'){ durSel.value = '60'; styleSel.value = 'teal'; hmuChk.checked = false; }
+  else if(v === 'hmu'){ durSel.value = '90'; styleSel.value = 'gold'; hmuChk.checked = true; }
+  else if(v === 'event'){ durSel.value = '120'; styleSel.value = 'teal'; hmuChk.checked = false; }
+  updatePreview();
+});
+
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(function(el, i){
+    el.classList.toggle('active', i === (t==='html'?0:t==='hmu'?1:2));
+  });
+  document.getElementById('tab-html').style.display = t==='html' ? '' : 'none';
+  document.getElementById('tab-hmu').style.display = t==='hmu' ? '' : 'none';
+  document.getElementById('tab-where').style.display = t==='where' ? '' : 'none';
+}
+
+function copyCode(id, btn){
+  var el = document.getElementById(id);
+  var text = el.textContent;
+  navigator.clipboard.writeText(text).then(function(){
+    var notice = document.getElementById('copy-notice-' + (id === 'code-html' ? 'html' : 'hmu'));
+    notice.style.display = 'block';
+    btn.textContent = '✓ Copied!';
+    setTimeout(function(){
+      notice.style.display = 'none';
+      btn.innerHTML = '📋 Copy ' + (id === 'code-html' ? 'HTML' : 'Regex');
+    }, 2000);
+  }).catch(function(){
+    // Fallback: select text
+    var range = document.createRange();
+    range.selectNode(el);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    alert('Selected — press Ctrl+C to copy');
+  });
+}
+
+function clearForm(){
+  document.getElementById('pkg-name').value = '';
+  document.getElementById('pkg-desc').value = '';
+  document.getElementById('pkg-price').value = '';
+  document.getElementById('pkg-pax').value = '';
+  document.getElementById('pkg-hmu').checked = false;
+  updatePreview();
+}
+
+// Library — stored in localStorage
+function getLibrary(){ try{ return JSON.parse(localStorage.getItem('pkg_library')||'[]'); }catch(e){ return []; } }
+function setLibrary(l){ localStorage.setItem('pkg_library', JSON.stringify(l)); renderLibrary(); }
+
+function saveToLibrary(){
+  var name = document.getElementById('pkg-name').value.trim();
+  if(!name){ alert('⚠ Enter a package name first'); return; }
+  var pkg = {
+    id: Date.now(),
+    name: name,
+    category: document.getElementById('pkg-category').value,
+    desc: document.getElementById('pkg-desc').value.trim(),
+    price: document.getElementById('pkg-price').value,
+    pax: document.getElementById('pkg-pax').value,
+    duration: document.getElementById('pkg-duration').value,
+    style: document.getElementById('pkg-style').value,
+    hmu: document.getElementById('pkg-hmu').checked,
+    savedAt: new Date().toISOString()
+  };
+  var lib = getLibrary();
+  // Overwrite same-name entries
+  lib = lib.filter(function(p){ return p.name.toLowerCase() !== name.toLowerCase(); });
+  lib.unshift(pkg);
+  setLibrary(lib);
+  alert('✅ Saved "' + name + '" to your library');
+}
+
+function renderLibrary(){
+  var lib = getLibrary();
+  var section = document.getElementById('library-section');
+  var list = document.getElementById('saved-list');
+  if(!lib.length){ section.style.display = 'none'; return; }
+  section.style.display = '';
+  list.innerHTML = lib.map(function(p){
+    return '<div class="saved-item">'+
+      '<div><strong>'+esc(p.name)+'</strong> · '+esc(p.category)+(p.price?' · ₱'+p.price:'')+'</div>'+
+      '<div class="saved-actions">'+
+        '<button class="btn btn-outline" onclick="loadPkg('+p.id+')">Load</button>'+
+        '<button class="btn btn-danger" onclick="removePkg('+p.id+')">✕</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function loadPkg(id){
+  var pkg = getLibrary().find(function(p){ return p.id === id; });
+  if(!pkg) return;
+  document.getElementById('pkg-name').value = pkg.name;
+  document.getElementById('pkg-category').value = pkg.category;
+  document.getElementById('pkg-desc').value = pkg.desc;
+  document.getElementById('pkg-price').value = pkg.price;
+  document.getElementById('pkg-pax').value = pkg.pax;
+  document.getElementById('pkg-duration').value = pkg.duration;
+  document.getElementById('pkg-style').value = pkg.style;
+  document.getElementById('pkg-hmu').checked = pkg.hmu;
+  updatePreview();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function removePkg(id){
+  if(!confirm('Remove this package from your library?')) return;
+  setLibrary(getLibrary().filter(function(p){ return p.id !== id; }));
+}
+
+function exportLibrary(){
+  var lib = getLibrary();
+  if(!lib.length){ alert('Nothing to export'); return; }
+  var all = lib.map(function(p){
+    var styleClass = p.style ? ' '+p.style : '';
+    var duration = p.duration || 30;
+    var hmuBadge = p.hmu ? ' <span style="font-size:9px;background:rgba(215,144,104,0.2);color:var(--gold);padding:1px 6px;border-radius:10px;font-weight:600;vertical-align:middle;">HMU</span>' : '';
+    return '<!-- ' + p.name + ' -->\n<div class="pkg-card'+styleClass+'" onclick="selectPkg(\''+p.name.replace(/'/g,"\\'")+'\',\''+(p.desc||'').replace(/'/g,"\\'")+'\',\''+(p.price||'')+'\','+duration+')">\n  <div class="pkg-name">'+esc(p.name)+hmuBadge+'</div>\n  <div class="pkg-desc">'+esc(p.desc||'')+'</div>\n  <div class="pkg-book">Book Now →</div>\n</div>';
+  }).join('\n\n');
+
+  var blob = new Blob([all], {type: 'text/html'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'cls-packages-' + new Date().toISOString().slice(0,10) + '.html';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Initial render
+updatePreview();
+renderLibrary();
+</script>
+</body>
+</html>
