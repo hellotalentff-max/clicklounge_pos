@@ -3307,14 +3307,32 @@ function calNavToday(){
   renderCalendar();
 }
 
+function _hasHMU(pkgName){
+  return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama)/i.test(pkgName||'');
+}
+
 function calDayClick(dateStr){
   var acks = (DB.acknowledgements||[]).filter(function(a){ return a.bookDate===dateStr; });
   if(!acks.length) return;
   var html = '<h3 style="margin-bottom:12px;">📅 '+dateStr+'</h3>';
+
+  // ─── HMU Alert: contact artist for any HMU packages this day ───
+  var hmuBookings = acks.filter(function(a){ return _hasHMU(a.service); });
+  if(hmuBookings.length){
+    html += '<div style="background:linear-gradient(135deg,#fff4e6,#ffe8cc);border:2px solid #d79068;border-radius:10px;padding:12px 14px;margin-bottom:12px;">'+
+      '<div style="font-size:13px;font-weight:800;color:#8b4d1f;margin-bottom:6px;">💄 HMU Artist Alert ('+hmuBookings.length+')</div>'+
+      '<div style="font-size:11px;color:#5c3717;margin-bottom:8px;">Contact your Hair &amp; Makeup artist to confirm availability for:</div>'+
+      hmuBookings.map(function(a){
+        return '<div style="font-size:11px;color:#5c3717;padding:4px 0;border-top:1px dashed rgba(139,77,31,.3);"><strong>'+escHtml(a.fbName||'')+'</strong> · '+escHtml(a.service||'')+' · '+escHtml(a.timeSlot||'—')+' <span style="color:#8b4d1f;">(arrive 1.5 hrs early)</span></div>';
+      }).join('')+
+    '</div>';
+  }
+
   acks.forEach(function(a){
     var isPending = !a.status || String(a.status||'').toLowerCase().includes('pending');
-    html += '<div style="background:var(--light);border-radius:8px;padding:12px 14px;margin-bottom:8px;">'+
-      '<div style="font-weight:600;">'+escHtml(a.fbName||'')+'</div>'+
+    var isHMU = _hasHMU(a.service);
+    html += '<div style="background:var(--light);border-radius:8px;padding:12px 14px;margin-bottom:8px;'+(isHMU?'border-left:4px solid #d79068;':'')+'">'+
+      '<div style="font-weight:600;">'+escHtml(a.fbName||'')+(isHMU?' <span style="font-size:9px;background:rgba(215,144,104,.2);color:#8b4d1f;padding:2px 7px;border-radius:10px;font-weight:700;vertical-align:middle;">💄 HMU</span>':'')+'</div>'+
       '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Status: '+(a.status||'Pending')+'</div>'+
       '<div style="display:flex;gap:6px;margin-top:8px;">'+
@@ -8847,6 +8865,22 @@ function qbAutoPrice(){
   var opt = sel.options[sel.selectedIndex];
   if(opt && opt.dataset.price) document.getElementById('qb-price').value = opt.dataset.price;
   if(opt && opt.dataset.pax)   document.getElementById('qb-pax').value = opt.dataset.pax;
+
+  // ─── HMU alert if package includes Hair & Makeup ───
+  var svc = sel.value || '';
+  var hmuBox = document.getElementById('qb-hmu-alert');
+  if(_hasHMU(svc)){
+    if(!hmuBox){
+      hmuBox = document.createElement('div');
+      hmuBox.id = 'qb-hmu-alert';
+      hmuBox.style.cssText = 'background:linear-gradient(135deg,#fff4e6,#ffe8cc);border:2px solid #d79068;border-radius:8px;padding:10px 12px;margin-top:8px;font-size:11px;color:#5c3717;';
+      sel.parentNode.parentNode.appendChild(hmuBox);
+    }
+    hmuBox.innerHTML = '💄 <strong>Hair &amp; Makeup package</strong> — remember to contact your HMU artist to confirm availability. Client should arrive <strong>1.5 hrs early</strong> for HMU prep.';
+    hmuBox.style.display = '';
+  } else if(hmuBox){
+    hmuBox.style.display = 'none';
+  }
 }
 
 // Check slot availability for selected date
