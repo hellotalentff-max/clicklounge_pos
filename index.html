@@ -3315,6 +3315,22 @@ function calDayClick(dateStr){
   var acks = (DB.acknowledgements||[]).filter(function(a){ return a.bookDate===dateStr; });
   if(!acks.length) return;
 
+  // Enrich acks with time slot from the Bookings sheet when missing.
+  // Online bookings save the time to DB.bookings but the ack (created on confirm)
+  // sometimes lacks it — cross-reference by name+date.
+  var bookingsForDay = (DB.bookings||[]).filter(function(b){
+    return (b.date||b.Date||b.bookDate||'').slice(0,10) === dateStr;
+  });
+  acks.forEach(function(a){
+    if(!a.timeSlot && !a.time){
+      var nameL = String(a.fbName||'').trim().toLowerCase();
+      var match = bookingsForDay.find(function(b){
+        return String(b.fbName||b['FB Name']||b.name||'').trim().toLowerCase() === nameL;
+      });
+      if(match) a.timeSlot = match.timeSlot || match['Time Slot'] || match.time || '';
+    }
+  });
+
   // Sort by time slot (chronologically)
   function _timeToMinutes(t){
     if(!t) return 9999;
