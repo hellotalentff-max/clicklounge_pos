@@ -3314,7 +3314,20 @@ function _hasHMU(pkgName){
 function calDayClick(dateStr){
   var acks = (DB.acknowledgements||[]).filter(function(a){ return a.bookDate===dateStr; });
   if(!acks.length) return;
-  var html = '<h3 style="margin-bottom:12px;">📅 '+dateStr+'</h3>';
+
+  // Sort by time slot (chronologically)
+  function _timeToMinutes(t){
+    if(!t) return 9999;
+    var m = String(t).match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if(!m) return 9999;
+    var h = parseInt(m[1]), min = parseInt(m[2]);
+    if(/PM/i.test(m[3]) && h < 12) h += 12;
+    if(/AM/i.test(m[3]) && h === 12) h = 0;
+    return h * 60 + min;
+  }
+  acks.sort(function(a,b){ return _timeToMinutes(a.timeSlot||a.time) - _timeToMinutes(b.timeSlot||b.time); });
+
+  var html = '<h3 style="margin-bottom:12px;">📅 '+dateStr+' <span style="font-size:12px;color:var(--muted);font-weight:400;">· '+acks.length+' booking'+(acks.length!==1?'s':'')+'</span></h3>';
 
   // ─── HMU Alert: contact artist for any HMU packages this day ───
   var hmuBookings = acks.filter(function(a){ return _hasHMU(a.service); });
@@ -3331,9 +3344,13 @@ function calDayClick(dateStr){
   acks.forEach(function(a){
     var isPending = !a.status || String(a.status||'').toLowerCase().includes('pending');
     var isHMU = _hasHMU(a.service);
+    var timeSlot = a.timeSlot || a.time || '—';
     html += '<div style="background:var(--light);border-radius:8px;padding:12px 14px;margin-bottom:8px;'+(isHMU?'border-left:4px solid #d79068;':'')+'">'+
-      '<div style="font-weight:600;">'+escHtml(a.fbName||'')+(isHMU?' <span style="font-size:9px;background:rgba(215,144,104,.2);color:#8b4d1f;padding:2px 7px;border-radius:10px;font-weight:700;vertical-align:middle;">💄 HMU</span>':'')+'</div>'+
-      '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'+
+        '<div style="font-weight:600;flex:1;">'+escHtml(a.fbName||'')+(isHMU?' <span style="font-size:9px;background:rgba(215,144,104,.2);color:#8b4d1f;padding:2px 7px;border-radius:10px;font-weight:700;vertical-align:middle;">💄 HMU</span>':'')+'</div>'+
+        '<div style="font-size:12px;font-weight:800;color:var(--teal);background:rgba(81,137,125,.1);padding:3px 10px;border-radius:6px;white-space:nowrap;">⏰ '+escHtml(timeSlot)+'</div>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-top:4px;">'+escHtml(a.service||'—')+' · ₱'+fmt(+a.downpayment||0)+' '+escHtml(a.mop||'')+'</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Status: '+(a.status||'Pending')+'</div>'+
       '<div style="display:flex;gap:6px;margin-top:8px;">'+
         (isPending ? '<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)">✓ Confirm</button>' : '')+
