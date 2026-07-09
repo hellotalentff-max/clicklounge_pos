@@ -3316,23 +3316,53 @@ function calDayClick(dateStr){
   if(!acks.length) return;
 
   // Enrich acks with time slot from the Bookings sheet when missing.
-  // Online bookings save the time to DB.bookings but the ack (created on confirm)
-  // sometimes lacks it — cross-reference by name+date.
   // Backend transforms sheet headers to snake_case: "FB Name" → fb_name, "Time Slot" → time_slot
   function _bookingName(b){ return b.fbName || b.fb_name || b['FB Name'] || b.name || ''; }
-  function _bookingDate(b){ return String(b.date || b.Date || b.bookDate || '').slice(0,10); }
   function _bookingTime(b){ return b.timeSlot || b.time_slot || b['Time Slot'] || b.time || ''; }
+  // Normalize any date value (Date object, ISO string, US "7/11/2026", or "2026-07-11")
+  // to YYYY-MM-DD for reliable matching
+  function _normDate(v){
+    if(!v) return '';
+    if(v instanceof Date){
+      var y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
+      return y+'-'+m+'-'+d;
+    }
+    var s = String(v).trim();
+    // Try YYYY-MM-DD prefix
+    var iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if(iso) return iso[1]+'-'+String(iso[2]).padStart(2,'0')+'-'+String(iso[3]).padStart(2,'0');
+    // Try M/D/YYYY or MM/DD/YYYY
+    var us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if(us) return us[3]+'-'+String(us[1]).padStart(2,'0')+'-'+String(us[2]).padStart(2,'0');
+    return s.slice(0,10);
+  }
 
   var bookingsForDay = (DB.bookings||[]).filter(function(b){
-    return _bookingDate(b) === dateStr;
+    return _normDate(b.date || b.Date || b.bookDate) === dateStr;
   });
+  console.log('[calDayClick]', dateStr, '→ found', bookingsForDay.length, 'bookings in DB.bookings for this day. Sample:', bookingsForDay[0]);
+
   acks.forEach(function(a){
     if(!a.timeSlot && !a.time){
       var nameL = String(a.fbName||'').trim().toLowerCase();
+      // First try exact name match
       var match = bookingsForDay.find(function(b){
         return _bookingName(b).trim().toLowerCase() === nameL;
       });
-      if(match) a.timeSlot = _bookingTime(match);
+      // Fallback: partial match (first name overlap)
+      if(!match && nameL){
+        var firstName = nameL.split(/\s+/)[0];
+        match = bookingsForDay.find(function(b){
+          var bn = _bookingName(b).trim().toLowerCase();
+          return bn.indexOf(firstName) === 0 || firstName.indexOf(bn.split(/\s+/)[0]) === 0;
+        });
+      }
+      if(match){
+        a.timeSlot = _bookingTime(match);
+        console.log('[calDayClick] Matched', a.fbName, '→', a.timeSlot);
+      } else {
+        console.warn('[calDayClick] No booking match for', a.fbName, 'on', dateStr);
+      }
     }
   });
 
