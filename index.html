@@ -3319,8 +3319,27 @@ function calDayClick(dateStr){
   // Backend transforms sheet headers to snake_case: "FB Name" → fb_name, "Time Slot" → time_slot
   function _bookingName(b){ return b.fbName || b.fb_name || b['FB Name'] || b.name || ''; }
   function _bookingTime(b){ return b.timeSlot || b.time_slot || b['Time Slot'] || b.time || ''; }
-  // Normalize any date value (Date object, ISO string, US "7/11/2026", or "2026-07-11")
-  // to YYYY-MM-DD for reliable matching
+
+  // Convert ANY time representation the sheet returns → clean PHT "2:00 PM" format
+  function _fmtPHT(t){
+    if(!t) return '';
+    t = String(t).trim();
+    // Already in "H:MM AM/PM" — return as-is
+    if(/AM|PM/i.test(t)) return t.replace(/\s+/g,' ');
+    // ISO string with T (Google Sheets sometimes stores time as "1899-12-30T14:00:00.000Z")
+    var iso = t.match(/T(\d{2}):(\d{2})/);
+    if(iso){ return _to12(parseInt(iso[1]), parseInt(iso[2])); }
+    // "HH:MM:SS" or "HH:MM" 24-hour
+    var hm = t.match(/^(\d{1,2}):(\d{2})/);
+    if(hm){ return _to12(parseInt(hm[1]), parseInt(hm[2])); }
+    return t;
+  }
+  function _to12(h, m){
+    var period = h >= 12 ? 'PM' : 'AM';
+    var h12 = h % 12; if(h12 === 0) h12 = 12;
+    return h12 + ':' + String(m).padStart(2,'0') + ' ' + period;
+  }
+  // Normalize any date value to YYYY-MM-DD for reliable matching
   function _normDate(v){
     if(!v) return '';
     if(v instanceof Date){
@@ -3328,10 +3347,8 @@ function calDayClick(dateStr){
       return y+'-'+m+'-'+d;
     }
     var s = String(v).trim();
-    // Try YYYY-MM-DD prefix
     var iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     if(iso) return iso[1]+'-'+String(iso[2]).padStart(2,'0')+'-'+String(iso[3]).padStart(2,'0');
-    // Try M/D/YYYY or MM/DD/YYYY
     var us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if(us) return us[3]+'-'+String(us[1]).padStart(2,'0')+'-'+String(us[2]).padStart(2,'0');
     return s.slice(0,10);
@@ -3340,16 +3357,17 @@ function calDayClick(dateStr){
   var bookingsForDay = (DB.bookings||[]).filter(function(b){
     return _normDate(b.date || b.Date || b.bookDate) === dateStr;
   });
-  console.log('[calDayClick]', dateStr, '→ found', bookingsForDay.length, 'bookings in DB.bookings for this day. Sample:', bookingsForDay[0]);
 
   acks.forEach(function(a){
+    // Always normalize the ack's existing time to PHT display format
+    if(a.timeSlot) a.timeSlot = _fmtPHT(a.timeSlot);
+    if(a.time) a.time = _fmtPHT(a.time);
+
     if(!a.timeSlot && !a.time){
       var nameL = String(a.fbName||'').trim().toLowerCase();
-      // First try exact name match
       var match = bookingsForDay.find(function(b){
         return _bookingName(b).trim().toLowerCase() === nameL;
       });
-      // Fallback: partial match (first name overlap)
       if(!match && nameL){
         var firstName = nameL.split(/\s+/)[0];
         match = bookingsForDay.find(function(b){
@@ -3357,12 +3375,7 @@ function calDayClick(dateStr){
           return bn.indexOf(firstName) === 0 || firstName.indexOf(bn.split(/\s+/)[0]) === 0;
         });
       }
-      if(match){
-        a.timeSlot = _bookingTime(match);
-        console.log('[calDayClick] Matched', a.fbName, '→', a.timeSlot);
-      } else {
-        console.warn('[calDayClick] No booking match for', a.fbName, 'on', dateStr);
-      }
+      if(match){ a.timeSlot = _fmtPHT(_bookingTime(match)); }
     }
   });
 
