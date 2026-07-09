@@ -3318,16 +3318,21 @@ function calDayClick(dateStr){
   // Enrich acks with time slot from the Bookings sheet when missing.
   // Online bookings save the time to DB.bookings but the ack (created on confirm)
   // sometimes lacks it — cross-reference by name+date.
+  // Backend transforms sheet headers to snake_case: "FB Name" → fb_name, "Time Slot" → time_slot
+  function _bookingName(b){ return b.fbName || b.fb_name || b['FB Name'] || b.name || ''; }
+  function _bookingDate(b){ return String(b.date || b.Date || b.bookDate || '').slice(0,10); }
+  function _bookingTime(b){ return b.timeSlot || b.time_slot || b['Time Slot'] || b.time || ''; }
+
   var bookingsForDay = (DB.bookings||[]).filter(function(b){
-    return (b.date||b.Date||b.bookDate||'').slice(0,10) === dateStr;
+    return _bookingDate(b) === dateStr;
   });
   acks.forEach(function(a){
     if(!a.timeSlot && !a.time){
       var nameL = String(a.fbName||'').trim().toLowerCase();
       var match = bookingsForDay.find(function(b){
-        return String(b.fbName||b['FB Name']||b.name||'').trim().toLowerCase() === nameL;
+        return _bookingName(b).trim().toLowerCase() === nameL;
       });
-      if(match) a.timeSlot = match.timeSlot || match['Time Slot'] || match.time || '';
+      if(match) a.timeSlot = _bookingTime(match);
     }
   });
 
