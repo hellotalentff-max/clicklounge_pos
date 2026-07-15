@@ -4797,7 +4797,21 @@ function toggleAckSort(){
 function getHiddenAcks(){ try{ return JSON.parse(localStorage.getItem('cl_hidden_acks')||'[]'); }catch(e){ return []; } }
 function setHiddenAcks(arr){ localStorage.setItem('cl_hidden_acks', JSON.stringify(arr)); }
 function toggleHideAck(id){ const hidden=getHiddenAcks(); const idx=hidden.indexOf(id); if(idx>=0) hidden.splice(idx,1); else hidden.push(id); setHiddenAcks(hidden); renderAcks(); }
-function deleteAck(id){ if(!confirm('Permanently delete this acknowledgement receipt?')) return; DB.acknowledgements=DB.acknowledgements.filter(a=>a.id!==id); saveLocal(); push('deleteRow',{sheet:'Acknowledgements',id}); renderAcks(); notify('Receipt deleted','success'); }
+function deleteAck(id){
+  if(!confirm('Permanently delete this acknowledgement receipt?')) return;
+  // Grab the ack BEFORE removing so we can free its calendar slot
+  var ack = (DB.acknowledgements||[]).find(function(a){ return a.id===id; }) || {};
+  DB.acknowledgements=DB.acknowledgements.filter(a=>a.id!==id);
+  saveLocal();
+  push('deleteRow',{sheet:'Acknowledgements',id});
+  // Free the slot: delete matching calendar event + mark Bookings row cancelled
+  if(hasUrl() && ack.fbName && ack.bookDate){
+    gasCall('freeBookingSlot',{ fbName:ack.fbName, bookDate:dateOnly(ack.bookDate) })
+      .then(function(r){ if(r&&r.ok&&r.removed) notify('🗓 Freed '+r.removed+' calendar event(s) — slot is open again','success'); })
+      .catch(function(){});
+  }
+  renderAcks(); notify('Receipt deleted','success');
+}
 function renderAcks(){
   const el     = document.getElementById('ack-list');
   if(!el) return;
@@ -9033,12 +9047,14 @@ async function submitQuickBook(sendEmail){
     };
 
     if(hasUrl()){
-      var action = sendEmail ? 'confirmBooking' : 'saveAcknowledgement';
-      var r = await gasCall(action, {
+      // Both paths use confirmBooking so the Google Calendar event is ALWAYS created.
+      // skipEmail:true suppresses the confirmation email for the plain "Create Booking" button.
+      var r = await gasCall('confirmBooking', {
         fbName: name, email: email, service: service,
         bookDate: bookDate, timeSlot: timeSlot,
         mop: mop, downpayment: dp, totalPrice: price,
-        pax: pax, notes: notes
+        pax: pax, notes: notes,
+        skipEmail: !sendEmail
       });
       if(r.ok){
         ack.ackNum = r.ackNum || ackNum;
