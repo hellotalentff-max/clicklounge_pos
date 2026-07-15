@@ -3538,6 +3538,29 @@ async function confirmAck(id){
   await push('saveAcknowledgement', a);
   notify('Booking confirmed ✓','success');
   logActivity('Booking Confirmed', a.fbName+' — '+a.bookDate, 'success');
+
+  // 💄 HMU: offer to block the following slot for hair & makeup time
+  var slotNow = String(a.timeSlot||'').trim();
+  if(_hasHMU(a.service) && slotNow){
+    var hIdx = ALL_TIME_SLOTS.indexOf(slotNow);
+    var hNext = (hIdx > -1 && hIdx < ALL_TIME_SLOTS.length - 1) ? ALL_TIME_SLOTS[hIdx + 1] : null;
+    if(hNext && confirm('💄 HMU package confirmed at ' + slotNow + '.\n\nBlock the NEXT slot (' + hNext + ') too, so the session has extra time for hair & makeup?')){
+      if(hasUrl()){
+        gasCall('createBlock', {
+          date: dateOnly(a.bookDate),
+          timeSlot: hNext,
+          reason: 'HMU extension — ' + (a.fbName||'')
+        }).then(function(br){
+          if(br && br.ok) notify('🚫 ' + hNext + ' blocked for HMU prep', 'success');
+        }).catch(function(){});
+      }
+      var hBlocks = loadBlocked();
+      hBlocks.push({ id: uid(), date: dateOnly(a.bookDate), fullDay: false, slots: [hNext], reason: 'HMU extension — ' + (a.fbName||''), addedAt: todayStr() });
+      saveBlocked(hBlocks);
+      renderBlockedList();
+    }
+  }
+
   renderCalendar();
   renderAcks();
 }
@@ -9059,6 +9082,25 @@ async function submitQuickBook(sendEmail){
       if(r.ok){
         ack.ackNum = r.ackNum || ackNum;
         if(r.ack) Object.assign(ack, r.ack);
+      }
+
+      // 💄 HMU: offer to block the following slot for hair & makeup time
+      if(_hasHMU(service)){
+        var _hmuIdx = ALL_TIME_SLOTS.indexOf(timeSlot);
+        var _hmuNext = (_hmuIdx > -1 && _hmuIdx < ALL_TIME_SLOTS.length - 1) ? ALL_TIME_SLOTS[_hmuIdx + 1] : null;
+        if(_hmuNext && confirm('💄 HMU package booked at ' + timeSlot + '.\n\nBlock the NEXT slot (' + _hmuNext + ') too, so the session has extra time for hair & makeup?')){
+          gasCall('createBlock', {
+            date: bookDate,
+            timeSlot: _hmuNext,
+            reason: 'HMU extension — ' + name
+          }).then(function(br){
+            if(br && br.ok) notify('🚫 ' + _hmuNext + ' blocked for HMU prep', 'success');
+          }).catch(function(){});
+          // Also record locally so the blocked list shows it
+          var _blocks = loadBlocked();
+          _blocks.push({ id: uid(), date: bookDate, fullDay: false, slots: [_hmuNext], reason: 'HMU extension — ' + name, addedAt: todayStr() });
+          saveBlocked(_blocks);
+        }
       }
     }
 
