@@ -4827,9 +4827,10 @@ function deleteAck(id){
   DB.acknowledgements=DB.acknowledgements.filter(a=>a.id!==id);
   saveLocal();
   push('deleteRow',{sheet:'Acknowledgements',id});
-  // Free the slot: delete matching calendar event + mark Bookings row cancelled
+  // Free the slot: delete matching calendar event + mark Bookings row cancelled.
+  // Passing timeSlot means a client's OTHER bookings on the same day stay intact.
   if(hasUrl() && ack.fbName && ack.bookDate){
-    gasCall('freeBookingSlot',{ fbName:ack.fbName, bookDate:dateOnly(ack.bookDate) })
+    gasCall('freeBookingSlot',{ fbName:ack.fbName, bookDate:dateOnly(ack.bookDate), timeSlot: String(ack.timeSlot||'').trim() })
       .then(function(r){ if(r&&r.ok&&r.removed) notify('🗓 Freed '+r.removed+' calendar event(s) — slot is open again','success'); })
       .catch(function(){});
   }
@@ -9079,6 +9080,25 @@ async function submitQuickBook(sendEmail){
         pax: pax, notes: notes,
         skipEmail: !sendEmail
       });
+
+      // Race-condition: slot got taken between opening the form and submitting
+      if(r && r.code === 'SLOT_TAKEN'){
+        if(confirm('⚠ ' + timeSlot + ' on ' + bookDate + ' was just taken by another booking.\n\nBook it ANYWAY (double-book on purpose)?\n\nCancel to pick a different slot instead.')){
+          r = await gasCall('confirmBooking', {
+            fbName: name, email: email, service: service,
+            bookDate: bookDate, timeSlot: timeSlot,
+            mop: mop, downpayment: dp, totalPrice: price,
+            pax: pax, notes: notes,
+            skipEmail: !sendEmail,
+            force: true
+          });
+        } else {
+          btn.disabled = false; btn.textContent = '📅 Create Booking';
+          qbCheckSlots(); // refresh availability display
+          return;
+        }
+      }
+
       if(r.ok){
         ack.ackNum = r.ackNum || ackNum;
         if(r.ack) Object.assign(ack, r.ack);
