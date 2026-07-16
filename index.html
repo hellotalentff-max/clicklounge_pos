@@ -1950,6 +1950,19 @@ tr:hover td { background:var(--light); }
       <div id="fin-chart-mop" style="margin-top:20px;"></div>
     </div>
 
+    <!-- Month Profit Forecast -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
+        <div class="ct" style="margin:0;">🔮 Month Profit Forecast</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);">
+          HMU artist cost/session ₱
+          <input type="number" id="fc-hmu-cost" min="0" step="50" style="width:80px;padding:4px 8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;" onchange="saveHmuCost()">
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Actual results so far + confirmed upcoming bookings − HMU artist fees − projected remaining expenses</div>
+      <div id="fin-forecast"></div>
+    </div>
+
     <!-- Cashflow Breakdown -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
@@ -7931,7 +7944,7 @@ function _buildReports(prefixes, label){
   const ackMap={};
   acks.forEach(a=>{ ackMap[a.fbName]=a; });
 
-  renderFinancialReport(txns, allExp, allFT, eods, label);
+  renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes);
   renderClientsReport(regs, txnMap, ackMap, label, prefixes);
   renderPackagesReport(txns, regs, txnMap, ackMap, label);
   renderOperationsReport(txns, eods, allFT, gifts, label);
@@ -7942,12 +7955,102 @@ function _buildReports(prefixes, label){
 // ════════════════════════════════
 // FINANCIAL
 // ════════════════════════════════
-function renderFinancialReport(txns, allExp, allFT, eods, label){
+// HMU artist cost per session — used by the profit forecast (persisted locally)
+function getHmuCost(){
+  var v = parseFloat(localStorage.getItem('cls_hmu_cost'));
+  return (isNaN(v) || v < 0) ? 1000 : v; // default ₱1,000/session
+}
+function saveHmuCost(){
+  var v = parseFloat(document.getElementById('fc-hmu-cost').value) || 0;
+  localStorage.setItem('cls_hmu_cost', String(v));
+  notify('💄 HMU cost set to ₱' + fmt(v) + '/session — regenerate the report to refresh the forecast', 'success');
+}
+
+function renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes){
   const totalRev  = txns.reduce((s,t)=>s+(+t.total||0),0);
   const totalExp  = allExp.reduce((s,e)=>s+(+e.amt||0),0);
   const totalDisc = txns.reduce((s,t)=>s+(+t.discount||0),0);
   const netIncome = totalRev - totalExp;
   const avgInv    = txns.length ? Math.round(totalRev/txns.length) : 0;
+
+  // ══════════════════════════════════════════════
+  //  MONTH PROFIT FORECAST
+  //  actual net + upcoming confirmed bookings − HMU artist fees − projected expenses
+  // ══════════════════════════════════════════════
+  try {
+    var fcBox = document.getElementById('fin-forecast');
+    if (fcBox && prefixes && prefixes.length === 1) {
+      var monthPrefix = prefixes[0];               // e.g. "2026-07"
+      var today = todayStr();                      // PHT today
+      var isCurrentMonth = today.slice(0,7) === monthPrefix;
+      var isFutureMonth  = monthPrefix > today.slice(0,7);
+      var hmuCost = getHmuCost();
+      document.getElementById('fc-hmu-cost').value = hmuCost;
+
+      // Upcoming confirmed bookings in this month (bookDate >= today, not cancelled)
+      var upcoming = (acks||[]).filter(function(a){
+        var d = String(a.bookDate||'').slice(0,10);
+        var st = String(a.status||'').toLowerCase();
+        return d >= today && st !== 'cancelled';
+      });
+      var upcomingRev = upcoming.reduce(function(s,a){
+        return s + (parseFloat(a.totalPrice) || parseFloat(a.downpayment) || 0);
+      }, 0);
+
+      // HMU sessions this month — past ones already paid the artist (cost is in
+      // expenses if recorded); we forecast the fee for UPCOMING HMU sessions.
+      var hmuAll = (acks||[]).filter(function(a){
+        return _hasHMU(a.service) && String(a.status||'').toLowerCase() !== 'cancelled';
+      });
+      var hmuUpcoming = upcoming.filter(function(a){ return _hasHMU(a.service); });
+      var hmuFees = hmuUpcoming.length * hmuCost;
+
+      // Projected remaining operating expenses (run-rate) — current month only
+      var projExp = 0, daysElapsed = 0, daysRemaining = 0;
+      if (isCurrentMonth) {
+        var yr = parseInt(monthPrefix.slice(0,4)), mo = parseInt(monthPrefix.slice(5,7));
+        var daysInMonth = new Date(yr, mo, 0).getDate();
+        daysElapsed = parseInt(today.slice(8,10));
+        daysRemaining = Math.max(0, daysInMonth - daysElapsed);
+        var dailyExpRate = daysElapsed > 0 ? totalExp / daysElapsed : 0;
+        projExp = Math.round(dailyExpRate * daysRemaining);
+      }
+
+      var forecast = netIncome + upcomingRev - hmuFees - projExp;
+      var fMax = Math.max(Math.abs(netIncome), upcomingRev, hmuFees, projExp, Math.abs(forecast), 1);
+
+      function fcRow(lbl, val, color, sign){
+        var pct = Math.min(100, Math.round(Math.abs(val)/fMax*100));
+        return '<div class="chart-bar-row">'+
+          '<div class="chart-bar-label" style="width:170px;">'+lbl+'</div>'+
+          '<div class="chart-bar-track"><div class="chart-bar-fill" style="width:'+pct+'%;background:'+color+';"></div></div>'+
+          '<div class="chart-bar-val" style="color:'+color+';">'+(sign||'')+'₱'+fmt(Math.abs(val))+'</div>'+
+        '</div>';
+      }
+
+      var html = '';
+      html += fcRow('Net income so far', netIncome, netIncome>=0?'var(--teal)':'var(--danger)', netIncome>=0?'':'−');
+      html += fcRow('+ Upcoming bookings ('+upcoming.length+')', upcomingRev, 'var(--gold)', '+');
+      if (hmuUpcoming.length) html += fcRow('− HMU artist fees ('+hmuUpcoming.length+' × ₱'+fmt(hmuCost)+')', hmuFees, 'var(--danger)', '−');
+      if (projExp > 0) html += fcRow('− Projected expenses ('+daysRemaining+' days left)', projExp, 'var(--danger)', '−');
+      html += '<div style="border-top:2px solid var(--border);margin:8px 0 4px;"></div>';
+      html += fcRow('🔮 FORECASTED MONTH PROFIT', forecast, forecast>=0?'var(--success)':'var(--danger)', forecast>=0?'':'−');
+
+      // Insight pills
+      var fcMargin = (totalRev + upcomingRev) > 0 ? Math.round(forecast/(totalRev+upcomingRev)*100) : 0;
+      html += '<div style="margin-top:12px;">'+
+        '<span class="insight-pill">📈 Forecast margin: '+fcMargin+'%</span>'+
+        '<span class="insight-pill">💄 HMU sessions this month: '+hmuAll.length+' ('+hmuUpcoming.length+' upcoming)</span>'+
+        (isFutureMonth ? '<span class="insight-pill">📅 Future month — based on confirmed bookings only</span>' : '')+
+        (!isCurrentMonth && !isFutureMonth ? '<span class="insight-pill">📗 Past month — forecast equals actual results</span>' : '')+
+        (forecast<0 ? '<span class="insight-pill" style="background:rgba(192,84,74,0.08);border-color:rgba(192,84,74,0.2);color:var(--danger);">⚠ Forecast is negative — review expenses</span>' : '')+
+      '</div>';
+
+      fcBox.innerHTML = html;
+    } else if (fcBox) {
+      fcBox.innerHTML = '<div class="tm">Forecast is available when a single month is selected.</div>';
+    }
+  } catch(fcErr) { console.error('forecast:', fcErr); }
 
   // Stats
   document.getElementById('fin-total-rev').innerHTML = '<div class="rs-label">Total Revenue</div><div class="rs-val rs-teal">₱'+fmt(totalRev)+'</div>';
