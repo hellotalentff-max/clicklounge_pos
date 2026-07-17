@@ -1681,7 +1681,7 @@ tr:hover td { background:var(--light); }
           <input type="text" id="exp-notes-page" placeholder="Additional details (optional)">
         </div>
         <div class="fe">
-          <button class="btn btn-gold" style="min-width:140px;padding:10px;" onclick="saveExpensePage()">💾 Save Expense</button>
+          <button class="btn btn-gold" id="exp-save-btn" style="min-width:140px;padding:10px;" onclick="saveExpensePage()">💾 Save Expense</button>
         </div>
       </div>
     </div>
@@ -6233,7 +6233,19 @@ function saveExpensePage(){
   var category = document.getElementById('exp-category')?.value||'Operations';
   var notes    = (document.getElementById('exp-notes-page')?.value||'').trim();
   if(!desc){ notify('Enter a description','error'); return; }
-  if(!amt)  { notify('Enter an amount','error'); return; }
+  // LOOPHOLE FIX: negative or zero amounts are rejected — a negative "expense"
+  // would inflate net income and could be used to offset a pocketed amount.
+  if(!amt || amt <= 0){ notify('Amount must be greater than zero','error'); return; }
+  if(amt > 1000000){ notify('Amount looks too large — double-check','error'); return; }
+
+  // LOOPHOLE FIX: double-click guard — prevent duplicate expense entries
+  var saveBtn = document.getElementById('exp-save-btn');
+  if(saveBtn){
+    if(saveBtn.disabled) return; // already saving
+    saveBtn.disabled = true;
+    setTimeout(function(){ saveBtn.disabled = false; }, 1500);
+  }
+
   var exp = {id:uid(), date:todayStr(), desc:desc, amt:amt, mop:mop, category:category, notes:notes};
   if(!DB.expenses) DB.expenses=[];
   DB.expenses.push(exp);
@@ -6331,11 +6343,28 @@ function renderExpensesPage(){
 }
 
 function deleteExpense(id){
-  if(!confirm('Delete this expense?')) return;
+  // LOOPHOLE FIX: deleting expenses is admin-only — staff could otherwise
+  // hide a cash expense after pocketing the money (EOD would still balance
+  // on the day, and the record would quietly vanish).
+  if(!IS_ADMIN){
+    var pin = prompt('🔒 Deleting an expense requires the Admin PIN:');
+    if(pin === null) return;
+    if(String(pin).trim() !== String((DB.settings&&DB.settings.adminPin)||'5678').trim()){
+      notify('Wrong admin PIN — expense NOT deleted','error');
+      logActivity('Expense Delete BLOCKED', 'Failed PIN attempt by '+(CURR_USER||'unknown'), 'error');
+      return;
+    }
+  }
+  if(!confirm('Delete this expense? This also removes it from Google Sheets.')) return;
+  var exp = (DB.expenses||[]).find(function(e){ return e.id===id; }) || {};
   DB.expenses = (DB.expenses||[]).filter(function(e){ return e.id!==id; });
   saveLocal();
+  // LOOPHOLE FIX: also delete from the backend sheet — previously the row
+  // stayed in Google Sheets and re-appeared after every sync.
+  push('deleteRow', {sheet:'Expenses', id:id});
+  logActivity('Expense Deleted', (exp.desc||'')+' — ₱'+fmt(+exp.amt||0)+' (by '+(CURR_USER||'Admin')+')', 'error');
   renderExpensesPage();
-  notify('Expense deleted','info');
+  notify('Expense deleted (synced)','info');
 }
 
 // ================================================================
