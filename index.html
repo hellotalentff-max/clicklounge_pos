@@ -3460,6 +3460,7 @@ function calDayClick(dateStr){
       '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Status: '+(a.status||'Pending')+'</div>'+
       '<div style="display:flex;gap:6px;margin-top:8px;">'+
         (isPending ? '<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)">✓ Confirm</button>' : '')+
+        '<button class="btn btn-sm" style="background:var(--gold);color:#fff;" data-aid="'+a.id+'" onclick="calRescheduleAck(this)">📆 Reschedule</button>'+
         '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)">🖨 Print</button>'+
         '<button class="btn btn-sm btn-danger" data-aid="'+a.id+'" onclick="calDeleteAck(this)">✕ Delete</button>'+
       '</div>'+
@@ -3472,6 +3473,76 @@ function calDayClick(dateStr){
 function calConfirmAck(btn){ var id=btn.dataset.aid; confirmAck(id); closeModal(); }
 function calPrintAck(btn)  { var id=btn.dataset.aid; printAck(id); }
 function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal(); }
+
+// ── Reschedule a booking from the calendar (admin transfer, no client fees) ──
+function calRescheduleAck(btn){
+  var id = btn.dataset.aid;
+  var a = (DB.acknowledgements||[]).find(function(x){ return x.id===id; });
+  if(!a){ notify('Booking not found','error'); return; }
+  var tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10);
+  openModal(
+    '<h3 style="margin-bottom:4px;">📆 Reschedule Booking</h3>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;"><strong>'+escHtml(a.fbName||'')+'</strong> · '+escHtml(a.service||'')+'<br>Currently: '+escHtml(dateOnly(a.bookDate))+' · '+escHtml(a.timeSlot||'—')+'</div>'+
+    '<div class="frow c2" style="margin-bottom:12px;">'+
+      '<div class="field" style="margin:0;"><label>New Date</label>'+
+        '<input type="date" id="rs-date" class="sinput" min="'+tomorrow+'" style="width:100%;"></div>'+
+      '<div class="field" style="margin:0;"><label>New Time Slot</label>'+
+        '<select id="rs-slot" class="sinput" style="width:100%;">'+
+          ALL_TIME_SLOTS.map(function(s){ return '<option>'+s+'</option>'; }).join('')+
+        '</select></div>'+
+    '</div>'+
+    '<div id="rs-status" style="font-size:11px;color:var(--muted);margin-bottom:10px;display:none;"></div>'+
+    '<div class="fe" style="gap:8px;">'+
+      '<button class="btn btn-outline" onclick="calDayClick(\''+dateOnly(a.bookDate)+'\')">← Back</button>'+
+      '<button class="btn btn-gold" id="rs-submit" onclick="submitReschedule(\''+id+'\')">📆 Transfer Booking</button>'+
+    '</div>'
+  );
+}
+
+async function submitReschedule(id){
+  var a = (DB.acknowledgements||[]).find(function(x){ return x.id===id; });
+  if(!a) return;
+  var newDate = document.getElementById('rs-date').value;
+  var newSlot = document.getElementById('rs-slot').value;
+  if(!newDate){ notify('Pick a new date','error'); return; }
+  var oldDate = dateOnly(a.bookDate), oldSlot = a.timeSlot||'';
+  if(newDate===oldDate && newSlot===oldSlot){ notify('Same date & slot — nothing to change','error'); return; }
+
+  var btn = document.getElementById('rs-submit');
+  btn.disabled = true; btn.textContent = '⏳ Transferring…';
+  var st = document.getElementById('rs-status');
+  st.style.display=''; st.textContent='Checking availability & moving calendar event…';
+
+  try{
+    var r = hasUrl() ? await gasCall('rescheduleBooking', {
+      ackNum: a.ackNum||'', fbName: a.fbName||'', email: a.email||'',
+      service: a.service||'', currentDate: oldDate,
+      newDate: newDate, newSlot: newSlot, adminOverride: true
+    }) : {ok:true};
+
+    if(r && r.code==='SLOT_TAKEN'){
+      st.textContent='⚠ '+(r.error||'That slot is taken.');
+      st.style.color='var(--danger)';
+      btn.disabled=false; btn.textContent='📆 Transfer Booking';
+      return;
+    }
+    if(!r || !r.ok) throw new Error((r&&r.error)||'Reschedule failed');
+
+    // Update local ack
+    a.bookDate = newDate; a.timeSlot = newSlot;
+    saveLocal();
+    push('saveAcknowledgement', a);
+    logActivity('Booking Rescheduled', (a.fbName||'')+' — '+oldDate+' '+oldSlot+' → '+newDate+' '+newSlot, 'info');
+    notify('📆 '+(a.fbName||'Booking')+' moved to '+newDate+' · '+newSlot,'success');
+    closeModal();
+    renderCalendar();
+    renderAcks();
+  }catch(e){
+    st.textContent='❌ '+e.message;
+    st.style.color='var(--danger)';
+    btn.disabled=false; btn.textContent='📆 Transfer Booking';
+  }
+}
 
 function calCancelAck(btn){
   var id = btn.dataset.aid;
