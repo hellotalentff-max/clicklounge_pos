@@ -2335,7 +2335,7 @@ tr:hover td { background:var(--light); }
       <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Sat</div>
       <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:rgba(232,239,238,0.3);text-transform:uppercase;letter-spacing:1px;">Sun</div>
     </div>
-    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--light2);grid-auto-rows:90px;"></div>
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--light2);grid-auto-rows:minmax(90px,auto);"></div>
   </div>
 
   <!-- Pending bookings list -->
@@ -3143,6 +3143,15 @@ function renderCalendar(){
            ';border-radius:3px;padding:1px 4px;margin-top:2px;overflow:hidden;'+
            'text-overflow:ellipsis;white-space:nowrap;">'+escHtml(name)+'</div>';
   }
+  // Client name only (no package) — trims to a compact display
+  function firstNameLast(full){
+    return String(full||'').trim();
+  }
+  // Minutes-since-midnight from a calendar event's start (for time sorting)
+  function _evSlotMin(ev){
+    var m = String(ev.start||'').match(/T(\d{2}):(\d{2})/);
+    return m ? parseInt(m[1])*60 + parseInt(m[2]) : 9999;
+  }
 
   for(var d = 1; d <= daysInMo; d++){
     var dateStr  = yr+'-'+String(mo+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
@@ -3208,21 +3217,34 @@ function renderCalendar(){
     var allCount = dayAcks.length + evPend.length + evConf.length;
     var chips = '';
     if(isBlocked) chips += '<div style="font-size:9px;color:#666;background:#ddd;border-radius:2px;padding:1px 3px;">🚫</div>';
-    // Show ack receipts
-    pend.slice(0,2).forEach(function(a){ chips += bookingChip(a.fbName,'#fff3cd','#ffc107'); });
-    conf.slice(0,2).forEach(function(a){ chips += bookingChip(a.fbName,'#d4edda','#51897d'); });
-    canc.slice(0,1).forEach(function(a){ chips += bookingChip(a.fbName,'#f8d7da','#c0544a'); });
-    // Show Google Cal events not already in acks
-    evPend.slice(0,2).forEach(function(ev){
-      chips += bookingChip(_evClientName(ev),'#fff3cd','#ffc107');
-    });
-    evConf.slice(0,1).forEach(function(ev){
-      chips += bookingChip(_evClientName(ev),'#d4edda','#51897d');
-    });
-    if(allCount > 4) chips += '<div style="font-size:9px;color:var(--muted);margin-top:2px;">+'+(allCount-4)+' more</div>';
 
-    html += '<div style="height:100%;box-sizing:border-box;background:'+bg+';border:1px solid var(--light2);'+
-            'padding:5px;cursor:pointer;overflow:hidden;" onclick="calDayClick(\''+dateStr+'\')">'+
+    // Build ONE unified list: acks + non-receipted calendar events,
+    // names only, sorted by their time slot — show ALL (no "+N more")
+    var _slotMin = function(t){
+      var m = String(t||'').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if(!m) return 9999;
+      var h = parseInt(m[1]); if(/PM/i.test(m[3]) && h<12) h+=12; if(/AM/i.test(m[3]) && h===12) h=0;
+      return h*60 + parseInt(m[2]);
+    };
+    var dayItems = [];
+    dayAcks.forEach(function(a){
+      var s = String(a.status||'').toLowerCase();
+      var style = s.includes('cancel') ? ['#f8d7da','#c0544a']
+                : s.includes('confirm') ? ['#d4edda','#51897d']
+                : ['#fff3cd','#ffc107'];
+      dayItems.push({ name: firstNameLast(a.fbName), t: _slotMin(a.timeSlot||a.time), bg: style[0], bd: style[1] });
+    });
+    evPend.forEach(function(ev){
+      dayItems.push({ name: firstNameLast(_evClientName(ev)), t: _evSlotMin(ev), bg:'#fff3cd', bd:'#ffc107' });
+    });
+    evConf.forEach(function(ev){
+      dayItems.push({ name: firstNameLast(_evClientName(ev)), t: _evSlotMin(ev), bg:'#d4edda', bd:'#51897d' });
+    });
+    dayItems.sort(function(a,b){ return a.t - b.t; });
+    dayItems.forEach(function(it){ chips += bookingChip(it.name, it.bg, it.bd); });
+
+    html += '<div style="min-height:90px;height:100%;box-sizing:border-box;background:'+bg+';border:1px solid var(--light2);'+
+            'padding:5px;cursor:pointer;" onclick="calDayClick(\''+dateStr+'\')">'+
             '<div style="font-size:11px;font-weight:'+(isToday?'700':'500')+';color:'+
             (isToday?'var(--teal)':isRest?'var(--danger)':'var(--text)')+';margin-bottom:3px;">'+d+'</div>'+
             chips+'</div>';
@@ -3315,7 +3337,13 @@ function renderCalendarLists(acks, yr, mo){
   }
 
   if(confEl){
-    const confHtml = confirmed.map(function(a){ return ackListRow(a,'confirmed'); }).join('');
+    // Most recently created/booked on top
+    const confSorted = confirmed.slice().sort(function(a,b){
+      // Prefer created date (a.date) desc, fall back to bookDate desc
+      var ad = String(a.date||a.bookDate||''), bd = String(b.date||b.bookDate||'');
+      return bd.localeCompare(ad);
+    });
+    const confHtml = confSorted.map(function(a){ return ackListRow(a,'confirmed'); }).join('');
     confEl.innerHTML = confHtml || '<div class="tm">No confirmed bookings this month.</div>';
   }
 }
