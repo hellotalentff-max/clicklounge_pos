@@ -1694,8 +1694,14 @@ tr:hover td { background:var(--light); }
         <div id="exp-page-list"><div class="tm">No expenses recorded today.</div></div>
       </div>
       <div class="card">
-        <div class="ct">This Month</div>
-        <div id="exp-page-month"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <div class="ct" style="margin:0;">📊 Expense Report</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="exp-rep-month" style="padding:5px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;" onchange="renderExpenseReport()"></select>
+            <button class="btn btn-sm btn-outline" onclick="exportExpenseCSV()">⬇ CSV</button>
+          </div>
+        </div>
+        <div id="exp-report"></div>
       </div>
     </div>
   </div>
@@ -3155,26 +3161,51 @@ function renderCalendar(){
     var dayEvents = calEvents.filter(function(ev){
       return String(ev.start||'').slice(0,10) === dateStr;
     });
+
+    // Extract the client name from "[CONFIRMED] Angel Johnson — Package" style titles
+    function _evClientName(ev){
+      var t = String(ev.title||'').replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+      // Name is BEFORE the em/en dash; package after
+      return t.split(/\s+[—–-]\s+/)[0].trim();
+    }
+    // Is there already an ack receipt for this client on this date?
+    function _evReceipted(ev){
+      var clientName = _evClientName(ev).toLowerCase();
+      if(!clientName) return false;
+      return dayAcks.some(function(a){
+        var ackName = String(a.fbName||'').trim().toLowerCase();
+        if(!ackName) return false;
+        return ackName === clientName ||
+               ackName.includes(clientName.split(' ')[0]) && clientName.includes(ackName.split(' ')[0]);
+      });
+    }
+
+    // Dedupe events among themselves too (same client shown once even if
+    // multiple duplicate events exist on the Google Calendar)
+    var _seenEvNames = {};
+    function _evUnique(ev){
+      var key = _evClientName(ev).toLowerCase();
+      if(!key) return true;
+      if(_seenEvNames[key]) return false;
+      _seenEvNames[key] = true;
+      return true;
+    }
+
     var evPend = dayEvents.filter(function(ev){
       if(ev.status !== 'pending') return false;
-      // Exclude if an ack receipt already exists for this date with matching name
-      var evTitle    = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
-      var nameMatch  = evTitle.match(/—\s*(.+?)\s*[\(\|]/);
-      var clientName = (nameMatch ? nameMatch[1] : evTitle).trim().toLowerCase();
-      var receipted  = dayAcks.some(function(a){
-        var ackName = String(a.fbName||'').toLowerCase();
-        return ackName.includes(clientName.split(' ')[0]) || clientName.includes(ackName.split(' ')[0]);
-      });
-      return !receipted;
+      return !_evReceipted(ev) && _evUnique(ev);
     });
-    var evConf = dayEvents.filter(function(ev){ return ev.status==='confirmed'; });
+    var evConf = dayEvents.filter(function(ev){
+      if(ev.status !== 'confirmed') return false;
+      return !_evReceipted(ev) && _evUnique(ev);
+    });
 
     var bg = 'var(--white)';
     if(isRest)    bg = 'rgba(192,84,74,0.04)';
     if(isBlocked) bg = '#e8e8e8';
     if(isToday)   bg = 'rgba(81,137,125,0.1)';
 
-    var allCount = dayAcks.length + dayEvents.length;
+    var allCount = dayAcks.length + evPend.length + evConf.length;
     var chips = '';
     if(isBlocked) chips += '<div style="font-size:9px;color:#666;background:#ddd;border-radius:2px;padding:1px 3px;">🚫</div>';
     // Show ack receipts
@@ -3183,12 +3214,10 @@ function renderCalendar(){
     canc.slice(0,1).forEach(function(a){ chips += bookingChip(a.fbName,'#f8d7da','#c0544a'); });
     // Show Google Cal events not already in acks
     evPend.slice(0,2).forEach(function(ev){
-      var name = ev.title.replace(/\[PENDING\]/g,'').replace(/\[CONFIRMED\]/g,'').trim();
-      chips += bookingChip(name,'#fff3cd','#ffc107');
+      chips += bookingChip(_evClientName(ev),'#fff3cd','#ffc107');
     });
     evConf.slice(0,1).forEach(function(ev){
-      var name = ev.title.replace(/\[PENDING\]/g,'').replace(/\[CONFIRMED\]/g,'').trim();
-      chips += bookingChip(name,'#d4edda','#51897d');
+      chips += bookingChip(_evClientName(ev),'#d4edda','#51897d');
     });
     if(allCount > 4) chips += '<div style="font-size:9px;color:var(--muted);margin-top:2px;">+'+(allCount-4)+' more</div>';
 
@@ -6306,40 +6335,146 @@ function renderExpensesPage(){
     }
   }
 
-  // ── This month breakdown by category ──
-  var monthExp = allExp.filter(function(e){ return String(e.date||'').startsWith(month); });
-  var monthEl  = document.getElementById('exp-page-month');
-  if(monthEl){
-    if(!monthExp.length){
-      monthEl.innerHTML='<div class="tm">No expenses this month yet.</div>';
-    } else {
-      var monthTotal = monthExp.reduce(function(s,e){ return s+(+e.amt||0); },0);
+  // ── Expense Report (month selector + full breakdown) ──
+  _expPopulateMonths();
+  renderExpenseReport();
+}
 
-      // Group by category
-      var byCat = {};
-      monthExp.forEach(function(e){
-        var cat = e.category||'Operations';
-        if(!byCat[cat]) byCat[cat]=0;
-        byCat[cat]+=(+e.amt||0);
-      });
-      var cats = Object.entries(byCat).sort(function(a,b){ return b[1]-a[1]; });
-      var maxAmt = cats[0]?cats[0][1]:1;
+// Populate month dropdown from expense data (newest first, always includes current month)
+function _expPopulateMonths(){
+  var sel = document.getElementById('exp-rep-month');
+  if(!sel) return;
+  var cur = sel.value;
+  var months = {};
+  months[todayStr().slice(0,7)] = true;
+  (DB.expenses||[]).forEach(function(e){
+    var m = String(e.date||'').slice(0,7);
+    if(/^\d{4}-\d{2}$/.test(m)) months[m] = true;
+  });
+  var keys = Object.keys(months).sort().reverse();
+  sel.innerHTML = keys.map(function(m){
+    var d = new Date(m+'-01T00:00:00');
+    var lbl = d.toLocaleDateString('en-PH',{month:'long',year:'numeric'});
+    return '<option value="'+m+'">'+lbl+'</option>';
+  }).join('');
+  if(cur && keys.indexOf(cur)>-1) sel.value = cur;
+}
 
-      var html = '<div style="margin-bottom:12px;">';
-      cats.forEach(function(pair){
-        var cat=pair[0], amt=pair[1];
-        var pct = Math.round(amt/maxAmt*100);
-        html += '<div class="chart-bar-row">'+
-          '<div class="chart-bar-label" style="min-width:110px;font-size:12px;">'+escHtml(cat)+'</div>'+
-          '<div class="chart-bar-track"><div class="chart-bar-fill" style="width:'+pct+'%;background:var(--danger);"></div></div>'+
-          '<div class="chart-bar-val" style="color:var(--danger);">₱'+fmt(amt)+'</div>'+
-        '</div>';
-      });
-      html += '</div>';
-      html += '<div style="font-size:12px;font-weight:700;color:var(--danger);border-top:2px solid var(--border);padding-top:8px;">Month Total: ₱'+fmt(monthTotal)+'</div>';
-      monthEl.innerHTML = html;
-    }
+function renderExpenseReport(){
+  var box = document.getElementById('exp-report');
+  var sel = document.getElementById('exp-rep-month');
+  if(!box || !sel) return;
+  var month = sel.value || todayStr().slice(0,7);
+
+  var monthExp = (DB.expenses||[]).filter(function(e){ return String(e.date||'').startsWith(month); })
+    .sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+
+  if(!monthExp.length){
+    box.innerHTML = '<div class="tm">No expenses recorded for this month.</div>';
+    return;
   }
+
+  var total = monthExp.reduce(function(s,e){ return s+(+e.amt||0); },0);
+
+  // Days elapsed in this month (for avg/day)
+  var isCurrent = month === todayStr().slice(0,7);
+  var daysElapsed = isCurrent ? parseInt(todayStr().slice(8,10))
+    : new Date(parseInt(month.slice(0,4)), parseInt(month.slice(5,7)), 0).getDate();
+  var avgDay = daysElapsed > 0 ? Math.round(total/daysElapsed) : 0;
+
+  // Group by category + MOP
+  var byCat = {}, byMop = {};
+  monthExp.forEach(function(e){
+    var cat = e.category||'Operations';
+    var mop = e.mop||'Cash';
+    byCat[cat] = (byCat[cat]||0) + (+e.amt||0);
+    byMop[mop] = (byMop[mop]||0) + (+e.amt||0);
+  });
+  var cats = Object.entries(byCat).sort(function(a,b){ return b[1]-a[1]; });
+  var mops = Object.entries(byMop).sort(function(a,b){ return b[1]-a[1]; });
+  var maxCat = cats[0] ? cats[0][1] : 1;
+
+  // ── Summary stats row ──
+  var html = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;">'+
+    _expStat('Total', '₱'+fmt(total), 'var(--danger)')+
+    _expStat('Entries', monthExp.length, 'var(--slate)')+
+    _expStat('Avg / day', '₱'+fmt(avgDay), 'var(--slate)')+
+    _expStat('Top category', cats[0][0], 'var(--gold)')+
+  '</div>';
+
+  // ── Category breakdown bars ──
+  html += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin-bottom:6px;">By Category</div>';
+  cats.forEach(function(pair){
+    var pct = Math.round(pair[1]/maxCat*100);
+    var share = Math.round(pair[1]/total*100);
+    html += '<div class="chart-bar-row">'+
+      '<div class="chart-bar-label" style="min-width:100px;font-size:11px;">'+escHtml(pair[0])+'</div>'+
+      '<div class="chart-bar-track"><div class="chart-bar-fill" style="width:'+pct+'%;background:var(--danger);"></div></div>'+
+      '<div class="chart-bar-val" style="color:var(--danger);">₱'+fmt(pair[1])+' <span style="color:var(--muted);font-weight:400;">('+share+'%)</span></div>'+
+    '</div>';
+  });
+
+  // ── MOP split pills ──
+  html += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:12px 0 6px;">By Payment Mode</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">';
+  mops.forEach(function(pair){
+    html += '<span style="font-size:11px;background:var(--light);border:1px solid var(--border);border-radius:10px;padding:4px 10px;">'+escHtml(pair[0])+' <strong style="color:var(--danger);">₱'+fmt(pair[1])+'</strong></span>';
+  });
+  html += '</div>';
+
+  // ── Itemized table ──
+  html += '<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin-bottom:6px;">All Entries</div>';
+  html += '<div style="overflow-x:auto;max-height:320px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">';
+  html += '<thead><tr style="background:var(--slate);color:var(--cream);position:sticky;top:0;">'+
+    '<th style="padding:5px 7px;text-align:left;">Date</th>'+
+    '<th style="padding:5px 7px;text-align:left;">Description</th>'+
+    '<th style="padding:5px 7px;text-align:left;">Category</th>'+
+    '<th style="padding:5px 7px;">MOP</th>'+
+    '<th style="padding:5px 7px;text-align:left;">Staff</th>'+
+    '<th style="padding:5px 7px;text-align:right;">Amount</th>'+
+    '</tr></thead><tbody>';
+  monthExp.forEach(function(e,i){
+    html += '<tr style="background:'+(i%2===0?'var(--white)':'var(--light)')+';">'+
+      '<td style="padding:5px 7px;white-space:nowrap;">'+String(e.date||'').slice(5,10)+'</td>'+
+      '<td style="padding:5px 7px;">'+escHtml(e.desc||'')+'</td>'+
+      '<td style="padding:5px 7px;"><span style="font-size:9px;background:var(--light2);border-radius:8px;padding:1px 6px;">'+escHtml(e.category||'Operations')+'</span></td>'+
+      '<td style="padding:5px 7px;font-size:10px;color:var(--muted);">'+escHtml(e.mop||'—')+'</td>'+
+      '<td style="padding:5px 7px;font-size:10px;color:var(--muted);">'+escHtml(e.staff||'—')+'</td>'+
+      '<td style="padding:5px 7px;text-align:right;color:var(--danger);font-weight:600;white-space:nowrap;">₱'+fmt(+e.amt)+'</td>'+
+    '</tr>';
+  });
+  html += '<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--border);">'+
+    '<td colspan="5" style="padding:6px 7px;">Month Total</td>'+
+    '<td style="padding:6px 7px;text-align:right;color:var(--danger);">₱'+fmt(total)+'</td></tr>';
+  html += '</tbody></table></div>';
+
+  box.innerHTML = html;
+}
+
+function _expStat(lbl, val, color){
+  return '<div style="background:var(--light);border-radius:8px;padding:8px 10px;text-align:center;">'+
+    '<div style="font-size:15px;font-weight:800;color:'+color+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+val+'</div>'+
+    '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:2px;">'+lbl+'</div>'+
+  '</div>';
+}
+
+function exportExpenseCSV(){
+  var sel = document.getElementById('exp-rep-month');
+  var month = (sel && sel.value) || todayStr().slice(0,7);
+  var rows = (DB.expenses||[]).filter(function(e){ return String(e.date||'').startsWith(month); })
+    .sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
+  if(!rows.length){ notify('No expenses to export for this month','error'); return; }
+  var esc = function(v){ v = String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+  var csv = 'Date,Description,Category,MOP,Staff,Notes,Amount\n' + rows.map(function(e){
+    return [e.date, e.desc, e.category||'Operations', e.mop||'', e.staff||'', e.notes||'', (+e.amt||0)].map(esc).join(',');
+  }).join('\n');
+  var blob = new Blob([csv], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'CLS-Expenses-'+month+'.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  notify('⬇ Exported '+rows.length+' expenses','success');
 }
 
 function deleteExpense(id){
