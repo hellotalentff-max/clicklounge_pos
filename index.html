@@ -3171,11 +3171,25 @@ function renderCalendar(){
       return String(ev.start||'').slice(0,10) === dateStr;
     });
 
-    // Extract the client name from "[CONFIRMED] Angel Johnson — Package" style titles
+    // Extract the client name from event titles. TWO formats exist:
+    //   Online bookings:  "[PENDING] Package — Name (2 pax)"   (package first)
+    //   Quick Book:       "[CONFIRMED] Name — Package"          (name first)
+    var _PKG_WORDS = /(styleshot|selfie|snapshot|tribe|crowd|crew|frenzy|party|click capture|candid|luxe|glowing|vip|radiant|photographer|rental|booth|event|bridal|cap and gown|kids|twogether|glam|mode|promo|session|package|mom)/i;
     function _evClientName(ev){
-      var t = String(ev.title||'').replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
-      // Name is BEFORE the em/en dash; package after
-      return t.split(/\s+[—–-]\s+/)[0].trim();
+      var raw = String(ev.title||'');
+      var isPending = /\[PENDING\]/i.test(raw);
+      var t = raw.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
+      var parts = t.split(/\s+[—–-]\s+/);
+      if(parts.length < 2){
+        return t.replace(/\s*\(.*?\)\s*$/,'').trim();
+      }
+      var p1 = parts[0].replace(/\s*\(.*?\)\s*$/,'').trim();
+      var p2 = parts.slice(1).join(' — ').replace(/\s*\(.*?\)\s*$/,'').trim();
+      var p1IsPkg = _PKG_WORDS.test(p1), p2IsPkg = _PKG_WORDS.test(p2);
+      if(p1IsPkg && !p2IsPkg) return p2;   // "Package — Name"
+      if(p2IsPkg && !p1IsPkg) return p1;   // "Name — Package"
+      // Ambiguous → decide by tag: PENDING = online format (name after dash)
+      return isPending ? p2 : p1;
     }
     // Is there already an ack receipt for this client on this date?
     function _evReceipted(ev){
