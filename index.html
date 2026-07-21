@@ -3534,12 +3534,14 @@ function createHmuPrepTask(a){
 
     var task = {
       id: uid(),
+      createdAt: todayStr(),
       created: todayStr(),
       type: 'HMU Prep',
       title: '💄 HMU Prep — ' + client + ' (' + (a.timeSlot||'') + ')',
       client: client,
       clientEmail: a.email||'',
       due: due,
+      dueDate: due,
       notes:
         '📌 CLIENT PEG / REFERENCE:\n' +
         '(paste peg links or describe the look the client wants)\n\n' +
@@ -3554,10 +3556,12 @@ function createHmuPrepTask(a){
       stage: 'new',
       done: '',
       completed: '',
+      completedAt: '',
       archived: '',
       priority: 'high',
       assignedTo: '',
-      updated: todayStr()
+      updated: todayStr(),
+      updatedAt: todayStr()
     };
     if(!DB.tasks) DB.tasks = [];
     DB.tasks.push(task);
