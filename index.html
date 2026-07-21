@@ -2310,6 +2310,7 @@ tr:hover td { background:var(--light); }
       <button class="btn btn-teal btn-sm" onclick="calNavToday()">Today</button>
       <button class="btn btn-outline btn-sm" onclick="calNav(1)">Next →</button>
       <button class="btn btn-danger btn-sm" onclick="openBlockDialog()">🚫 Block Date/Time</button>
+      <button class="btn btn-outline btn-sm" onclick="if(confirm('Create session prep tasks for all existing photographer bookings that don\'t have one yet?')) backfillPhotographerTasks();" title="Create prep tasks for past bookings">🔄 Sync Session Tasks</button>
       <button class="btn btn-gold btn-sm" onclick="openQuickBook()">➕ New Booking</button>
     </div>
   </div>
@@ -3585,7 +3586,20 @@ function createHmuPrepTask(a){
   }catch(e){ console.error('createHmuPrepTask:', e); }
 }
 
-// ── Reschedule a booking from the calendar (admin transfer, no client fees) ──
+// Backfill: create session tasks for existing photographer bookings missing one.
+function backfillPhotographerTasks(){
+  var acks = (DB.acknowledgements||[]).filter(function(a){
+    var st = String(a.status||'').toLowerCase();
+    return _isPhotographerPkg(a.service) && st !== 'cancelled';
+  });
+  var before = (DB.tasks||[]).filter(function(t){ return String(t.type||'')==='HMU Prep'; }).length;
+  acks.forEach(function(a){ createHmuPrepTask(a); });
+  var after = (DB.tasks||[]).filter(function(t){ return String(t.type||'')==='HMU Prep'; }).length;
+  var made = after - before;
+  notify('📋 Backfill complete — created ' + made + ' session task(s) from ' + acks.length + ' photographer booking(s)', 'success');
+  return { scanned: acks.length, created: made };
+}
+
 function calRescheduleAck(btn){
   var id = btn.dataset.aid;
   var a = (DB.acknowledgements||[]).find(function(x){ return x.id===id; });
