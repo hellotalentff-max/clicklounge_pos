@@ -3516,6 +3516,58 @@ function calConfirmAck(btn){ var id=btn.dataset.aid; confirmAck(id); closeModal(
 function calPrintAck(btn)  { var id=btn.dataset.aid; printAck(id); }
 function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal(); }
 
+// ── Auto-create a structured HMU Prep task for the Tasks Manager ──
+// Fired whenever an HMU booking is confirmed (Quick Book + calendar confirm).
+// Staff fill in the peg, edit file names, shopping list, and notes.
+function createHmuPrepTask(a){
+  try{
+    if(!a || !_hasHMU(a.service)) return;
+    var client = String(a.fbName||'').trim();
+    var due = dateOnly(a.bookDate);
+    // Dedupe: one prep task per client+session date
+    var exists = (DB.tasks||[]).some(function(t){
+      return String(t.type||'')==='HMU Prep' &&
+             String(t.client||'').toLowerCase()===client.toLowerCase() &&
+             String(t.due||'').slice(0,10)===due && !t.archived;
+    });
+    if(exists) return;
+
+    var task = {
+      id: uid(),
+      created: todayStr(),
+      type: 'HMU Prep',
+      title: '💄 HMU Prep — ' + client + ' (' + (a.timeSlot||'') + ')',
+      client: client,
+      clientEmail: a.email||'',
+      due: due,
+      notes:
+        '📌 CLIENT PEG / REFERENCE:\n' +
+        '(paste peg links or describe the look the client wants)\n\n' +
+        '🗂 FILE NAMES FOR EDITING:\n' +
+        '(list the selected shot file names here after the session)\n\n' +
+        '🛒 TO BUY FOR THE SHOOT:\n' +
+        '(props, makeup items, or materials needed)\n\n' +
+        '📝 OTHER NOTES:\n' +
+        '(allergies, outfit details, arrival reminders, etc.)\n\n' +
+        '— Package: ' + (a.service||'') + ' · Session: ' + due + ' ' + (a.timeSlot||''),
+      driveLink: '',
+      stage: 'new',
+      done: '',
+      completed: '',
+      archived: '',
+      priority: 'high',
+      assignedTo: '',
+      updated: todayStr()
+    };
+    if(!DB.tasks) DB.tasks = [];
+    DB.tasks.push(task);
+    saveLocal();
+    push('saveTask', task);
+    notify('📋 HMU Prep task created for ' + client + ' — open the Tasks App to fill in the peg & details','success');
+    logActivity('Task Created', 'HMU Prep — ' + client + ' (due ' + due + ')', 'info');
+  }catch(e){ console.error('createHmuPrepTask:', e); }
+}
+
 // ── Reschedule a booking from the calendar (admin transfer, no client fees) ──
 function calRescheduleAck(btn){
   var id = btn.dataset.aid;
@@ -3693,6 +3745,7 @@ async function confirmAck(id){
   await push('saveAcknowledgement', a);
   notify('Booking confirmed ✓','success');
   logActivity('Booking Confirmed', a.fbName+' — '+a.bookDate, 'success');
+  createHmuPrepTask(a);
 
   // 💄 HMU: offer to block the following slot for hair & makeup time
   var slotNow = String(a.timeSlot||'').trim();
@@ -9486,6 +9539,7 @@ async function submitQuickBook(sendEmail){
 
       // 💄 HMU: offer to block the following slot for hair & makeup time
       if(_hasHMU(service)){
+        createHmuPrepTask(ack);
         var _hmuIdx = ALL_TIME_SLOTS.indexOf(timeSlot);
         var _hmuNext = (_hmuIdx > -1 && _hmuIdx < ALL_TIME_SLOTS.length - 1) ? ALL_TIME_SLOTS[_hmuIdx + 1] : null;
         if(_hmuNext && confirm('💄 HMU package booked at ' + timeSlot + '.\n\nBlock the NEXT slot (' + _hmuNext + ') too, so the session has extra time for hair & makeup?')){
