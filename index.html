@@ -9593,8 +9593,10 @@ async function submitQuickBook(sendEmail){
       }
 
       // 💄 HMU: offer to block the following slot for hair & makeup time
-      if(_hasHMU(service)){
+      if(_isPhotographerPkg(service)){
         createHmuPrepTask(ack);
+      }
+      if(_hasHMU(service)){
         var _hmuIdx = ALL_TIME_SLOTS.indexOf(timeSlot);
         var _hmuNext = (_hmuIdx > -1 && _hmuIdx < ALL_TIME_SLOTS.length - 1) ? ALL_TIME_SLOTS[_hmuIdx + 1] : null;
         if(_hmuNext && confirm('💄 HMU package booked at ' + timeSlot + '.\n\nBlock the NEXT slot (' + _hmuNext + ') too, so the session has extra time for hair & makeup?')){
