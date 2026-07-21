@@ -3392,7 +3392,7 @@ function calNavToday(){
 }
 
 function _hasHMU(pkgName){
-  return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama)/i.test(pkgName||'');
+  return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama|luxe mode|coat code|luxe m0de|styleshots)/i.test(pkgName||'');
 }
 
 function calDayClick(dateStr){
@@ -3701,6 +3701,7 @@ async function quickConfirmBooking(btn){
       saveLocal();
       notify('Booking confirmed! Email sent to '+email,'success');
       logActivity('Quick Confirmed',(result.ackNum||'')+' — '+name,'success');
+      createHmuPrepTask(ack);
       renderCalendar();
     } else {
       notify('Failed: '+(result.error||'Unknown'),'error');
@@ -4973,6 +4974,7 @@ async function saveAck(){
 
         saveLocal();
         notify('✓ Booking confirmed! Email with T&C sent to '+email,'success');
+        createHmuPrepTask(ack);
         closeModal();
         renderAcks();
         if(document.getElementById('page-calendar')?.classList.contains('active')) renderCalendar();
@@ -9329,8 +9331,30 @@ function openQuickBook(){
             '<option value="Party Clicks Birthday" data-price="1000" data-pax="6">Party Clicks Birthday (₱1,000)</option>'+
             '<option value="Click Capture Birthday" data-price="1500" data-pax="10">Click Capture Birthday (₱1,500)</option>'+
           '</optgroup>'+
-          '<optgroup label="Photographer">'+
-            '<option value="Photographer Session" data-price="0" data-pax="1">Photographer Session</option>'+
+          '<optgroup label="Photographer — Styleshots">'+
+            '<option value="Styleshots" data-price="1500" data-pax="1">Styleshots (₱1,500)</option>'+
+            '<option value="Promo Styleshots" data-price="0" data-pax="1">Promo Styleshots + HMU 💄</option>'+
+            '<option value="Couple Styleshots" data-price="2500" data-pax="2">Couple Styleshots (₱2,500)</option>'+
+            '<option value="Couple Styleshots Promo" data-price="0" data-pax="2">Couple Styleshots Promo + HMU 💄</option>'+
+            '<option value="Luxe Mode" data-price="3500" data-pax="1">Luxe Mode + HMU 💄 (₱3,500)</option>'+
+            '<option value="The Coat Code" data-price="3500" data-pax="1">The Coat Code + HMU 💄 (₱3,500)</option>'+
+          '</optgroup>'+
+          '<optgroup label="Photographer — Family & Occasions">'+
+            '<option value="Pop Reveal" data-price="3000" data-pax="4">Pop Reveal (₱3,000)</option>'+
+            '<option value="Radiant Mama - Mama Love" data-price="2000" data-pax="1">Radiant Mama — Mama Love (₱2,000)</option>'+
+            '<option value="Radiant Mama - Glowing Mom" data-price="4500" data-pax="1">Radiant Mama — Glowing Mom + HMU 💄 (₱4,500)</option>'+
+            '<option value="Candid Kids" data-price="1500" data-pax="3">Candid Kids (from ₱1,500)</option>'+
+            '<option value="Family Portraits" data-price="1700" data-pax="10">Family Portraits (from ₱1,700)</option>'+
+            '<option value="PAWtraits" data-price="1500" data-pax="4">PAWtraits (from ₱1,500)</option>'+
+          '</optgroup>'+
+          '<optgroup label="Photographer — Graduation & Bridal">'+
+            '<option value="Cap and Gown" data-price="700" data-pax="1">Cap and Gown (₱700)</option>'+
+            '<option value="Grad-U-Click" data-price="1500" data-pax="5">Grad-U-Click (₱1,500)</option>'+
+            '<option value="VIP Grad Glam" data-price="3000" data-pax="1">VIP Grad Glam + HMU 💄 (₱3,000)</option>'+
+            '<option value="Bridal Bliss" data-price="5000" data-pax="2">Bridal Bliss (₱5,000)</option>'+
+          '</optgroup>'+
+          '<optgroup label="Other">'+
+            '<option value="Photographer Session" data-price="0" data-pax="1">Photographer Session (custom)</option>'+
             '<option value="Studio Rental" data-price="0" data-pax="1">Studio Rental</option>'+
           '</optgroup>'+
           '<optgroup label="Events">'+
