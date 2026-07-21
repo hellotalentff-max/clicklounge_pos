@@ -3519,9 +3519,17 @@ function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal()
 // ── Auto-create a structured HMU Prep task for the Tasks Manager ──
 // Fired whenever an HMU booking is confirmed (Quick Book + calendar confirm).
 // Staff fill in the peg, edit file names, shopping list, and notes.
+// True for any package that involves a photographer session (needs prep planning).
+// Self-shoot and event/booth rentals don't need a prep task.
+function _isPhotographerPkg(svc){
+  var s = String(svc||'').toLowerCase();
+  if(_hasHMU(svc)) return true; // all HMU packages qualify
+  return /(styleshots|couple styleshots|luxe mode|coat code|pop reveal|radiant mama|candid kids|family portraits|pawtraits|grad-u-click|cap and gown|vip grad glam|bridal|photographer session)/i.test(s);
+}
+
 function createHmuPrepTask(a){
   try{
-    if(!a || !_hasHMU(a.service)) return;
+    if(!a || !_isPhotographerPkg(a.service)) return;
     var client = String(a.fbName||'').trim();
     var due = dateOnly(a.bookDate);
     // Dedupe: one prep task per client+session date
@@ -3532,21 +3540,26 @@ function createHmuPrepTask(a){
     });
     if(exists) return;
 
+    // Pull the client's own booking notes into the Peg / Reference section
+    var clientNote = String(a.notes||'').trim();
+    var pegBody = clientNote ? clientNote : '(paste peg links or describe the look the client wants)';
+
+    var isHMU = _hasHMU(a.service);
     var task = {
       id: uid(),
       createdAt: todayStr(),
       created: todayStr(),
       type: 'HMU Prep',
-      title: '💄 HMU Prep — ' + client + ' (' + (a.timeSlot||'') + ')',
+      title: (isHMU?'💄':'📸') + ' ' + (a.service||'Session') + ' — ' + client + ' (' + (a.timeSlot||'') + ')',
       client: client,
       clientEmail: a.email||'',
       due: due,
       dueDate: due,
       notes:
         '💄 HMUA ASSIGNED:\n' +
-        '(name of the assigned hair & makeup artist)\n\n' +
+        (isHMU ? '(name of the assigned hair & makeup artist)' : '(no HMU for this package)') + '\n\n' +
         '📌 CLIENT PEG / REFERENCE:\n' +
-        '(paste peg links or describe the look the client wants)\n\n' +
+        pegBody + '\n\n' +
         '🛒 TO BUY FOR THE SHOOT:\n' +
         '(props, makeup items, or materials needed)\n\n' +
         '📝 OTHER NOTES:\n' +
@@ -3567,7 +3580,7 @@ function createHmuPrepTask(a){
     DB.tasks.push(task);
     saveLocal();
     push('saveTask', task);
-    notify('📋 HMU Prep task created for ' + client + ' — open the Tasks App to fill in the peg & details','success');
+    notify('📋 Session prep task created for ' + client + ' — open the Tasks App (Photographer Sessions) to add details','success');
     logActivity('Task Created', 'HMU Prep — ' + client + ' (due ' + due + ')', 'info');
   }catch(e){ console.error('createHmuPrepTask:', e); }
 }
