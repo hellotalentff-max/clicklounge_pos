@@ -9416,8 +9416,9 @@ function openQuickBook(){
         '</div>'+
       '</div>'+
       '<div class="field" style="margin:0;">'+
-        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Client Email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);">(optional)</span></label>'+
-        '<input type="email" id="qb-email" class="sinput" placeholder="For booking confirmation email" style="width:100%;">'+
+        '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Client Email *</label>'+
+        '<input type="email" id="qb-email" class="sinput" placeholder="email@example.com" style="width:100%;">'+
+        '<div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">This is where we\'ll send the photo drive link — please use a valid Gmail or Yahoo email address.</div>'+
       '</div>'+
       '<div class="field" style="margin:0;">'+
         '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Notes</label>'+
@@ -9541,7 +9542,8 @@ async function submitQuickBook(sendEmail){
   if(!service) { notify('⚠ Select a package','error'); return; }
   if(!bookDate){ notify('⚠ Select a booking date','error'); return; }
   if(!timeSlot){ notify('⚠ Select a time slot','error'); return; }
-  if(sendEmail && !email){ notify('⚠ Email required to send confirmation','error'); return; }
+  if(!email)   { notify('⚠ Email required — this is where the photo drive link will be sent','error'); return; }
+  if(!/^[^@]+@[^@]+\.[^@]+$/.test(email)){ notify('⚠ Please enter a valid email address','error'); return; }
 
   var btn = document.getElementById('qb-submit-btn');
   btn.disabled = true; btn.textContent = '⏳ Booking…';
