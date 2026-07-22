@@ -3525,7 +3525,7 @@ function calDeleteAck(btn) { var id=btn.dataset.aid; deleteAck(id); closeModal()
 function _isPhotographerPkg(svc){
   var s = String(svc||'').toLowerCase();
   if(_hasHMU(svc)) return true; // all HMU packages qualify
-  return /(styleshots|couple styleshots|luxe mode|coat code|pop reveal|radiant mama|candid kids|family portraits|pawtraits|grad-u-click|cap and gown|vip grad glam|bridal|photographer session)/i.test(s);
+  return /(styleshots|couple styleshots|luxe mode|coat code|pop reveal|radiant mama|candid kids|family portraits|pawtraits|grad-u-click|cap and gown|vip grad glam|bridal|photographer)/i.test(s);
 }
 
 function createHmuPrepTask(a){
