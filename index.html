@@ -1680,6 +1680,25 @@ tr:hover td { background:var(--light); }
           <label for="exp-notes-page">Notes</label>
           <input type="text" id="exp-notes-page" placeholder="Additional details (optional)">
         </div>
+        <div class="field mb16">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;">
+            <input type="checkbox" id="exp-recurring" onchange="toggleExpRecurFields()" style="width:16px;height:16px;">
+            🔁 Recurring expense
+          </label>
+        </div>
+        <div id="exp-recur-fields" class="frow c2" style="display:none;">
+          <div class="field mb16">
+            <label for="exp-recur-interval">Repeats every</label>
+            <select id="exp-recur-interval">
+              <option value="week">Week</option>
+              <option value="month" selected>Month</option>
+            </select>
+          </div>
+          <div class="field mb16">
+            <label for="exp-recur-count">How many times should it recur?</label>
+            <input type="number" id="exp-recur-count" placeholder="e.g. 3" min="1" step="1">
+          </div>
+        </div>
         <div class="fe">
           <button class="btn btn-gold" id="exp-save-btn" style="min-width:140px;padding:10px;" onclick="saveExpensePage()">💾 Save Expense</button>
         </div>
@@ -6454,17 +6473,33 @@ function deleteFT(id){
   notify('Transfer deleted','info');
 }
 
+function toggleExpRecurFields(){
+  var on = document.getElementById('exp-recurring')?.checked;
+  var box = document.getElementById('exp-recur-fields');
+  if(box) box.style.display = on ? '' : 'none';
+}
+
+function addMonthsToDate(dateStr, months){
+  var d = new Date(dateStr+'T00:00:00');
+  d.setMonth(d.getMonth()+months);
+  return d.toISOString().slice(0,10);
+}
+
 function saveExpensePage(){
   var desc     = (document.getElementById('exp-desc')?.value||'').trim();
   var amt      = parseFloat(document.getElementById('exp-amt')?.value)||0;
   var mop      = document.getElementById('exp-mop')?.value||'Cash';
   var category = document.getElementById('exp-category')?.value||'Operations';
   var notes    = (document.getElementById('exp-notes-page')?.value||'').trim();
+  var isRecurring   = document.getElementById('exp-recurring')?.checked;
+  var recurInterval = document.getElementById('exp-recur-interval')?.value||'month';
+  var recurCount    = parseInt(document.getElementById('exp-recur-count')?.value)||0;
   if(!desc){ notify('Enter a description','error'); return; }
   // LOOPHOLE FIX: negative or zero amounts are rejected — a negative "expense"
   // would inflate net income and could be used to offset a pocketed amount.
   if(!amt || amt <= 0){ notify('Amount must be greater than zero','error'); return; }
   if(amt > 1000000){ notify('Amount looks too large — double-check','error'); return; }
+  if(isRecurring && recurCount <= 0){ notify('Enter how many times this expense should recur','error'); return; }
 
   // LOOPHOLE FIX: double-click guard — prevent duplicate expense entries
   var saveBtn = document.getElementById('exp-save-btn');
@@ -6474,15 +6509,31 @@ function saveExpensePage(){
     setTimeout(function(){ saveBtn.disabled = false; }, 1500);
   }
 
-  var exp = {id:uid(), date:todayStr(), desc:desc, amt:amt, mop:mop, category:category, notes:notes};
   if(!DB.expenses) DB.expenses=[];
+  var today = todayStr();
+  var exp = {id:uid(), date:today, desc:desc, amt:amt, mop:mop, category:category, notes:notes};
   DB.expenses.push(exp);
-  saveLocal();
   push('saveExpense', exp);
-  logActivity('Expense Logged', desc+' \u2014 \u20b1'+fmt(amt)+' ('+mop+')', 'info');
-  notify('Expense saved','success');
+
+  var createdCount = 1;
+  if(isRecurring && recurCount > 0){
+    for(var i=1; i<=recurCount; i++){
+      var futureDate = recurInterval==='week' ? addDays(today, 7*i) : addMonthsToDate(today, i);
+      var futureExp = {id:uid(), date:futureDate, desc:desc, amt:amt, mop:mop, category:category,
+        notes:(notes?notes+' ':'')+'(recurring occurrence '+(i+1)+' of '+(recurCount+1)+')'};
+      DB.expenses.push(futureExp);
+      push('saveExpense', futureExp);
+      createdCount++;
+    }
+  }
+
+  saveLocal();
+  logActivity('Expense Logged', desc+' \u2014 \u20b1'+fmt(amt)+' ('+mop+')'+(createdCount>1?' + '+(createdCount-1)+' recurring':''), 'info');
+  notify(createdCount>1 ? 'Expense saved with '+(createdCount-1)+' future recurrence(s)' : 'Expense saved','success');
   var clr = function(id){ var e=document.getElementById(id); if(e) e.value=''; };
-  clr('exp-desc'); clr('exp-amt'); clr('exp-notes-page');
+  clr('exp-desc'); clr('exp-amt'); clr('exp-notes-page'); clr('exp-recur-count');
+  var recurBox = document.getElementById('exp-recurring');
+  if(recurBox){ recurBox.checked = false; toggleExpRecurFields(); }
   renderExpensesPage();
 }
 
