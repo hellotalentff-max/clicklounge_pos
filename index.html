@@ -3605,6 +3605,55 @@ function createHmuPrepTask(a){
   }catch(e){ console.error('createHmuPrepTask:', e); }
 }
 
+// ── Auto-create a Photo Editing task for the Tasks Manager ──
+// Fired alongside createHmuPrepTask whenever a photographer-package booking
+// is confirmed. Includes a dedicated "Photos for Editing" field the
+// photographer/editor fills in with file names or a picks list once the
+// shoot is done — separate from the general Notes field.
+function createEditingTask(a){
+  try{
+    if(!a || !_isPhotographerPkg(a.service)) return;
+    var client = String(a.fbName||'').trim();
+    var due = dateOnly(a.bookDate);
+    // Dedupe: one editing task per client+session date
+    var exists = (DB.tasks||[]).some(function(t){
+      return String(t.type||'')==='editing' &&
+             String(t.client||'').toLowerCase()===client.toLowerCase() &&
+             String(t.due||'').slice(0,10)===due && !t.archived;
+    });
+    if(exists) return;
+
+    var task = {
+      id: uid(),
+      createdAt: todayStr(),
+      created: todayStr(),
+      type: 'editing',
+      title: '🖼 ' + (a.service||'Session') + ' — ' + client + ' (' + (a.timeSlot||'') + ')',
+      client: client,
+      clientEmail: a.email||'',
+      due: due,
+      dueDate: due,
+      notes: '— Package: ' + (a.service||'') + ' · Session: ' + due + ' ' + (a.timeSlot||''),
+      photosForEditing: '',
+      driveLink: '',
+      stage: 'new',
+      done: '',
+      completed: '',
+      completedAt: '',
+      archived: '',
+      priority: 'normal',
+      assignedTo: '',
+      updated: todayStr(),
+      updatedAt: todayStr()
+    };
+    if(!DB.tasks) DB.tasks = [];
+    DB.tasks.push(task);
+    saveLocal();
+    push('saveTask', task);
+    logActivity('Task Created', 'Photo Editing — ' + client + ' (due ' + due + ')', 'info');
+  }catch(e){ console.error('createEditingTask:', e); }
+}
+
 // Backfill: create session tasks for existing photographer bookings missing one.
 function backfillPhotographerTasks(){
   var acks = (DB.acknowledgements||[]).filter(function(a){
@@ -3612,11 +3661,14 @@ function backfillPhotographerTasks(){
     return _isPhotographerPkg(a.service) && st !== 'cancelled';
   });
   var before = (DB.tasks||[]).filter(function(t){ return String(t.type||'')==='HMU Prep'; }).length;
-  acks.forEach(function(a){ createHmuPrepTask(a); });
+  var editBefore = (DB.tasks||[]).filter(function(t){ return String(t.type||'')==='editing'; }).length;
+  acks.forEach(function(a){ createHmuPrepTask(a); createEditingTask(a); });
   var after = (DB.tasks||[]).filter(function(t){ return String(t.type||'')==='HMU Prep'; }).length;
+  var editAfter = (DB.tasks||[]).filter(function(t){ return String(t.type||'')==='editing'; }).length;
   var made = after - before;
-  notify('📋 Backfill complete — created ' + made + ' session task(s) from ' + acks.length + ' photographer booking(s)', 'success');
-  return { scanned: acks.length, created: made };
+  var editMade = editAfter - editBefore;
+  notify('📋 Backfill complete — created ' + made + ' prep task(s) and ' + editMade + ' editing task(s) from ' + acks.length + ' photographer booking(s)', 'success');
+  return { scanned: acks.length, created: made, editingCreated: editMade };
 }
 
 function calRescheduleAck(btn){
@@ -3752,6 +3804,7 @@ async function quickConfirmBooking(btn){
       notify('Booking confirmed! Email sent to '+email,'success');
       logActivity('Quick Confirmed',(result.ackNum||'')+' — '+name,'success');
       createHmuPrepTask(ack);
+      createEditingTask(ack);
       renderCalendar();
     } else {
       notify('Failed: '+(result.error||'Unknown'),'error');
@@ -3797,6 +3850,7 @@ async function confirmAck(id){
   notify('Booking confirmed ✓','success');
   logActivity('Booking Confirmed', a.fbName+' — '+a.bookDate, 'success');
   createHmuPrepTask(a);
+  createEditingTask(a);
 
   // 💄 HMU: offer to block the following slot for hair & makeup time
   var slotNow = String(a.timeSlot||'').trim();
@@ -5025,6 +5079,7 @@ async function saveAck(){
         saveLocal();
         notify('✓ Booking confirmed! Email with T&C sent to '+email,'success');
         createHmuPrepTask(ack);
+        createEditingTask(ack);
         closeModal();
         renderAcks();
         if(document.getElementById('page-calendar')?.classList.contains('active')) renderCalendar();
@@ -9648,6 +9703,7 @@ async function submitQuickBook(sendEmail){
       // 💄 HMU: offer to block the following slot for hair & makeup time
       if(_isPhotographerPkg(service)){
         createHmuPrepTask(ack);
+        createEditingTask(ack);
       }
       if(_hasHMU(service)){
         var _hmuIdx = ALL_TIME_SLOTS.indexOf(timeSlot);
