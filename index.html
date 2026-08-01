@@ -3363,7 +3363,7 @@ function renderCalendarLists(acks, yr, mo){
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
           '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">✉ Confirm & Email</button>'+
           '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:4px 8px;" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="quickConfirmBooking(this)">⚡ Quick</button>'+
-          '<button class="btn btn-sm" style="background:var(--danger);color:#fff;font-size:10px;padding:4px 8px;" data-evid="'+encodeURIComponent(evId)+'" data-name="'+encodeURIComponent(clientName)+'" onclick="calCancelCalEvent(this)">✕ Cancel</button>'+
+          '<button class="btn btn-sm" style="background:var(--danger);color:#fff;font-size:10px;padding:4px 8px;" data-evid="'+encodeURIComponent(evId)+'" data-name="'+encodeURIComponent(clientName)+'" data-email="'+encodeURIComponent(evEmail)+'" data-svc="'+encodeURIComponent(service)+'" data-date="'+date+'" data-time="'+encodeURIComponent(evTime)+'" onclick="calCancelCalEvent(this)">✕ Cancel</button>'+
         '</div>'+
       '</div>';
     });
@@ -3744,11 +3744,12 @@ function calCancelAck(btn){
   var id = btn.dataset.aid;
   if(!confirm('Cancel this booking? The client will need to rebook.')) return;
   var ack = DB.acknowledgements.find(function(a){ return a.id === id; });
+  var notifyClient = ack && ack.email && confirm('Also email '+ack.fbName+' that their booking was cancelled due to no downpayment?');
   if(ack){
     ack.status = 'Cancelled';
     saveLocal();
     push('saveAcknowledgement', ack);
-    if(hasUrl()) gasCall('cancelBooking', { id: id }).catch(function(){});
+    if(hasUrl()) gasCall('cancelBooking', { id: id, fbName: ack.fbName, notifyClient: notifyClient, email: ack.email||'', package: ack.service||'', bookDate: ack.bookDate||'', timeSlot: ack.timeSlot||'' }).catch(function(){});
   }
   notify('Booking cancelled', 'success');
   logActivity('Booking Cancelled', (ack?ack.ackNum:'') + ' — ' + (ack?ack.fbName:''), 'danger');
@@ -3756,13 +3757,20 @@ function calCancelAck(btn){
 }
 
 function calCancelCalEvent(btn){
-  var evId = decodeURIComponent(btn.dataset.evid||'');
-  var name = decodeURIComponent(btn.dataset.name||'');
+  var evId  = decodeURIComponent(btn.dataset.evid||'');
+  var name  = decodeURIComponent(btn.dataset.name||'');
+  var email = decodeURIComponent(btn.dataset.email||'');
+  var svc   = decodeURIComponent(btn.dataset.svc||'');
+  var date  = btn.dataset.date||'';
+  var time  = decodeURIComponent(btn.dataset.time||'');
   if(!confirm('Cancel booking for '+name+'? This will remove it from Google Calendar.')) return;
+  var notifyClient = email && confirm('Also email '+name+' that their booking was cancelled due to no downpayment?');
   if(hasUrl() && evId){
-    gasCall('cancelBooking', { eventId: evId, clientName: name })
+    gasCall('cancelBooking', { eventId: evId, fbName: name, notifyClient: notifyClient, email: email, package: svc, bookDate: date, timeSlot: time })
       .then(function(r){
-        notify(r.ok ? 'Booking cancelled for '+name : 'Cancelled locally', r.ok?'success':'warn');
+        var msg = r.ok ? 'Booking cancelled for '+name : 'Cancelled locally';
+        if(r.ok && notifyClient) msg += r.emailSent ? ' — email sent' : ' — email failed to send';
+        notify(msg, r.ok?'success':'warn');
         renderCalendar();
       })
       .catch(function(){ notify('Cancelled locally', 'warn'); renderCalendar(); });
