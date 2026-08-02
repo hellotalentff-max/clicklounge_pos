@@ -3656,9 +3656,11 @@ function createEditingTask(a){
 
 // Backfill: create session tasks for existing photographer bookings missing one.
 function backfillPhotographerTasks(){
+  var today = todayStr();
   var acks = (DB.acknowledgements||[]).filter(function(a){
     var st = String(a.status||'').toLowerCase();
-    return _isPhotographerPkg(a.service) && st !== 'cancelled';
+    var d  = String(a.bookDate||'').slice(0,10);
+    return _isPhotographerPkg(a.service) && st !== 'cancelled' && d >= today;
   });
   var before = (DB.tasks||[]).filter(function(t){ return String(t.type||'')==='HMU Prep'; }).length;
   var editBefore = (DB.tasks||[]).filter(function(t){ return String(t.type||'')==='editing'; }).length;
