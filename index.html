@@ -3744,7 +3744,12 @@ function calCancelAck(btn){
   var id = btn.dataset.aid;
   if(!confirm('Cancel this booking? The client will need to rebook.')) return;
   var ack = DB.acknowledgements.find(function(a){ return a.id === id; });
-  var notifyClient = ack && ack.email && confirm('Also email '+ack.fbName+' that their booking was cancelled due to no downpayment?');
+  var notifyClient = false;
+  if(ack && ack.email){
+    notifyClient = confirm('Also email '+ack.fbName+' ('+ack.email+') that their booking was cancelled due to no downpayment?');
+  } else if(ack){
+    notify('No email on file for '+ack.fbName+' — they will not be notified.', 'warn');
+  }
   if(ack){
     ack.status = 'Cancelled';
     saveLocal();
@@ -3764,7 +3769,12 @@ function calCancelCalEvent(btn){
   var date  = btn.dataset.date||'';
   var time  = decodeURIComponent(btn.dataset.time||'');
   if(!confirm('Cancel booking for '+name+'? This will remove it from Google Calendar.')) return;
-  var notifyClient = email && confirm('Also email '+name+' that their booking was cancelled due to no downpayment?');
+  var notifyClient = false;
+  if(email){
+    notifyClient = confirm('Also email '+name+' ('+email+') that their booking was cancelled due to no downpayment?');
+  } else {
+    notify('No email on file for '+name+' — they will not be notified.', 'warn');
+  }
   if(hasUrl() && evId){
     gasCall('cancelBooking', { eventId: evId, fbName: name, notifyClient: notifyClient, email: email, package: svc, bookDate: date, timeSlot: time })
       .then(function(r){
