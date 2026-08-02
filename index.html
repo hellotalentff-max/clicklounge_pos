@@ -3740,25 +3740,49 @@ async function submitReschedule(id){
   }
 }
 
+// Asks which cancellation email (if any) to send. Resolves to:
+//   'nopayment'     — no downpayment received (client will be told the slot was released for non-payment)
+//   'clientrequest' — client asked to cancel (neutral "cancelled as requested" tone)
+//   null            — don't email (no email on file, or staff chose to skip)
+function promptCancelReason(name, email){
+  return new Promise(function(resolve){
+    if(!email){
+      notify('No email on file for '+name+' — they will not be notified.', 'warn');
+      resolve(null);
+      return;
+    }
+    openModal(
+      '<h3 style="margin-bottom:4px;">Notify '+escHtml(name)+'?</h3>'+
+      '<p style="font-size:12px;color:var(--muted);margin-bottom:16px;">'+escHtml(email)+'</p>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;">'+
+        '<button class="btn btn-gold" id="cr-nopay">💰 No downpayment received</button>'+
+        '<button class="btn btn-teal" id="cr-client">🙋 Client requested cancellation</button>'+
+        '<button class="btn btn-outline" id="cr-skip">Skip — don\'t email</button>'+
+      '</div>'
+    );
+    setTimeout(function(){
+      document.getElementById('cr-nopay').onclick  = function(){ closeModal(); resolve('nopayment'); };
+      document.getElementById('cr-client').onclick = function(){ closeModal(); resolve('clientrequest'); };
+      document.getElementById('cr-skip').onclick   = function(){ closeModal(); resolve(null); };
+    }, 30);
+  });
+}
+
 function calCancelAck(btn){
   var id = btn.dataset.aid;
   if(!confirm('Cancel this booking? The client will need to rebook.')) return;
   var ack = DB.acknowledgements.find(function(a){ return a.id === id; });
-  var notifyClient = false;
-  if(ack && ack.email){
-    notifyClient = confirm('Also email '+ack.fbName+' ('+ack.email+') that their booking was cancelled due to no downpayment?');
-  } else if(ack){
-    notify('No email on file for '+ack.fbName+' — they will not be notified.', 'warn');
-  }
-  if(ack){
-    ack.status = 'Cancelled';
-    saveLocal();
-    push('saveAcknowledgement', ack);
-    if(hasUrl()) gasCall('cancelBooking', { id: id, fbName: ack.fbName, notifyClient: notifyClient, email: ack.email||'', package: ack.service||'', bookDate: ack.bookDate||'', timeSlot: ack.timeSlot||'' }).catch(function(){});
-  }
-  notify('Booking cancelled', 'success');
-  logActivity('Booking Cancelled', (ack?ack.ackNum:'') + ' — ' + (ack?ack.fbName:''), 'danger');
-  renderCalendar();
+  promptCancelReason(ack?ack.fbName:'', ack?ack.email||'':'').then(function(reason){
+    if(ack){
+      ack.status = 'Cancelled';
+      saveLocal();
+      push('saveAcknowledgement', ack);
+      if(hasUrl()) gasCall('cancelBooking', { id: id, fbName: ack.fbName, notifyClient: !!reason, cancelReason: reason||'', email: ack.email||'', package: ack.service||'', bookDate: ack.bookDate||'', timeSlot: ack.timeSlot||'' }).catch(function(){});
+    }
+    notify('Booking cancelled', 'success');
+    logActivity('Booking Cancelled', (ack?ack.ackNum:'') + ' — ' + (ack?ack.fbName:''), 'danger');
+    renderCalendar();
+  });
 }
 
 function calCancelCalEvent(btn){
@@ -3769,25 +3793,21 @@ function calCancelCalEvent(btn){
   var date  = btn.dataset.date||'';
   var time  = decodeURIComponent(btn.dataset.time||'');
   if(!confirm('Cancel booking for '+name+'? This will remove it from Google Calendar.')) return;
-  var notifyClient = false;
-  if(email){
-    notifyClient = confirm('Also email '+name+' ('+email+') that their booking was cancelled due to no downpayment?');
-  } else {
-    notify('No email on file for '+name+' — they will not be notified.', 'warn');
-  }
-  if(hasUrl() && evId){
-    gasCall('cancelBooking', { eventId: evId, fbName: name, notifyClient: notifyClient, email: email, package: svc, bookDate: date, timeSlot: time })
-      .then(function(r){
-        var msg = r.ok ? 'Booking cancelled for '+name : 'Cancelled locally';
-        if(r.ok && notifyClient) msg += r.emailSent ? ' — email sent' : ' — email failed to send';
-        notify(msg, r.ok?'success':'warn');
-        renderCalendar();
-      })
-      .catch(function(){ notify('Cancelled locally', 'warn'); renderCalendar(); });
-  } else {
-    notify('Booking cancelled locally', 'success');
-    renderCalendar();
-  }
+  promptCancelReason(name, email).then(function(reason){
+    if(hasUrl() && evId){
+      gasCall('cancelBooking', { eventId: evId, fbName: name, notifyClient: !!reason, cancelReason: reason||'', email: email, package: svc, bookDate: date, timeSlot: time })
+        .then(function(r){
+          var msg = r.ok ? 'Booking cancelled for '+name : 'Cancelled locally';
+          if(r.ok && reason) msg += r.emailSent ? ' — email sent' : ' — email failed to send';
+          notify(msg, r.ok?'success':'warn');
+          renderCalendar();
+        })
+        .catch(function(){ notify('Cancelled locally', 'warn'); renderCalendar(); });
+    } else {
+      notify('Booking cancelled locally', 'success');
+      renderCalendar();
+    }
+  });
 }
 
 // Quick confirm — no modal, directly calls confirmBooking with event data
