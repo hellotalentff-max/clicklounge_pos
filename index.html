@@ -1131,6 +1131,9 @@ tr:hover td { background:var(--light); }
             <div><span style="color:var(--muted);font-size:10px;">Downpayment</span><br><strong id="ia-dp" style="color:var(--teal);">—</strong></div>
           </div>
           <div style="font-size:10px;color:var(--muted);margin-top:6px;">This downpayment will be auto-deducted from the balance.</div>
+          <div id="ia-pkg-note" style="display:none;font-size:11px;color:var(--gold);margin-top:8px;background:rgba(215,144,104,0.08);border:1px solid rgba(215,144,104,0.25);border-radius:6px;padding:6px 8px;">
+            🎂 <span id="ia-pkg-total">—</span> — added to the invoice automatically from the client's built package.
+          </div>
         </div>
       </div>
 
@@ -2355,7 +2358,7 @@ tr:hover td { background:var(--light); }
       <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:var(--teal-lt);text-transform:uppercase;letter-spacing:1px;">Sat</div>
       <div style="padding:8px;text-align:center;font-size:10px;font-weight:600;color:rgba(232,239,238,0.3);text-transform:uppercase;letter-spacing:1px;">Sun</div>
     </div>
-    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--light2);grid-auto-rows:minmax(90px,auto);"></div>
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--light2);"></div>
   </div>
 
   <!-- Pending bookings list -->
@@ -3155,13 +3158,13 @@ function renderCalendar(){
   var html = '';
 
   for(var i = 0; i < firstOffset; i++){
-    html += '<div style="height:100%;background:var(--light);border:1px solid var(--light2);"></div>';
+    html += '<div style="aspect-ratio:1;background:var(--light);border:1px solid var(--light2);"></div>';
   }
 
   function bookingChip(name, color, border){
     return '<div style="font-size:9px;background:'+color+';border:1px solid '+border+
            ';border-radius:3px;padding:1px 4px;margin-top:2px;overflow:hidden;'+
-           'text-overflow:ellipsis;white-space:nowrap;">'+escHtml(name)+'</div>';
+           'text-overflow:ellipsis;white-space:nowrap;width:100%;box-sizing:border-box;">'+escHtml(name)+'</div>';
   }
   // Client name only (no package) — trims to a compact display
   function firstNameLast(full){
@@ -3171,6 +3174,29 @@ function renderCalendar(){
   function _evSlotMin(ev){
     var m = String(ev.start||'').match(/T(\d{2}):(\d{2})/);
     return m ? parseInt(m[1])*60 + parseInt(m[2]) : 9999;
+  }
+  // ── ClickLounge Birthday Experience: compact calendar label ──
+  // Full package name is "ClickLounge Birthday Experience: {Tier} + {Mood} +
+  // {Keepsake}" — far too long for a day chip. Show "CBE - Tier - Client"
+  // instead. Reads the package straight from the event's description
+  // ("Package: ...") rather than guessing from the title, since that's the
+  // clean, labeled field createBooking already writes.
+  function _isCBEPkg(pkgName){ return /^ClickLounge Birthday Experience/i.test(pkgName||''); }
+  function _cbeTier(pkgName){
+    var m = String(pkgName||'').match(/^ClickLounge Birthday Experience:\s*([^+]+)/i);
+    return m ? m[1].trim() : '';
+  }
+  function _cbeChipLabel(pkgName, clientName){
+    var tier = _cbeTier(pkgName);
+    return ['CBE', tier, String(clientName||'').trim()].filter(Boolean).join(' - ');
+  }
+  function _evPackageFromDesc(ev){
+    var m = (ev.description||'').match(/Package:\s*(.+?)\s*\(₱/i);
+    return m ? m[1].trim() : '';
+  }
+  function _evNameFromDesc(ev){
+    var m = (ev.description||'').match(/FB Name:\s*(.+)/i);
+    return m ? m[1].split('\n')[0].trim() : '';
   }
 
   for(var d = 1; d <= daysInMo; d++){
@@ -3266,19 +3292,24 @@ function renderCalendar(){
       var style = s.includes('cancel') ? ['#f8d7da','#c0544a']
                 : s.includes('confirm') ? ['#d4edda','#51897d']
                 : ['#fff3cd','#ffc107'];
-      dayItems.push({ name: firstNameLast(a.fbName), t: _slotMin(a.timeSlot||a.time), bg: style[0], bd: style[1] });
+      var label = _isCBEPkg(a.service) ? _cbeChipLabel(a.service, a.fbName) : firstNameLast(a.fbName);
+      dayItems.push({ name: label, t: _slotMin(a.timeSlot||a.time), bg: style[0], bd: style[1] });
     });
     evPend.forEach(function(ev){
-      dayItems.push({ name: firstNameLast(_evClientName(ev)), t: _evSlotMin(ev), bg:'#fff3cd', bd:'#ffc107' });
+      var descPkg = _evPackageFromDesc(ev);
+      var label = _isCBEPkg(descPkg) ? _cbeChipLabel(descPkg, _evNameFromDesc(ev) || _evClientName(ev)) : firstNameLast(_evClientName(ev));
+      dayItems.push({ name: label, t: _evSlotMin(ev), bg:'#fff3cd', bd:'#ffc107' });
     });
     evConf.forEach(function(ev){
-      dayItems.push({ name: firstNameLast(_evClientName(ev)), t: _evSlotMin(ev), bg:'#d4edda', bd:'#51897d' });
+      var descPkg = _evPackageFromDesc(ev);
+      var label = _isCBEPkg(descPkg) ? _cbeChipLabel(descPkg, _evNameFromDesc(ev) || _evClientName(ev)) : firstNameLast(_evClientName(ev));
+      dayItems.push({ name: label, t: _evSlotMin(ev), bg:'#d4edda', bd:'#51897d' });
     });
     dayItems.sort(function(a,b){ return a.t - b.t; });
     dayItems.forEach(function(it){ chips += bookingChip(it.name, it.bg, it.bd); });
 
-    html += '<div style="min-height:90px;height:100%;box-sizing:border-box;background:'+bg+';border:1px solid var(--light2);'+
-            'padding:5px;cursor:pointer;" onclick="calDayClick(\''+dateStr+'\')">'+
+    html += '<div style="aspect-ratio:1;box-sizing:border-box;background:'+bg+';border:1px solid var(--light2);'+
+            'padding:5px;cursor:pointer;overflow-y:auto;overflow-x:hidden;" onclick="calDayClick(\''+dateStr+'\')">'+
             '<div style="font-size:11px;font-weight:'+(isToday?'700':'500')+';color:'+
             (isToday?'var(--teal)':isRest?'var(--danger)':'var(--text)')+';margin-bottom:3px;">'+d+'</div>'+
             chips+'</div>';
@@ -3351,6 +3382,13 @@ function renderCalendarLists(acks, yr, mo){
           evTime = d.toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'Asia/Manila'});
         }catch(e){}
       }
+      // Total package price: createBooking (GAS) already writes this into the
+      // event description as "Package: {pkg} (₱{price})" — pull the number
+      // straight out of that line's parentheses. No backend change needed.
+      // Downpayment is intentionally NOT auto-filled — the amount actually
+      // collected can vary per client, so staff always enters it manually.
+      var totalMatch = (ev.description||'').match(/Package:.*?\(\s*[₱P]?\s*([\d,]+(?:\.\d+)?)\s*\)/i);
+      var evTotal = totalMatch ? totalMatch[1].replace(/,/g,'') : '';
       pendHtml += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--light2);background:rgba(255,243,205,0.2);">'+
         '<div style="width:8px;height:8px;border-radius:50%;background:#ffc107;flex-shrink:0;"></div>'+
         '<div style="flex:1;">'+
@@ -3358,11 +3396,12 @@ function renderCalendarLists(acks, yr, mo){
           '<div style="font-size:11px;color:var(--muted);">'+
             '📅 '+date+(evTime?' · 🕐 '+escHtml(evTime):'')+' · '+escHtml(service||'Booking request')+
             (evEmail?' · ✉ '+escHtml(evEmail):'')+
+            (evTotal?' · ₱'+fmt(+evTotal)+' total':'')+
           '</div>'+
         '</div>'+
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
-          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="openNewAckFromCalEvent(this)">✉ Confirm & Email</button>'+
-          '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:4px 8px;" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" onclick="quickConfirmBooking(this)">⚡ Quick</button>'+
+          '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" data-total="'+encodeURIComponent(evTotal)+'" onclick="openNewAckFromCalEvent(this)">✉ Confirm & Email</button>'+
+          '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:4px 8px;" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" data-total="'+encodeURIComponent(evTotal)+'" onclick="quickConfirmBooking(this)">⚡ Quick</button>'+
           '<button class="btn btn-sm" style="background:var(--danger);color:#fff;font-size:10px;padding:4px 8px;" data-evid="'+encodeURIComponent(evId)+'" data-name="'+encodeURIComponent(clientName)+'" data-email="'+encodeURIComponent(evEmail)+'" data-svc="'+encodeURIComponent(service)+'" data-date="'+date+'" data-time="'+encodeURIComponent(evTime)+'" onclick="calCancelCalEvent(this)">✕ Cancel</button>'+
         '</div>'+
       '</div>';
@@ -3820,6 +3859,7 @@ async function quickConfirmBooking(btn){
   var email = decodeURIComponent(btn.dataset.email||'');
   var time  = decodeURIComponent(btn.dataset.time||'');
   var evId  = decodeURIComponent(btn.dataset.evid||'');
+  var total = +decodeURIComponent(btn.dataset.total||'') || 0;
 
   if(!email){ notify('No email found — use Confirm & Email to enter it manually','error'); return; }
   if(!confirm('Quick confirm booking for '+name+' on '+date+'?\n\nConfirmation email will be sent to: '+email)){ return; }
@@ -3829,10 +3869,11 @@ async function quickConfirmBooking(btn){
   try{
     var result = await gasCall('confirmBooking', {
       eventId:evId, fbName:name, email:email, service:svc,
-      bookDate:date, timeSlot:time, mop:'GCash', downpayment:0
+      bookDate:date, timeSlot:time, mop:'GCash', downpayment:0, totalPrice:total
     });
     if(result.ok){
-      var ack = result.ack || {id:uid(),date:todayStr(),fbName:name,email:email,service:svc,bookDate:date,ackNum:result.ackNum||'',status:'Confirmed',timeSlot:time};
+      var ack = Object.assign({id:uid(),date:todayStr(),fbName:name,email:email,service:svc,bookDate:date,ackNum:result.ackNum||'',status:'Confirmed',timeSlot:time,totalPrice:total}, result.ack||{});
+      if(!ack.totalPrice) ack.totalPrice = total;
       if(!DB.acknowledgements) DB.acknowledgements=[];
       DB.acknowledgements.push(ack);
       if(!DB.clients) DB.clients=[];
@@ -3863,6 +3904,9 @@ function openNewAckFromCalEvent(btn){
   var email = decodeURIComponent(btn.dataset.email||'');
   var evId  = decodeURIComponent(btn.dataset.evid||'');
   var time  = decodeURIComponent(btn.dataset.time||'');
+  var total = decodeURIComponent(btn.dataset.total||'');
+  // Downpayment is left blank for staff to enter manually — the amount
+  // actually collected can vary per client, so it's never auto-filled.
 
   openNewAck(true);
   setTimeout(function(){
@@ -3872,12 +3916,14 @@ function openNewAckFromCalEvent(btn){
     var emailEl = document.getElementById('ma-email');
     var evidEl  = document.getElementById('ma-evid');
     var timeEl  = document.getElementById('ma-time');
+    var totalEl = document.getElementById('ma-total');
     if(fbEl)    fbEl.value    = name;
     if(dateEl)  dateEl.value  = date;
     if(svcEl)   svcEl.value   = svc;
     if(emailEl) emailEl.value = email;
     if(evidEl)  evidEl.value  = evId;
     if(timeEl)  timeEl.value  = time;
+    if(totalEl && total) totalEl.value = total;
   }, 150);
 }
 
@@ -5095,16 +5141,22 @@ async function saveAck(){
         service: service,
         mop: mop,
         downpayment: dp,
+        totalPrice: total,
         bookDate: bookDate,
         timeSlot: (document.getElementById('ma-time')?.value||'').trim()
       });
       if(result.ok){
-        // Add the ack receipt to local DB
-        var ack = result.ack || {
+        // Add the ack receipt to local DB. Build from the fallback shape first,
+        // then layer the server's ack (if any) on top — but always keep OUR
+        // totalPrice: the server's confirmBooking doesn't necessarily know
+        // about it yet, and we never want the built package's price to be
+        // silently dropped just because result.ack came back without it.
+        var ack = Object.assign({
           id: result.ackId||uid(), date: todayStr(), fbName: fbName, email: email,
           service: service, bookDate: bookDate, mop: mop,
           downpayment: dp, totalPrice: total, ackNum: result.ackNum||'', status: 'Confirmed'
-        };
+        }, result.ack || {});
+        if(!ack.totalPrice) ack.totalPrice = total;
         ack.status = 'Confirmed';
         if(!DB.acknowledgements) DB.acknowledgements = [];
         DB.acknowledgements.push(ack);
@@ -5688,6 +5740,22 @@ function showAckDP(a, dpEl, box){
   if(iaDp)   iaDp.textContent   = '₱'+fmt(+a.downpayment);
   if(dpEl)   dpEl.value = a.downpayment;
   if(box)    box.style.display = '';
+
+  // ClickLounge Birthday Experience only: the total the client built in the
+  // mood-board (stored on the acknowledgement as totalPrice) is added to this
+  // invoice as its own line item, so staff don't have to reconstruct the
+  // built package's pricing by hand from the general service catalog.
+  var pkgNote  = document.getElementById('ia-pkg-note');
+  var pkgTotal = document.getElementById('ia-pkg-total');
+  var isCBE    = /^ClickLounge Birthday Experience/i.test(a.service||'');
+  var total    = +a.totalPrice || 0;
+  if(isCBE && total > 0){
+    if(!INV.length) addItem(a.service, total, false);
+    if(pkgTotal) pkgTotal.textContent = (a.service||'CBE package') + ' — ₱' + fmt(total);
+    if(pkgNote)  pkgNote.style.display = '';
+  } else if(pkgNote){
+    pkgNote.style.display = 'none';
+  }
 }
 function viewAckFromInv(){
   const name=document.getElementById('inv-client').value.trim();
