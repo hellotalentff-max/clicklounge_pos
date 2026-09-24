@@ -897,6 +897,7 @@ tr:hover td { background:var(--light); }
     <button onclick="showPage('gifts')" data-page="gifts"><span class="ni">🎁</span>Gifts</button>
     <button onclick="showPage('eod')" data-page="eod"><span class="ni">◑</span>End of Shift</button>
     <button onclick="showPage('reports')" data-page="reports" class="admin-only"><span class="ni">📊</span>Monthly Reports</button>
+    <button onclick="showPage('packages')" data-page="packages" class="admin-only"><span class="ni">☑</span>Packages</button>
     <button onclick="showPage('settings')" data-page="settings" class="admin-only"><span class="ni">⚙</span>Settings</button>
   </nav>
   <div id="sidebar-bottom">
@@ -2380,6 +2381,65 @@ tr:hover td { background:var(--light); }
       <button class="btn btn-sm btn-outline" onclick="openBlockDialog()">+ Add Block</button>
     </div>
     <div id="blocked-list"><div class="tm">No blocked dates or times.</div></div>
+  </div>
+</div>
+
+
+<!-- ══ Packages — what each one owes the client ══ -->
+<div id="page-packages" class="page">
+  <div class="ph">
+    <h2>Packages</h2>
+    <p>Tick what each package includes. This is what fills in the Client Jobs checklist when a booking is confirmed.</p>
+  </div>
+
+  <div class="card">
+    <div class="ct">
+      Package list
+      <span id="pk-source" class="badge b-void" style="margin-left:8px;font-weight:400;">loading…</span>
+    </div>
+    <div id="pk-warn" class="tm" style="margin-bottom:10px;"></div>
+    <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+
+      <!-- the packages -->
+      <div style="flex:0 0 260px;min-width:220px;">
+        <input type="text" id="pk-search" class="sinput" placeholder="🔍 Find a package…"
+               oninput="pkRenderList()" style="margin-bottom:8px;">
+        <div id="pk-list" style="max-height:560px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;"></div>
+        <button class="btn btn-sm btn-outline" style="width:100%;margin-top:8px;" onclick="pkAddPackage()">+ Add package</button>
+      </div>
+
+      <!-- the one being edited -->
+      <div style="flex:1;min-width:320px;">
+        <div id="pk-editor"><div class="tm" style="padding:40px 0;text-align:center;">Pick a package on the left.</div></div>
+      </div>
+    </div>
+
+    <div class="fe" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+      <span id="pk-dirty" class="tm" style="margin-right:auto;"></span>
+      <button class="btn btn-outline" onclick="pkLoad(true)">Reload from sheet</button>
+      <button class="btn btn-teal" id="pk-save-btn" onclick="pkSave()">💾 Save all packages</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ct">Inclusion list</div>
+    <p class="tm" style="margin-top:0;">
+      Every tick box available above. Add one here and it appears on every package.
+      <strong>Print</strong> shows as “Print …”, <strong>Frame</strong> as “Mount the …”, <strong>To-do</strong> exactly as written.
+    </p>
+    <div class="frow c3">
+      <div class="field"><label>New inclusion</label>
+        <input type="text" id="pk-new-inc" placeholder="e.g. 4 Minis prints"></div>
+      <div class="field"><label>Kind</label>
+        <select id="pk-new-kind">
+          <option value="print">Print</option>
+          <option value="frame">Frame</option>
+          <option value="task">To-do</option>
+        </select></div>
+      <div class="field"><label>&nbsp;</label>
+        <button class="btn btn-outline" onclick="pkAddInclusion()">+ Add inclusion</button></div>
+    </div>
+    <div id="pk-inc-list" style="max-height:260px;overflow-y:auto;"></div>
   </div>
 </div>
 
@@ -4086,6 +4146,7 @@ function showPage(pg){
     settings:     renderSettings,
     calendar:     renderCalendar,
     reports:      renderReports,
+    packages:     pkLoad,
     tasks: function(){ var link=document.getElementById('tasks-app-link'); if(link&&DB.studioInfo&&DB.studioInfo.tasksAppUrl) link.href=DB.studioInfo.tasksAppUrl; }
   };
   if(map[pg]) map[pg]();
@@ -10435,6 +10496,281 @@ function renderClientsHub(){
 
 function escHtmlSafe(s){
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+
+// ════════════════════════════════════════════════════════════
+//  ☑️ PACKAGES — what each package owes the client
+//  ------------------------------------------------------------
+//  Edits the same list the Client Jobs checklists are built from.
+//  Loads with getPackages, saves with savePackages; the Apps Script
+//  writes it to the "Package Builder" and "Inclusions" tabs.
+// ════════════════════════════════════════════════════════════
+var PK = { packages: [], inclusions: [], sel: -1, dirty: false, source: '' };
+
+function pkKindLabel(k){ return k === 'print' ? 'Prints' : (k === 'frame' ? 'Frames' : 'To-dos'); }
+function pkEsc(s){ return String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// a package with no inclusions on file — the thing we want to surface
+function pkUndocumented(p){ return p.unknown === true; }
+
+async function pkLoad(force){
+  var badge = document.getElementById('pk-source');
+  if(!hasUrl()){
+    if(badge){ badge.textContent = 'no backend URL set'; badge.className = 'badge b-danger'; }
+    return;
+  }
+  if(PK.packages.length && !force) return;
+  if(PK.dirty && force && !confirm('Reload from the sheet and lose your unsaved changes?')) return;
+  if(badge){ badge.textContent = 'loading…'; badge.className = 'badge b-void'; }
+  try{
+    var r = await gasCall('getPackages', {});
+    if(!r || !r.ok) throw new Error((r && r.error) || 'no answer');
+    PK.packages   = r.packages || [];
+    PK.inclusions = r.inclusions || [];
+    PK.source     = r.source || '';
+    PK.dirty = false; PK.sel = -1;
+    // give every package a display name
+    PK.packages.forEach(function(p){ if(!p.name) p.name = (p.m && p.m[0]) || ''; });
+    if(badge){
+      badge.textContent = PK.packages.length + ' packages · ' +
+        (PK.source === 'grid' ? 'from the sheet' :
+         PK.source === 'sheet' ? 'from the Packages tab' : 'built-in list (not saved yet)');
+      badge.className = 'badge ' + (PK.source === 'builtin' ? 'b-gold' : 'b-teal');
+    }
+    pkRenderList(); pkRenderInclusions(); pkRenderEditor(); pkMarkDirty(false);
+  }catch(e){
+    if(badge){ badge.textContent = 'could not load: ' + e.message; badge.className = 'badge b-danger'; }
+  }
+}
+
+function pkMarkDirty(on){
+  PK.dirty = !!on;
+  var d = document.getElementById('pk-dirty');
+  if(d) d.textContent = PK.dirty ? '● unsaved changes' : '';
+  if(d) d.style.color = PK.dirty ? 'var(--gold)' : '';
+}
+
+function pkRenderList(){
+  var el = document.getElementById('pk-list'); if(!el) return;
+  var q = (document.getElementById('pk-search') || {}).value || '';
+  q = q.trim().toLowerCase();
+  var html = '';
+  var missing = 0;
+  PK.packages.forEach(function(p, i){
+    if(pkUndocumented(p)) missing++;
+    var nm = p.name || (p.m && p.m[0]) || '(unnamed)';
+    if(q && nm.toLowerCase().indexOf(q) === -1 && (p.m || []).join(' ').indexOf(q) === -1) return;
+    var flag = pkUndocumented(p) ? '<span class="badge b-danger" style="font-size:9px;">check</span>'
+             : (p.unknown === 'edits' ? '<span class="badge b-gold" style="font-size:9px;">edits?</span>' : '');
+    html += '<div onclick="pkSelect('+i+')" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border);'+
+      'display:flex;gap:6px;align-items:center;'+(PK.sel===i?'background:var(--teal-lt);font-weight:600;':'')+'">'+
+      '<span style="flex:1;font-size:12.5px;">'+pkEsc(nm)+'</span>'+flag+'</div>';
+  });
+  el.innerHTML = html || '<div class="tm" style="padding:14px;">Nothing matches.</div>';
+  var w = document.getElementById('pk-warn');
+  if(w) w.innerHTML = missing
+    ? '⚠ <strong>'+missing+'</strong> package'+(missing===1?' has':'s have')+' no inclusions on file. '+
+      'Their jobs say “CHECK THE PACKAGE” until you fill them in.'
+    : '';
+}
+
+function pkSelect(i){ PK.sel = i; pkRenderList(); pkRenderEditor(); }
+
+function pkRenderEditor(){
+  var el = document.getElementById('pk-editor'); if(!el) return;
+  if(PK.sel < 0 || !PK.packages[PK.sel]){
+    el.innerHTML = '<div class="tm" style="padding:40px 0;text-align:center;">Pick a package on the left.</div>';
+    return;
+  }
+  var p = PK.packages[PK.sel];
+  var on = function(name){
+    return (p.prints||[]).indexOf(name) !== -1 ||
+           (p.frames||[]).indexOf(name) !== -1 ||
+           (p.other ||[]).indexOf(name) !== -1;
+  };
+
+  var groups = { print: [], frame: [], task: [] };
+  PK.inclusions.forEach(function(inc, j){
+    (groups[inc.kind] || groups.task).push(
+      '<label class="pk-inc" for="pk-inc-'+j+'" style="display:flex;gap:7px;align-items:flex-start;padding:3px 0;font-size:12.5px;cursor:pointer;">'+
+        '<input type="checkbox" id="pk-inc-'+j+'" '+(on(inc.name)?'checked':'')+
+          ' onchange="pkToggle('+j+',this.checked)" style="margin-top:2px;flex-shrink:0;">'+
+        '<span>'+pkEsc(inc.name)+'</span></label>');
+  });
+
+  var box = function(kind){
+    var items = groups[kind];
+    return '<div style="flex:1;min-width:230px;">'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:5px;">'+
+        pkKindLabel(kind)+'</div>'+
+      (items.length ? items.join('') : '<div class="tm" style="font-size:11px;">none yet</div>')+
+    '</div>';
+  };
+
+  el.innerHTML =
+    '<div class="frow c2">'+
+      '<div class="field"><label>Package name</label>'+
+        '<input type="text" id="pk-f-name" value="'+pkEsc(p.name)+'" oninput="pkField(\'name\',this.value)"></div>'+
+      '<div class="field"><label>Also called <span class="tm" style="font-weight:400;">(other names, comma separated)</span></label>'+
+        '<input type="text" id="pk-f-alias" value="'+pkEsc((p.m||[]).slice(1).join(', '))+'" oninput="pkField(\'alias\',this.value)"></div>'+
+    '</div>'+
+    '<div class="frow c3">'+
+      '<div class="field"><label>Edited photos</label>'+
+        '<input type="text" id="pk-f-edits" value="'+pkEsc(p.unknown===true||p.unknown==='edits'?'?':(p.edits||0))+
+        '" oninput="pkField(\'edits\',this.value)" placeholder="number, or ? if unknown"></div>'+
+      '<div class="field"><label>ClickCards</label>'+
+        '<input type="number" min="0" id="pk-f-cards" value="'+(p.cards||0)+'" oninput="pkField(\'cards\',this.value)"></div>'+
+      '<div class="field"><label>Catch-all for a family?</label>'+
+        '<select id="pk-f-weak" onchange="pkField(\'weak\',this.value)">'+
+          '<option value="">No</option><option value="yes"'+(p.weak?' selected':'')+'>Yes</option>'+
+        '</select></div>'+
+    '</div>'+
+    '<div class="field"><label>Digital copies</label>'+
+      '<input type="text" id="pk-f-digital" value="'+pkEsc(p.unknown===true?'?':(p.digital||''))+
+      '" oninput="pkField(\'digital\',this.value)" placeholder="e.g. all digital copies — or ? if the package isn\'t documented"></div>'+
+    '<div class="field"><label>Hair &amp; makeup <span class="tm" style="font-weight:400;">(leave blank if none)</span></label>'+
+      '<input type="text" id="pk-f-hmu" value="'+pkEsc(p.hmu||'')+'" oninput="pkField(\'hmu\',this.value)"'+
+      ' placeholder="e.g. Free basic hair and makeup — book the HMUA"></div>'+
+    '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:12px;">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--slate);margin-bottom:9px;">What this package includes</div>'+
+      '<div style="display:flex;gap:18px;flex-wrap:wrap;">'+box('print')+box('frame')+box('task')+'</div>'+
+    '</div>'+
+    '<div class="field"><label>Anything else <span class="tm" style="font-weight:400;">(one per line)</span></label>'+
+      '<textarea id="pk-f-extra" rows="2" oninput="pkField(\'extra\',this.value)">'+pkEsc((p.extra||[]).join('\n'))+'</textarea></div>'+
+    '<div class="fe">'+
+      '<button class="btn btn-sm btn-danger" onclick="pkDeletePackage()">🗑 Remove this package</button>'+
+    '</div>';
+}
+
+function pkField(which, val){
+  var p = PK.packages[PK.sel]; if(!p) return;
+  if(which === 'name'){
+    p.name = val;
+    p.m = [String(val||'').toLowerCase().trim()].concat((p.m||[]).slice(1));
+  }
+  else if(which === 'alias'){
+    p.m = [(p.m && p.m[0]) || String(p.name||'').toLowerCase()]
+      .concat(String(val||'').split(',').map(function(x){ return x.trim().toLowerCase(); }).filter(Boolean));
+  }
+  else if(which === 'edits'){
+    if(String(val).trim() === '?'){ p.unknown = p.unknown === true ? true : 'edits'; delete p.edits; }
+    else { p.edits = parseInt(val,10) || 0; if(p.unknown === 'edits') delete p.unknown; }
+  }
+  else if(which === 'digital'){
+    if(String(val).trim() === '?'){ p.unknown = true; delete p.digital; }
+    else { p.digital = val; if(p.unknown === true) delete p.unknown; }
+  }
+  else if(which === 'cards') p.cards = parseInt(val,10) || 0;
+  else if(which === 'hmu')   p.hmu = val;
+  else if(which === 'weak')  { if(val === 'yes') p.weak = true; else delete p.weak; }
+  else if(which === 'extra') p.extra = String(val||'').split('\n').map(function(x){ return x.trim(); }).filter(Boolean);
+  pkMarkDirty(true);
+  if(which === 'name') pkRenderList();
+}
+
+function pkToggle(incIdx, isOn){
+  var p = PK.packages[PK.sel], inc = PK.inclusions[incIdx];
+  if(!p || !inc) return;
+  var key = inc.kind === 'print' ? 'prints' : (inc.kind === 'frame' ? 'frames' : 'other');
+  p[key] = p[key] || [];
+  var at = p[key].indexOf(inc.name);
+  if(isOn && at === -1) p[key].push(inc.name);
+  if(!isOn && at !== -1) p[key].splice(at, 1);
+  if(!p[key].length) delete p[key];
+  pkMarkDirty(true);
+}
+
+function pkAddPackage(){
+  var name = prompt('Package name, exactly as it is booked:');
+  if(!name || !name.trim()) return;
+  name = name.trim();
+  if(PK.packages.some(function(p){ return (p.name||'').toLowerCase() === name.toLowerCase(); })){
+    notify('There is already a package called that.','error'); return;
+  }
+  PK.packages.push({ name: name, m: [name.toLowerCase()], edits: 0, digital: 'all digital copies' });
+  PK.sel = PK.packages.length - 1;
+  pkMarkDirty(true); pkRenderList(); pkRenderEditor();
+}
+
+function pkDeletePackage(){
+  var p = PK.packages[PK.sel]; if(!p) return;
+  if(!confirm('Remove "'+(p.name||'this package')+'" from the list?\n\nJobs already raised keep their checklists — this only affects new ones.')) return;
+  PK.packages.splice(PK.sel, 1);
+  PK.sel = -1;
+  pkMarkDirty(true); pkRenderList(); pkRenderEditor();
+}
+
+function pkRenderInclusions(){
+  var el = document.getElementById('pk-inc-list'); if(!el) return;
+  if(!PK.inclusions.length){ el.innerHTML = '<div class="tm">No inclusions yet.</div>'; return; }
+  el.innerHTML = PK.inclusions.map(function(inc, j){
+    var used = PK.packages.filter(function(p){
+      return (p.prints||[]).indexOf(inc.name) !== -1 || (p.frames||[]).indexOf(inc.name) !== -1 ||
+             (p.other||[]).indexOf(inc.name) !== -1; }).length;
+    return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">'+
+      '<span class="badge '+(inc.kind==='print'?'b-info':inc.kind==='frame'?'b-gold':'b-teal')+'" style="font-size:9px;">'+
+        pkKindLabel(inc.kind).replace(/s$/,'')+'</span>'+
+      '<span style="flex:1;">'+pkEsc(inc.name)+'</span>'+
+      '<span class="tm" style="font-size:10px;">'+used+' package'+(used===1?'':'s')+'</span>'+
+      '<button class="btn btn-sm btn-outline" onclick="pkDelInclusion('+j+')">✕</button></div>';
+  }).join('');
+}
+
+function pkAddInclusion(){
+  var name = (document.getElementById('pk-new-inc').value || '').trim();
+  var kind = document.getElementById('pk-new-kind').value || 'task';
+  if(!name){ notify('Type the inclusion first.','error'); return; }
+  if(PK.inclusions.some(function(i){ return i.name.toLowerCase() === name.toLowerCase(); })){
+    notify('That inclusion is already on the list.','error'); return;
+  }
+  PK.inclusions.push({ name: name, kind: kind });
+  document.getElementById('pk-new-inc').value = '';
+  pkMarkDirty(true); pkRenderInclusions(); pkRenderEditor();
+}
+
+function pkDelInclusion(j){
+  var inc = PK.inclusions[j]; if(!inc) return;
+  var used = PK.packages.filter(function(p){
+    return (p.prints||[]).indexOf(inc.name) !== -1 || (p.frames||[]).indexOf(inc.name) !== -1 ||
+           (p.other||[]).indexOf(inc.name) !== -1; }).length;
+  if(!confirm('Remove "'+inc.name+'" from the inclusion list?'+
+      (used ? '\n\nIt is ticked on '+used+' package'+(used===1?'':'s')+' — it will be unticked there too.' : ''))) return;
+  PK.packages.forEach(function(p){
+    ['prints','frames','other'].forEach(function(k){
+      if(!p[k]) return;
+      var at = p[k].indexOf(inc.name);
+      if(at !== -1) p[k].splice(at,1);
+      if(!p[k].length) delete p[k];
+    });
+  });
+  PK.inclusions.splice(j,1);
+  pkMarkDirty(true); pkRenderInclusions(); pkRenderEditor(); pkRenderList();
+}
+
+async function pkSave(){
+  if(!hasUrl()){ notify('Set the Apps Script URL in Settings first.','error'); return; }
+  if(!PK.packages.length){ notify('Nothing to save.','error'); return; }
+  var unnamed = PK.packages.filter(function(p){ return !(p.name||'').trim(); }).length;
+  if(unnamed){ notify(unnamed+' package'+(unnamed===1?' has':'s have')+' no name — give them one first.','error'); return; }
+  var btn = document.getElementById('pk-save-btn');
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+  try{
+    var r = await gasCall('savePackages', {
+      packages: JSON.stringify(PK.packages),
+      inclusions: JSON.stringify(PK.inclusions)
+    });
+    if(!r || !r.ok) throw new Error((r && r.error) || 'save refused');
+    pkMarkDirty(false);
+    notify('Saved ✓ — '+r.packages+' packages, '+r.inclusions+' inclusions','success');
+    var badge = document.getElementById('pk-source');
+    if(badge){ badge.textContent = PK.packages.length + ' packages · from the sheet'; badge.className = 'badge b-teal'; }
+  }catch(e){
+    notify('Could not save: '+e.message,'error');
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '💾 Save all packages'; }
+  }
 }
 
 </script>
