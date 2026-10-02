@@ -2756,7 +2756,7 @@ async function syncAll(){
       DB.tasks = (DB.tasks||[]).filter(t=>!_deletedTaskIds.has(String(t.id)));
     }
     saveLocal(); notify('Sync complete ✓','success');
-    if(typeof loadTasks==='function'){ loadTasks(); if(TASK_VIEW==='board') renderKanban(); else renderTasks(); updateDashTaskAlert(); }
+    if(typeof loadTasks==='function'){ loadTasks(); renderTasks(); updateDashTaskAlert(); }
     const pg=document.querySelector('.page.active'); if(pg) showPage(pg.id.replace('page-',''));
     populateInvClient(); populateBookedSel(); updateClientDatalist();
   }catch(e){ setSS('error'); notify('Sync failed: '+e.message,'error'); }
