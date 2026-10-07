@@ -1133,7 +1133,7 @@ tr:hover td { background:var(--light); }
           </div>
           <div style="font-size:10px;color:var(--muted);margin-top:6px;">This downpayment will be auto-deducted from the balance.</div>
           <div id="ia-pkg-note" style="display:none;font-size:11px;color:var(--gold);margin-top:8px;background:rgba(215,144,104,0.08);border:1px solid rgba(215,144,104,0.25);border-radius:6px;padding:6px 8px;">
-            🎂 <span id="ia-pkg-total">—</span> — added to the invoice automatically from the client's built package.
+            <span id="ia-pkg-icon">🎂</span> <span id="ia-pkg-total">—</span> — <span id="ia-pkg-why">added to the invoice automatically from the client's built package.</span>
           </div>
         </div>
       </div>
@@ -5802,17 +5802,33 @@ function showAckDP(a, dpEl, box){
   if(dpEl)   dpEl.value = a.downpayment;
   if(box)    box.style.display = '';
 
-  // ClickLounge Birthday Experience only: the total the client built in the
-  // mood-board (stored on the acknowledgement as totalPrice) is added to this
-  // invoice as its own line item, so staff don't have to reconstruct the
-  // built package's pricing by hand from the general service catalog.
+  // The package total saved on the booking (the "Total Price" typed when the
+  // booking was confirmed) goes onto the invoice as its own line, so staff
+  // don't have to look up the package price and retype it. The downpayment is
+  // already deducted separately, so the balance comes out right.
+  //
+  // A booking saved without a Total Price is stored by the server with the
+  // downpayment in that column, so for ordinary packages a total is only
+  // trusted when it is larger than the downpayment — otherwise a blank total
+  // would invoice the downpayment itself as if it were the package price.
+  // The ClickLounge Birthday Experience is a built package whose total is
+  // always the client's own, so any total counts there.
   var pkgNote  = document.getElementById('ia-pkg-note');
   var pkgTotal = document.getElementById('ia-pkg-total');
+  var pkgIcon  = document.getElementById('ia-pkg-icon');
+  var pkgWhy   = document.getElementById('ia-pkg-why');
   var isCBE    = /^ClickLounge Birthday Experience/i.test(a.service||'');
   var total    = +a.totalPrice || 0;
-  if(isCBE && total > 0){
+  var dpPaid   = +a.downpayment || 0;
+  var usable   = !!(a.service) && total > 0 && (isCBE || total > dpPaid);
+  if(usable){
     if(!INV.length) addItem(a.service, total, false);
-    if(pkgTotal) pkgTotal.textContent = (a.service||'CBE package') + ' — ₱' + fmt(total);
+    var when = dateOnly(a.bookDate||'');
+    if(pkgTotal) pkgTotal.textContent = (a.service||'package') + ' — ₱' + fmt(total);
+    if(pkgIcon)  pkgIcon.textContent  = isCBE ? '🎂' : '📦';
+    if(pkgWhy)   pkgWhy.textContent   = isCBE
+      ? "added to the invoice automatically from the client's built package."
+      : 'added to the invoice automatically from the booking' + (when ? ' for ' + when : '') + '. Remove it with ✕ if this isn\'t the session being invoiced.';
     if(pkgNote)  pkgNote.style.display = '';
   } else if(pkgNote){
     pkgNote.style.display = 'none';
