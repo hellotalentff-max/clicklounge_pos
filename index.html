@@ -2010,6 +2010,13 @@ tr:hover td { background:var(--light); }
       <div id="fin-sales-table"></div>
     </div>
 
+    <!-- Deposits and payments that fall in a different month -->
+    <div class="card">
+      <div class="ct">📆 Deposits &amp; Payments in Other Months</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Money received in a different month from the session it belongs to, compared with the report period. The Sales Report above also tags each invoice's deposit and balance.</div>
+      <div id="fin-cross"></div>
+    </div>
+
     <!-- Expenses Table -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
@@ -6313,6 +6320,8 @@ function executePrint(){
   if(inc.sales){
     body += sectionTitle('🧾','Sales Report');
     body += (document.getElementById('fin-sales-table')?.innerHTML||'<p style="color:#6b8080;font-size:11px;">No sales data.</p>');
+    body += sectionTitle('📆','Deposits & Payments in Other Months');
+    body += (document.getElementById('fin-cross')?.innerHTML||'');
   }
 
   // ── Expenses Table ──
@@ -8620,6 +8629,98 @@ function saveHmuCost(){
   notify('💄 HMU cost set to ₱' + fmt(v) + '/session — regenerate the report to refresh the forecast', 'success');
 }
 
+// ── Which month did a deposit or payment fall in, compared with the report period? ──
+function _monthIdx(d){ var s=String(dateOnly(d)||'').slice(0,7); return /^\d{4}-\d{2}$/.test(s) ? parseInt(s.slice(0,4),10)*12+parseInt(s.slice(5,7),10)-1 : null; }
+function _periodSpan(prefixes){
+  var ix=(prefixes||[]).map(_monthIdx).filter(function(x){ return x!==null; });
+  return ix.length ? {from:Math.min.apply(null,ix), to:Math.max.apply(null,ix)} : null;
+}
+// '' when the date is inside the report period, otherwise a tag saying how far outside it is
+// (literal colours on purpose: this HTML is also copied into the print window, which has no CSS variables)
+function _periodTag(d, span){
+  var i=_monthIdx(d); if(i===null||!span) return '';
+  var diff, txt, bg, fg;
+  if(i<span.from){ diff=span.from-i; txt=diff===1?'Previous month':diff+' months earlier'; bg='rgba(196,154,26,0.18)'; fg='#8a6a0c'; }
+  else if(i>span.to){ diff=i-span.to; txt=diff===1?'Following month':diff+' months later'; bg='rgba(81,137,125,0.16)'; fg='#3d6b61'; }
+  else return '';
+  return '<span class="badge" style="background:'+bg+';color:'+fg+';margin-left:4px;white-space:nowrap;">'+txt+'</span>';
+}
+function _fmtShortDate(d){
+  try{ return new Date(dateOnly(d)+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric',timeZone:'Asia/Manila'}); }
+  catch(e){ return String(d||''); }
+}
+function _sameClient(a,b){ return String(a||'').trim().toLowerCase() === String(b||'').trim().toLowerCase() && String(a||'').trim() !== ''; }
+
+// The booking receipt (acknowledgement) a deposit on an invoice came from: same client, the same amount when
+// possible, and the booking closest to (on or before) the invoice date.
+function _findDepositAck(t){
+  var dp=+t.downpayment||0; if(dp<=0) return null;
+  var tDate=dateOnly(t.date);
+  var cands=(DB.acknowledgements||[]).filter(function(a){
+    return _sameClient(a.fbName,t.clientName) && (+a.downpayment||0)>0 && String(a.status||'').toLowerCase()!=='cancelled';
+  });
+  if(!cands.length) return null;
+  var exact=cands.filter(function(a){ return Math.abs((+a.downpayment||0)-dp)<0.5; });
+  var pool=exact.length?exact:cands;
+  var before=pool.filter(function(a){ return dateOnly(a.bookDate)<=tDate; }).sort(function(a,b){ return dateOnly(b.bookDate).localeCompare(dateOnly(a.bookDate)); });
+  return before[0] || pool.slice().sort(function(a,b){ return dateOnly(a.bookDate).localeCompare(dateOnly(b.bookDate)); })[0];
+}
+
+// Deposits and balances that were received in a different month from the session they belong to.
+function _crossMonthHtml(span, label){
+  if(!span) return '<div class="tm">Select a period to see this.</div>';
+  var acksAll=(DB.acknowledgements||[]).filter(function(a){ return String(a.status||'').toLowerCase()!=='cancelled'; });
+  var txnsAll=(DB.transactions||[]).filter(function(t){ return !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var inSpan=function(i){ return i!==null && i>=span.from && i<=span.to; };
+  var bySession=function(a,b){ return dateOnly(a.bookDate).localeCompare(dateOnly(b.bookDate)); };
+
+  // A) deposits taken in an earlier month for sessions in this period
+  var earlier=acksAll.filter(function(a){ var r=_monthIdx(a.date); return (+a.downpayment||0)>0 && r!==null && r<span.from && inSpan(_monthIdx(a.bookDate)); }).sort(bySession);
+  // B) deposits taken in this period for sessions in a later month
+  var later=acksAll.filter(function(a){ var s=_monthIdx(a.bookDate); return (+a.downpayment||0)>0 && inSpan(_monthIdx(a.date)) && s!==null && s>span.to; }).sort(bySession);
+  // C) sessions in this period whose invoice (balance payment) was made in a later month
+  var lateBal=[];
+  acksAll.filter(function(a){ return inSpan(_monthIdx(a.bookDate)); }).forEach(function(a){
+    var inv=txnsAll.filter(function(t){ return _sameClient(t.clientName,a.fbName) && dateOnly(t.date)>=dateOnly(a.bookDate); })
+                   .sort(function(x,y){ return dateOnly(x.date).localeCompare(dateOnly(y.date)); })[0];
+    if(inv){ var m=_monthIdx(inv.date); if(m!==null && m>span.to) lateBal.push({ack:a, inv:inv}); }
+  });
+  lateBal.sort(function(x,y){ return bySession(x.ack,y.ack); });
+
+  var th='style="text-align:left;"', thr='style="text-align:right;"';
+  var money=function(n){ return '₱'+fmt(+n||0); };
+  function depositTable(title, rows, dateOf, note){
+    var tot=rows.reduce(function(s,a){ return s+(+a.downpayment||0); },0);
+    var h='<div style="font-weight:600;margin:14px 0 2px;">'+title+'</div><div style="font-size:10px;color:#6b8080;margin-bottom:6px;">'+note+'</div>'+
+      '<div style="overflow-x:auto;"><table><thead><tr><th '+th+'>Client</th><th '+th+'>Deposit received</th><th '+th+'>Session</th><th '+thr+'>Deposit</th></tr></thead><tbody>';
+    rows.forEach(function(a){
+      h+='<tr><td style="font-weight:500;">'+(a.fbName||'—')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;">'+(a.date?_fmtShortDate(a.date)+_periodTag(a.date,span):'—')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;">'+_fmtShortDate(a.bookDate)+_periodTag(a.bookDate,span)+'</td>'+
+        '<td style="text-align:right;font-weight:600;">'+money(a.downpayment)+'</td></tr>';
+    });
+    return h+'<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--light2);"><td colspan="3">TOTAL ('+rows.length+')</td><td style="text-align:right;">'+money(tot)+'</td></tr></tbody></table></div>';
+  }
+  var html='';
+  if(earlier.length) html+=depositTable('Deposits taken before this period, for this period\'s sessions', earlier, null, 'Cash that came in earlier; the sessions are in '+label+'.');
+  if(later.length)   html+=depositTable('Deposits taken in this period, for sessions in a later month', later, null, 'Cash that came in during '+label+'; the sessions are in a following month, so they are not in this period\'s revenue.');
+  if(lateBal.length){
+    var tot=lateBal.reduce(function(s,x){ return s+(+x.inv.balance||0); },0);
+    html+='<div style="font-weight:600;margin:14px 0 2px;">Sessions in this period, balance paid in a following month</div>'+
+      '<div style="font-size:10px;color:#6b8080;margin-bottom:6px;">The invoice was made after the period ended, so it is counted in that later month\'s sales.</div>'+
+      '<div style="overflow-x:auto;"><table><thead><tr><th '+th+'>Client</th><th '+th+'>Session</th><th '+th+'>Invoice</th><th '+th+'>Balance paid</th><th '+thr+'>Balance</th></tr></thead><tbody>';
+    lateBal.forEach(function(x){
+      html+='<tr><td style="font-weight:500;">'+(x.ack.fbName||'—')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;">'+_fmtShortDate(x.ack.bookDate)+'</td>'+
+        '<td style="font-size:11px;">'+(x.inv.invoiceNum||'—')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;">'+_fmtShortDate(x.inv.date)+_periodTag(x.inv.date,span)+'</td>'+
+        '<td style="text-align:right;font-weight:600;">'+money(x.inv.balance)+'</td></tr>';
+    });
+    html+='<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--light2);"><td colspan="4">TOTAL ('+lateBal.length+')</td><td style="text-align:right;">'+money(tot)+'</td></tr></tbody></table></div>';
+  }
+  return html || '<div class="tm">No deposits or payments fall in another month for '+label+'.</div>';
+}
+
 function renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes){
   const totalRev  = txns.reduce((s,t)=>s+(+t.total||0),0);
   const totalExp  = allExp.reduce((s,e)=>s+(+e.amt||0),0);
@@ -8770,19 +8871,33 @@ function renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes)
   // Sales table
   const seenInv = new Set();
   const txnRows = txns.filter(t=>{ const inv=String(t.invoiceNum||''); if(!inv||seenInv.has(inv)) return false; seenInv.add(inv); return true; });
-  let salesHtml = '<div style="overflow-x:auto;"><table><thead><tr><th>Invoice</th><th>Date</th><th>Client</th><th>Services</th><th style="text-align:right;">Total</th></tr></thead><tbody>';
+  const span = _periodSpan(prefixes);
+  let salesHtml = '<div style="overflow-x:auto;"><table><thead><tr><th>Invoice</th><th>Date</th><th>Client</th><th>Services</th><th style="min-width:200px;">Deposit / Payment</th><th style="text-align:right;">Total</th></tr></thead><tbody>';
   txnRows.forEach(t=>{
     const items = Array.isArray(t.items)?t.items:(typeof t.items==='string'?JSON.parse(t.items||'[]'):[]);
     const svcs  = items.map(i=>i.name+(i.qty>1?' x'+i.qty:'')).join(', ')||'—';
+    // when the deposit and the balance were paid, tagged when that is outside the report period
+    const dp = +t.downpayment||0, bal = +t.balance||0, dpAck = _findDepositAck(t);
+    let payHtml = '';
+    if(dp>0){
+      const dpDate = dpAck && dpAck.date ? dateOnly(dpAck.date) : '';
+      payHtml += '<div>Deposit ₱'+fmt(dp)+' · '+(dpDate ? _fmtShortDate(dpDate)+_periodTag(dpDate, span) : '<span style="color:#9aa8a5;">date not recorded</span>')+'</div>';
+    }
+    if(bal>0) payHtml += '<div>Balance ₱'+fmt(bal)+' · '+_fmtShortDate(t.date)+(t.balanceMOP?' · '+t.balanceMOP:'')+_periodTag(t.date, span)+'</div>';
+    // a booking from another month: say which session this invoice settles
+    if(dpAck && dpAck.bookDate && _periodTag(dpAck.bookDate, span)) payHtml += '<div style="color:#6b8080;">Session '+_fmtShortDate(dpAck.bookDate)+_periodTag(dpAck.bookDate, span)+'</div>';
     salesHtml += '<tr><td><span class="badge b-gold">'+t.invoiceNum+'</span></td>'+
       '<td style="white-space:nowrap;font-size:11px;">'+new Date(String(t.date).slice(0,10)+'T00:00:00').toLocaleDateString('en-PH',{month:'short',day:'numeric',timeZone:'Asia/Manila'})+'</td>'+
       '<td style="font-weight:500;">'+t.clientName+'</td>'+
       '<td style="font-size:11px;color:var(--muted);">'+svcs+'</td>'+
+      '<td style="font-size:11px;line-height:1.6;min-width:200px;">'+(payHtml||'—')+'</td>'+
       '<td style="text-align:right;font-weight:600;">₱'+fmt(+t.total)+'</td></tr>';
   });
-  salesHtml += '<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--light2);"><td colspan="4">TOTAL ('+txnRows.length+' transactions)</td><td style="text-align:right;">₱'+fmt(totalRev)+'</td></tr>';
+  salesHtml += '<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--light2);"><td colspan="5">TOTAL ('+txnRows.length+' transactions)</td><td style="text-align:right;">₱'+fmt(totalRev)+'</td></tr>';
   salesHtml += '</tbody></table></div>';
   document.getElementById('fin-sales-table').innerHTML = txnRows.length ? salesHtml : '<div class="tm">No sales this period.</div>';
+  const crossEl = document.getElementById('fin-cross');
+  if(crossEl) crossEl.innerHTML = _crossMonthHtml(span, label);
 
   // Expenses table
   let expHtml = '<div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th>Mode</th></tr></thead><tbody>';
