@@ -1970,6 +1970,7 @@ tr:hover td { background:var(--light); }
       <div class="rep-card-stat" id="fin-txns"><div class="rs-label">Transactions</div><div class="rs-val">—</div></div>
       <div class="rep-card-stat" id="fin-disc"><div class="rs-label">Discounts Given</div><div class="rs-val rs-muted">—</div></div>
       <div class="rep-card-stat" id="fin-avg"><div class="rs-label">Avg Invoice Value</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="fin-cash-in"><div class="rs-label">Cash Received</div><div class="rs-val">—</div></div>
     </div>
 
     <!-- Revenue vs Expenses Bar Chart -->
@@ -1999,6 +2000,13 @@ tr:hover td { background:var(--light); }
         <button class="btn btn-sm btn-outline" onclick="printCashflowReport()">🖨 Print Cashflow</button>
       </div>
       <div id="fin-mop-detail"></div>
+    </div>
+
+    <!-- Cash actually received in the period -->
+    <div class="card">
+      <div class="ct">💵 Cash Received This Period</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Money received in the period, by the date it arrived: balances paid on invoices plus deposits taken, less refunds. Total Revenue counts a session when it is invoiced, deposit included, so the two figures differ.</div>
+      <div id="fin-cash-received"></div>
     </div>
 
     <!-- Sales Table -->
@@ -6314,6 +6322,8 @@ function executePrint(){
   if(inc.mop){
     body += sectionTitle('💳','Payment Method Breakdown');
     body += (document.getElementById('fin-mop-detail')?.innerHTML||'<p style="color:#6b8080;font-size:11px;">No data.</p>');
+    body += sectionTitle('💵','Cash Received This Period');
+    body += (document.getElementById('fin-cash-received')?.innerHTML||'');
   }
 
   // ── Sales Table ──
@@ -8898,6 +8908,54 @@ function renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes)
   document.getElementById('fin-sales-table').innerHTML = txnRows.length ? salesHtml : '<div class="tm">No sales this period.</div>';
   const crossEl = document.getElementById('fin-cross');
   if(crossEl) crossEl.innerHTML = _crossMonthHtml(span, label);
+
+  // Cash received in the period: money counted on the day it arrived, not when the session was invoiced.
+  // = balances paid on this period's invoices + deposits taken in the period (any booking status, the money still came in) - refunds.
+  try {
+    const inSpan = (i)=> i!==null && span && i>=span.from && i<=span.to;
+    const depAcks = (DB.acknowledgements||[]).filter(a=> (+a.downpayment||0)>0 && inSpan(_monthIdx(a.date)));
+    const balPaid = txns.reduce((s,t)=>s+(+t.balance||0),0);
+    const depTotal = depAcks.reduce((s,a)=>s+(+a.downpayment||0),0);
+    const depFor = {here:0, later:0, earlier:0};
+    depAcks.forEach(a=>{
+      const sIdx=_monthIdx(a.bookDate), amt=+a.downpayment||0;
+      if(sIdx===null || inSpan(sIdx)) depFor.here+=amt; else if(sIdx>span.to) depFor.later+=amt; else depFor.earlier+=amt;
+    });
+    const refunds = allFT.filter(f=>String(f.type||'').toLowerCase().includes('refund')).reduce((s,f)=>s+(+f.amt||0),0);
+    const received = balPaid + depTotal, netCash = received - refunds;
+
+    const row = (lbl, val, o)=>{ o=o||{};
+      return '<tr'+(o.total?' style="background:var(--light);font-weight:700;border-top:2px solid var(--light2);"':'')+'><td style="'+(o.indent?'padding-left:26px;font-size:11px;color:#6b8080;':'')+'">'+lbl+'</td>'+
+        '<td style="text-align:right;font-weight:'+(o.total?'700':'600')+';color:'+(o.neg?'#c0544a':'inherit')+';">'+(o.neg?'−':'')+'₱'+fmt(val)+'</td></tr>'; };
+    let ch = '<div style="overflow-x:auto;"><table><thead><tr><th>Source</th><th style="text-align:right;">Amount</th></tr></thead><tbody>';
+    ch += row('Balances paid on invoices in this period', balPaid);
+    ch += row('Deposits taken in this period', depTotal);
+    if(depFor.here)    ch += row('for sessions in this period', depFor.here, {indent:true});
+    if(depFor.later)   ch += row('for sessions in a following month', depFor.later, {indent:true});
+    if(depFor.earlier) ch += row('for sessions in an earlier month', depFor.earlier, {indent:true});
+    ch += row('Total money received', received, {total:true});
+    if(refunds) ch += row('Refunds paid to clients', refunds, {neg:true});
+    ch += row('NET CASH RECEIVED', netCash, {total:true});
+    ch += '</tbody></table></div>';
+
+    // by payment method: balances by the method used on the invoice, deposits by the method on the booking receipt
+    const meth = {};
+    const addM = (m, k, v)=>{ m=m||'Other'; (meth[m]=meth[m]||{bal:0,dep:0})[k]+=v; };
+    txns.forEach(t=>{ if(+t.balance>0) addM(t.balanceMOP,'bal',+t.balance); });
+    depAcks.forEach(a=>addM(a.mop,'dep',+a.downpayment||0));
+    const mNames = Object.keys(meth).sort((a,b)=>(meth[b].bal+meth[b].dep)-(meth[a].bal+meth[a].dep));
+    if(mNames.length){
+      ch += '<div style="font-weight:600;margin:16px 0 6px;">By payment method</div><div style="overflow-x:auto;"><table><thead><tr><th>Method</th><th style="text-align:right;">Balances</th><th style="text-align:right;">Deposits</th><th style="text-align:right;">Total received</th></tr></thead><tbody>';
+      mNames.forEach(m=>{ ch += '<tr><td style="font-weight:500;">'+m+'</td><td style="text-align:right;">₱'+fmt(meth[m].bal)+'</td><td style="text-align:right;">₱'+fmt(meth[m].dep)+'</td><td style="text-align:right;font-weight:600;">₱'+fmt(meth[m].bal+meth[m].dep)+'</td></tr>'; });
+      ch += '</tbody></table></div>';
+    }
+    const diff = netCash - totalRev;
+    ch += '<div style="margin-top:12px;font-size:11px;color:#6b8080;line-height:1.6;">Net cash received is <b>₱'+fmt(Math.abs(diff))+(diff>=0?' more':' less')+'</b> than Total Revenue (₱'+fmt(totalRev)+'). '+
+      'Deposits taken in earlier months for this period\'s sessions are in revenue but not in this period\'s cash. Deposits taken now for later sessions are in cash but not yet in revenue.</div>';
+    const cr = document.getElementById('fin-cash-received'); if(cr) cr.innerHTML = ch;
+    const ci = document.getElementById('fin-cash-in');
+    if(ci) ci.innerHTML = '<div class="rs-label">Cash Received</div><div class="rs-val rs-teal">₱'+fmt(netCash)+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px;">'+(diff>=0?'₱'+fmt(diff)+' above':'₱'+fmt(-diff)+' below')+' revenue</div>';
+  } catch(cashErr){ console.error('cash received:', cashErr); }
 
   // Expenses table
   let expHtml = '<div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Description</th><th style="text-align:right;">Amount</th><th>Mode</th></tr></thead><tbody>';
