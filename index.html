@@ -10112,8 +10112,8 @@ async function submitQuickBook(sendEmail){
 function openBlockDialog(){
   const today = todayStr();
   const slots = ALL_TIME_SLOTS.map(function(s){
-    return '<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0;cursor:pointer;">' +
-      '<input type="checkbox" name="block-slot" value="' + s + '" style="accent-color:var(--danger);"> ' + s +
+    return '<label class="blk-slot" data-slot="' + s + '" style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0;cursor:pointer;">' +
+      '<input type="checkbox" name="block-slot" value="' + s + '" style="accent-color:var(--danger);"> <span class="blk-lbl">' + s + '</span>' +
     '</label>';
   }).join('');
 
@@ -10124,11 +10124,15 @@ function openBlockDialog(){
     '</p>' +
     '<div class="field" style="margin-bottom:14px;">' +
       '<label for="blk-date">Date *</label>' +
-      '<input type="date" id="blk-date" min="' + today + '">' +
+      '<input type="date" id="blk-date" min="' + today + '" onchange="blkRefreshSlots()">' +
     '</div>' +
     '<div style="margin-bottom:14px;">' +
-      '<label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:500;display:block;margin-bottom:8px;">Block Specific Time Slots</label>' +
-      '<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Leave all unchecked to block the entire day.</p>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">' +
+        '<label style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:500;margin:0;">Block Specific Time Slots</label>' +
+        '<button type="button" class="btn btn-sm btn-outline" style="font-size:10px;padding:3px 8px;" onclick="blkSelectOpen()">Select all open slots</button>' +
+      '</div>' +
+      '<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Leave all unchecked to block the entire day. Slots that already have a booking (or a block) are greyed out and will be left alone.</p>' +
+      '<div id="blk-slot-info" style="font-size:11px;color:var(--muted);margin-bottom:6px;"></div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;background:var(--light);border:1px solid var(--light2);border-radius:8px;padding:10px;">' +
         slots +
       '</div>' +
@@ -10144,12 +10148,83 @@ function openBlockDialog(){
   );
 }
 
+// Slots on a date that already hold a booking (server + local records)
+var _blkBooked = [];
+async function blkRefreshSlots(){
+  var dateVal = (document.getElementById('blk-date')||{}).value;
+  var info = document.getElementById('blk-slot-info');
+  var labels = Array.from(document.querySelectorAll('.blk-slot'));
+  _blkBooked = [];
+  if(!dateVal){ labels.forEach(function(l){ blkMarkSlot(l, ''); }); if(info) info.textContent=''; return; }
+  if(info) info.textContent = '⏳ Checking existing bookings…';
+
+  var booked = [];
+  // local records (confirmed/pending acknowledgements)
+  (DB.acknowledgements||[]).forEach(function(a){
+    if(dateOnly(a.bookDate) !== dateVal) return;
+    if(/cancel/i.test(a.status||'')) return;
+    var t = String(a.timeSlot||'').trim();
+    if(t && booked.indexOf(t) === -1) booked.push(t);
+  });
+  // server (calendar) — catches bookings made through the website
+  if(hasUrl()){
+    try{
+      var r = await gasCall('getBookedSlots', { date: dateVal });
+      if(r && r.ok) (r.takenSlots||[]).forEach(function(t){ if(booked.indexOf(t) === -1) booked.push(t); });
+    }catch(e){}
+  }
+  // ignore a late reply if the user already picked another date
+  if(((document.getElementById('blk-date')||{}).value) !== dateVal) return;
+
+  var blockedAlready = getLocalBlockedSlotsForDate(dateVal);
+  var fullDayBlocked = loadBlocked().some(function(b){ return b.date===dateVal && b.fullDay; });
+  labels.forEach(function(l){
+    var slot = l.getAttribute('data-slot');
+    if(blockedAlready.indexOf(slot) > -1) blkMarkSlot(l, 'blocked');
+    else if(booked.indexOf(slot) > -1)    blkMarkSlot(l, 'booked');
+    else                                   blkMarkSlot(l, '');
+  });
+  _blkBooked = booked.filter(function(t){ return ALL_TIME_SLOTS.indexOf(t) > -1; });
+  var open = ALL_TIME_SLOTS.filter(function(s){ return _blkBooked.indexOf(s)===-1 && blockedAlready.indexOf(s)===-1; });
+  if(info){
+    info.textContent = fullDayBlocked ? 'This whole day is already blocked.'
+      : _blkBooked.length + ' booked · ' + open.length + ' open slot' + (open.length!==1?'s':'');
+    info.style.color = open.length ? 'var(--teal)' : 'var(--danger)';
+  }
+}
+function blkMarkSlot(label, state){
+  var cb = label.querySelector('input'), txt = label.querySelector('.blk-lbl'), slot = label.getAttribute('data-slot');
+  if(state){
+    cb.checked = false; cb.disabled = true;
+    label.style.opacity = '.5'; label.style.cursor = 'not-allowed';
+    txt.textContent = slot + (state==='booked' ? ' — booked' : ' — blocked');
+  }else{
+    cb.disabled = false;
+    label.style.opacity = ''; label.style.cursor = 'pointer';
+    txt.textContent = slot;
+  }
+}
+function blkSelectOpen(){
+  if(!document.getElementById('blk-date').value){ notify('Pick a date first','error'); return; }
+  document.querySelectorAll('input[name="block-slot"]').forEach(function(cb){ if(!cb.disabled) cb.checked = true; });
+}
+
 async function saveBlock(){
   const dateVal = document.getElementById('blk-date').value;
   if(!dateVal){ notify('Please select a date','error'); return; }
 
   const reason  = document.getElementById('blk-reason').value.trim() || 'Blocked';
-  const checked = Array.from(document.querySelectorAll('input[name="block-slot"]:checked')).map(function(el){ return el.value; });
+  let checked = Array.from(document.querySelectorAll('input[name="block-slot"]:checked')).filter(function(el){ return !el.disabled; }).map(function(el){ return el.value; });
+  // Nothing ticked on a day that already has bookings: block only what is still open
+  if(!checked.length){
+    var openSlots = Array.from(document.querySelectorAll('input[name="block-slot"]')).filter(function(el){ return !el.disabled; }).map(function(el){ return el.value; });
+    var hasBookings = _blkBooked.length > 0 || openSlots.length < ALL_TIME_SLOTS.length;
+    if(hasBookings){
+      if(!openSlots.length){ notify('No open slots left to block on ' + dateVal,'info'); return; }
+      if(!confirm('This date already has ' + _blkBooked.length + ' booking(s).\n\nBlock only the ' + openSlots.length + ' open slot(s) and leave the booked ones untouched?')) return;
+      checked = openSlots;
+    }
+  }
   const fullDay = checked.length === 0;
 
   const blocks = loadBlocked();
