@@ -3637,6 +3637,7 @@ function calDayClick(dateStr){
       '<div style="display:flex;gap:6px;margin-top:8px;">'+
         (isPending ? '<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="calConfirmAck(this)">✓ Confirm</button>' : '')+
         '<button class="btn btn-sm" style="background:var(--gold);color:#fff;" data-aid="'+a.id+'" onclick="calRescheduleAck(this)">📆 Reschedule</button>'+
+        '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calChangePkgAck(this)">🔄 Change Package</button>'+
         '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)">🖨 Print</button>'+
         '<button class="btn btn-sm btn-danger" data-aid="'+a.id+'" onclick="calDeleteAck(this)">✕ Delete</button>'+
       '</div>'+
@@ -3785,6 +3786,151 @@ function backfillPhotographerTasks(){
   var editMade = editAfter - editBefore;
   notify('📋 Backfill complete — created ' + made + ' prep task(s) and ' + editMade + ' editing task(s) from ' + acks.length + ' photographer booking(s)', 'success');
   return { scanned: acks.length, created: made, editingCreated: editMade };
+}
+
+// ── Change Package ─────────────────────────────────────────────
+// Swap a booking's package + price (e.g. client upgrades to another package).
+function calChangePkgAck(btn){ changePackage(btn.dataset.aid); }
+
+function changePackage(id){
+  var a = (DB.acknowledgements||[]).find(function(x){ return x.id===id; });
+  if(!a){ notify('Booking not found','error'); return; }
+  var total = +a.totalPrice || +a.total || 0, dp = +a.downpayment || 0;
+  openModal(
+    '<h3 style="margin-bottom:4px;">🔄 Change Package</h3>'+
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;"><strong>'+escHtml(a.fbName||'')+'</strong> · '+escHtml(dateOnly(a.bookDate))+' · '+escHtml(a.timeSlot||'—')+'<br>'+
+      'Current: <strong>'+escHtml(a.service||'—')+'</strong> · ₱'+fmt(total)+' · ₱'+fmt(dp)+' paid</div>'+
+    '<div class="field" style="margin-bottom:12px;"><label>New Package</label>'+
+      '<select id="cp-service" class="sinput" style="width:100%;" onchange="cpPick()">'+
+        '<option value="">— Select Package —</option>'+pkgOptionsHtml()+
+      '</select></div>'+
+    '<div class="frow c2" style="margin-bottom:10px;">'+
+      '<div class="field" style="margin:0;"><label>New Total (₱)</label>'+
+        '<input type="number" id="cp-price" class="sinput" min="0" style="width:100%;" oninput="cpBalance()"></div>'+
+      '<div class="field" style="margin:0;"><label>Balance after change</label>'+
+        '<div id="cp-balance" style="padding:9px 0;font-weight:700;color:var(--slate);">—</div></div>'+
+    '</div>'+
+    '<div id="cp-hmu" style="display:none;margin-bottom:10px;"></div>'+
+    '<div id="cp-status" style="font-size:11px;color:var(--muted);margin-bottom:10px;display:none;"></div>'+
+    '<div class="fe" style="gap:8px;">'+
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>'+
+      '<button class="btn btn-gold" id="cp-submit" onclick="submitChangePackage(\''+id+'\')">🔄 Change Package</button>'+
+    '</div>'
+  );
+  window._cpAckId = id;
+}
+
+function cpPick(){
+  var sel = document.getElementById('cp-service');
+  var opt = sel.options[sel.selectedIndex];
+  var a = (DB.acknowledgements||[]).find(function(x){ return x.id===window._cpAckId; });
+  // price 0 = custom / promo: leave blank so staff types it
+  document.getElementById('cp-price').value = (opt && +opt.dataset.price > 0) ? opt.dataset.price : '';
+  cpBalance();
+
+  // HMU prep: offer to block the next slot if the new package has HMU and the old one did not
+  var box = document.getElementById('cp-hmu');
+  box.style.display = 'none'; box.innerHTML = '';
+  if(a && sel.value && _hasHMU(sel.value) && !_hasHMU(a.service)){
+    var idx = ALL_TIME_SLOTS.indexOf(String(a.timeSlot||'').trim());
+    var next = (idx > -1 && idx < ALL_TIME_SLOTS.length-1) ? ALL_TIME_SLOTS[idx+1] : null;
+    var d = dateOnly(a.bookDate);
+    var nextTaken = next && (DB.acknowledgements||[]).some(function(x){
+      return x.id!==a.id && dateOnly(x.bookDate)===d && String(x.timeSlot||'').trim()===next && !/cancel/i.test(x.status||'');
+    });
+    var html = '<div style="background:#fff4e6;border:1px solid #d79068;border-radius:8px;padding:10px 12px;font-size:11px;color:#5c3717;">'+
+      '💄 <strong>This package includes Hair &amp; Makeup.</strong> Client should arrive 1.5 hrs early and the HMU artist must be booked.';
+    if(next && !nextTaken) html += '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12px;"><input type="checkbox" id="cp-blocknext" checked> Also block the next slot ('+next+') for HMU prep</label>';
+    else if(nextTaken)     html += '<div style="margin-top:6px;">⚠ The next slot ('+next+') already has a booking, so it can\'t be blocked.</div>';
+    box.innerHTML = html + '</div>';
+    box.style.display = '';
+    box.dataset.next = (next && !nextTaken) ? next : '';
+  }
+}
+
+function cpBalance(){
+  var a = (DB.acknowledgements||[]).find(function(x){ return x.id===window._cpAckId; });
+  var el = document.getElementById('cp-balance');
+  var v = document.getElementById('cp-price').value;
+  if(!a || v===''){ el.textContent = '—'; return; }
+  var bal = (+v||0) - (+a.downpayment||0);
+  el.textContent = bal > 0 ? '₱'+fmt(bal)+' due' : bal === 0 ? 'Fully paid' : '₱'+fmt(-bal)+' to refund / credit';
+  el.style.color = bal > 0 ? 'var(--danger)' : 'var(--success)';
+}
+
+async function submitChangePackage(id){
+  var a = (DB.acknowledgements||[]).find(function(x){ return x.id===id; });
+  if(!a) return;
+  var newSvc = document.getElementById('cp-service').value;
+  var priceRaw = document.getElementById('cp-price').value;
+  if(!newSvc){ notify('Choose the new package','error'); return; }
+  if(priceRaw === '' || isNaN(+priceRaw) || +priceRaw < 0){ notify('Enter the new total price','error'); return; }
+  var newPrice = +priceRaw, oldSvc = a.service||'', oldPrice = +a.totalPrice || +a.total || 0;
+  if(newSvc===oldSvc && newPrice===oldPrice){ notify('Same package & price — nothing to change','error'); return; }
+
+  var btn = document.getElementById('cp-submit');
+  btn.disabled = true; btn.textContent = '⏳ Changing…';
+  var st = document.getElementById('cp-status');
+  st.style.display=''; st.style.color='var(--muted)'; st.textContent='Updating booking, calendar and tasks…';
+
+  var hmuBox = document.getElementById('cp-hmu');
+  var blockNext = !!(document.getElementById('cp-blocknext') && document.getElementById('cp-blocknext').checked && hmuBox.dataset.next);
+  var nextSlot = hmuBox.dataset.next || '';
+  var bookDate = dateOnly(a.bookDate), client = String(a.fbName||'').trim();
+
+  // 1) booking record (+ sheet)
+  a.service = newSvc; a.totalPrice = newPrice;
+  if(a.total !== undefined) a.total = newPrice;
+  saveLocal();
+  push('saveAcknowledgement', a);
+
+  // 2) calendar event (needs the changeBookingPackage action in the Apps Script)
+  var calMsg = '';
+  if(hasUrl()){
+    try{
+      var r = await gasCall('changeBookingPackage', {
+        ackNum: a.ackNum||'', fbName: client, email: a.email||'',
+        bookDate: bookDate, timeSlot: a.timeSlot||'',
+        oldService: oldSvc, newService: newSvc, newPrice: newPrice
+      });
+      if(r && r.ok) calMsg = ' · calendar updated';
+      else calMsg = ' · ⚠ calendar not updated ('+((r&&r.error)||'unknown')+') — rename the event by hand';
+    }catch(e){ calMsg = ' · ⚠ calendar not updated — rename the event by hand'; }
+  }
+
+  // 3) session tasks: rename existing ones, create any the new package now needs
+  var touched = 0;
+  (DB.tasks||[]).forEach(function(t){
+    if(t.archived) return;
+    if(String(t.client||'').toLowerCase()!==client.toLowerCase()) return;
+    if(String(t.due||'').slice(0,10)!==bookDate) return;
+    if(['HMU Prep','editing'].indexOf(String(t.type||''))===-1) return;
+    if(oldSvc){
+      t.title = String(t.title||'').split(oldSvc).join(newSvc);
+      t.notes = String(t.notes||'').split(oldSvc).join(newSvc);
+    }
+    t.updated = t.updatedAt = todayStr();
+    push('saveTask', t); touched++;
+  });
+  createHmuPrepTask(a);
+  createEditingTask(a);
+  saveLocal();
+
+  // 4) block the follow-up slot for hair & makeup
+  if(blockNext && nextSlot){
+    var reason = 'HMU extension — ' + client;
+    var blocks = loadBlocked();
+    blocks.push({ id: uid(), date: bookDate, fullDay: false, slots: [nextSlot], reason: reason, createdAt: todayStr() });
+    saveBlocked(blocks);
+    if(hasUrl()) gasCall('createBlock', { date: bookDate, timeSlot: nextSlot, reason: reason }).catch(function(){});
+    renderBlockedList();
+  }
+
+  logActivity('Package Changed', (a.ackNum||'')+' — '+client+': '+oldSvc+' (₱'+fmt(oldPrice)+') → '+newSvc+' (₱'+fmt(newPrice)+')', 'info');
+  notify('🔄 '+client+': '+newSvc+' · ₱'+fmt(newPrice)+calMsg, calMsg.indexOf('⚠')>-1 ? 'info' : 'success');
+  closeModal();
+  renderCalendar();
+  renderAcks();
 }
 
 function calRescheduleAck(btn){
@@ -5411,6 +5557,7 @@ function renderAcks(){
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;">
           ${status==='pending'?'<button class="btn btn-sm btn-teal" data-aid="'+a.id+'" onclick="confirmAck(this.dataset.aid)">✓ Confirm</button>':''}
+          ${status!=='cancelled'?'<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="changePackage(this.dataset.aid)" title="Change package">🔄</button>':''}
           <button class="btn btn-sm btn-outline" data-aid="${a.id}" onclick="viewAckDetail(this.dataset.aid)">👁</button>
           <button class="btn btn-sm btn-outline" data-aid="${a.id}" onclick="printAck(this.dataset.aid)">🖨</button>
           <button class="btn btn-sm btn-outline" data-aid="${a.id}" onclick="toggleHideAck(this.dataset.aid)" title="${isHidden?'Show':'Hide'}">${isHidden?'👁':'🙈'}</button>
@@ -9817,45 +9964,7 @@ function openQuickBook(){
         '<label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--slate);">Package / Service *</label>'+
         '<select id="qb-service" class="sinput" style="width:100%;" onchange="qbAutoPrice()">'+
           '<option value="">— Select Service —</option>'+
-          '<optgroup label="Self-Shoot">'+
-            '<option value="Snapshot Selfie" data-price="500" data-pax="1">Snapshot Selfie (₱500)</option>'+
-            '<option value="Tribe Time" data-price="800" data-pax="4">Tribe Time (₱800)</option>'+
-            '<option value="Crowd Cam" data-price="1000" data-pax="6">Crowd Cam (₱1,000)</option>'+
-            '<option value="Crew Captures" data-price="1200" data-pax="10">Crew Captures (₱1,200)</option>'+
-            '<option value="Frenzy Snaps Birthday" data-price="700" data-pax="4">Frenzy Snaps Birthday (₱700)</option>'+
-            '<option value="Party Clicks Birthday" data-price="1000" data-pax="6">Party Clicks Birthday (₱1,000)</option>'+
-            '<option value="Click Capture Birthday" data-price="1500" data-pax="10">Click Capture Birthday (₱1,500)</option>'+
-          '</optgroup>'+
-          '<optgroup label="Photographer — Styleshots">'+
-            '<option value="Styleshots" data-price="1500" data-pax="1">Styleshots (₱1,500)</option>'+
-            '<option value="Promo Styleshots" data-price="0" data-pax="1">Promo Styleshots + HMU 💄</option>'+
-            '<option value="Couple Styleshots" data-price="2500" data-pax="2">Couple Styleshots (₱2,500)</option>'+
-            '<option value="Couple Styleshots Promo" data-price="0" data-pax="2">Couple Styleshots Promo + HMU 💄</option>'+
-            '<option value="Luxe Mode" data-price="3500" data-pax="1">Luxe Mode + HMU 💄 (₱3,500)</option>'+
-            '<option value="The Coat Code" data-price="3500" data-pax="1">The Coat Code + HMU 💄 (₱3,500)</option>'+
-          '</optgroup>'+
-          '<optgroup label="Photographer — Family & Occasions">'+
-            '<option value="Pop Reveal" data-price="3000" data-pax="4">Pop Reveal (₱3,000)</option>'+
-            '<option value="Radiant Mama - Mama Love" data-price="2000" data-pax="1">Radiant Mama — Mama Love (₱2,000)</option>'+
-            '<option value="Radiant Mama - Glowing Mom" data-price="5500" data-pax="1">Radiant Mama — Glowing Mom + HMU 💄 (₱5,500)</option>'+
-            '<option value="Candid Kids" data-price="1500" data-pax="3">Candid Kids (from ₱1,500)</option>'+
-            '<option value="Family Portraits" data-price="1700" data-pax="10">Family Portraits (from ₱1,700)</option>'+
-            '<option value="PAWtraits" data-price="1500" data-pax="4">PAWtraits (from ₱1,500)</option>'+
-          '</optgroup>'+
-          '<optgroup label="Photographer — Graduation & Bridal">'+
-            '<option value="Cap and Gown" data-price="700" data-pax="1">Cap and Gown (₱700)</option>'+
-            '<option value="Grad-U-Click" data-price="1500" data-pax="5">Grad-U-Click (₱1,500)</option>'+
-            '<option value="VIP Grad Glam" data-price="3000" data-pax="1">VIP Grad Glam + HMU 💄 (₱3,000)</option>'+
-            '<option value="Bridal Bliss" data-price="5000" data-pax="2">Bridal Bliss (₱5,000)</option>'+
-          '</optgroup>'+
-          '<optgroup label="Other">'+
-            '<option value="Photographer Session" data-price="0" data-pax="1">Photographer Session (custom)</option>'+
-            '<option value="Studio Rental" data-price="0" data-pax="1">Studio Rental</option>'+
-          '</optgroup>'+
-          '<optgroup label="Events">'+
-            '<option value="Event Booking" data-price="0" data-pax="1">Event Booking</option>'+
-            '<option value="Booth Rental" data-price="0" data-pax="1">Booth Rental</option>'+
-          '</optgroup>'+
+          pkgOptionsHtml()+
         '</select>'+
       '</div>'+
       '<div class="frow c2" style="gap:10px;">'+
@@ -9909,6 +10018,50 @@ function openQuickBook(){
 
   openModal(html);
   qbCheckSlots();
+}
+
+// Shared package list (Quick Book + Change Package)
+function pkgOptionsHtml(){
+  return (
+          '<optgroup label="Self-Shoot">'+
+            '<option value="Snapshot Selfie" data-price="500" data-pax="1">Snapshot Selfie (₱500)</option>'+
+            '<option value="Tribe Time" data-price="800" data-pax="4">Tribe Time (₱800)</option>'+
+            '<option value="Crowd Cam" data-price="1000" data-pax="6">Crowd Cam (₱1,000)</option>'+
+            '<option value="Crew Captures" data-price="1200" data-pax="10">Crew Captures (₱1,200)</option>'+
+            '<option value="Frenzy Snaps Birthday" data-price="700" data-pax="4">Frenzy Snaps Birthday (₱700)</option>'+
+            '<option value="Party Clicks Birthday" data-price="1000" data-pax="6">Party Clicks Birthday (₱1,000)</option>'+
+            '<option value="Click Capture Birthday" data-price="1500" data-pax="10">Click Capture Birthday (₱1,500)</option>'+
+          '</optgroup>'+
+          '<optgroup label="Photographer — Styleshots">'+
+            '<option value="Styleshots" data-price="1500" data-pax="1">Styleshots (₱1,500)</option>'+
+            '<option value="Promo Styleshots" data-price="0" data-pax="1">Promo Styleshots + HMU 💄</option>'+
+            '<option value="Couple Styleshots" data-price="2500" data-pax="2">Couple Styleshots (₱2,500)</option>'+
+            '<option value="Couple Styleshots Promo" data-price="0" data-pax="2">Couple Styleshots Promo + HMU 💄</option>'+
+            '<option value="Luxe Mode" data-price="3500" data-pax="1">Luxe Mode + HMU 💄 (₱3,500)</option>'+
+            '<option value="The Coat Code" data-price="3500" data-pax="1">The Coat Code + HMU 💄 (₱3,500)</option>'+
+          '</optgroup>'+
+          '<optgroup label="Photographer — Family & Occasions">'+
+            '<option value="Pop Reveal" data-price="3000" data-pax="4">Pop Reveal (₱3,000)</option>'+
+            '<option value="Radiant Mama - Mama Love" data-price="2000" data-pax="1">Radiant Mama — Mama Love (₱2,000)</option>'+
+            '<option value="Radiant Mama - Glowing Mom" data-price="5500" data-pax="1">Radiant Mama — Glowing Mom + HMU 💄 (₱5,500)</option>'+
+            '<option value="Candid Kids" data-price="1500" data-pax="3">Candid Kids (from ₱1,500)</option>'+
+            '<option value="Family Portraits" data-price="1700" data-pax="10">Family Portraits (from ₱1,700)</option>'+
+            '<option value="PAWtraits" data-price="1500" data-pax="4">PAWtraits (from ₱1,500)</option>'+
+          '</optgroup>'+
+          '<optgroup label="Photographer — Graduation & Bridal">'+
+            '<option value="Cap and Gown" data-price="700" data-pax="1">Cap and Gown (₱700)</option>'+
+            '<option value="Grad-U-Click" data-price="1500" data-pax="5">Grad-U-Click (₱1,500)</option>'+
+            '<option value="VIP Grad Glam" data-price="3000" data-pax="1">VIP Grad Glam + HMU 💄 (₱3,000)</option>'+
+            '<option value="Bridal Bliss" data-price="5000" data-pax="2">Bridal Bliss (₱5,000)</option>'+
+          '</optgroup>'+
+          '<optgroup label="Other">'+
+            '<option value="Photographer Session" data-price="0" data-pax="1">Photographer Session (custom)</option>'+
+            '<option value="Studio Rental" data-price="0" data-pax="1">Studio Rental</option>'+
+          '</optgroup>'+
+          '<optgroup label="Events">'+
+            '<option value="Event Booking" data-price="0" data-pax="1">Event Booking</option>'+
+            '<option value="Booth Rental" data-price="0" data-pax="1">Booth Rental</option>'+
+          '</optgroup>');
 }
 
 // Check if client is a repeat visitor
