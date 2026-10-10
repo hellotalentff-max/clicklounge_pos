@@ -3802,8 +3802,19 @@ function changePackage(id){
       'Current: <strong>'+escHtml(a.service||'—')+'</strong> · ₱'+fmt(total)+' · ₱'+fmt(dp)+' paid</div>'+
     '<div class="field" style="margin-bottom:12px;"><label>New Package</label>'+
       '<select id="cp-service" class="sinput" style="width:100%;" onchange="cpPick()">'+
-        '<option value="">— Select Package —</option>'+pkgOptionsHtml()+
+        '<option value="">— Select Package —</option>'+
+        '<option value="__looklab__">🎨 The Look Lab — build a combination…</option>'+pkgOptionsHtml()+
       '</select></div>'+
+    '<div id="cp-ll" style="display:none;background:var(--light);border-radius:8px;padding:12px;margin-bottom:12px;">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--slate);margin-bottom:8px;">🎨 The Look Lab <span id="cp-ll-src" style="font-weight:400;color:var(--muted);"></span></div>'+
+      '<div class="frow c2" style="margin-bottom:8px;">'+
+        '<div class="field" style="margin:0;"><label>Session</label><select id="cp-ll-s" class="sinput" style="width:100%;" onchange="cpLLUpdate()"></select></div>'+
+        '<div class="field" style="margin:0;"><label>Mood</label><select id="cp-ll-m" class="sinput" style="width:100%;" onchange="cpLLMood()"></select></div>'+
+      '</div>'+
+      '<div class="field" style="margin:0 0 8px;"><label>Keepsake</label><select id="cp-ll-k" class="sinput" style="width:100%;" onchange="cpLLUpdate()"></select></div>'+
+      '<div id="cp-ll-x" style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:12px;"></div>'+
+      '<div id="cp-ll-name" style="font-size:11px;color:var(--muted);margin-top:8px;word-break:break-word;"></div>'+
+    '</div>'+
     '<div class="frow c2" style="margin-bottom:10px;">'+
       '<div class="field" style="margin:0;"><label>New Total (₱)</label>'+
         '<input type="number" id="cp-price" class="sinput" min="0" style="width:100%;" oninput="cpBalance()"></div>'+
@@ -3820,18 +3831,35 @@ function changePackage(id){
   window._cpAckId = id;
 }
 
+function cpChosen(){
+  var v = document.getElementById('cp-service').value;
+  return v==='__looklab__' ? (window._cpLLName||'') : v;
+}
 function cpPick(){
   var sel = document.getElementById('cp-service');
   var opt = sel.options[sel.selectedIndex];
   var a = (DB.acknowledgements||[]).find(function(x){ return x.id===window._cpAckId; });
-  // price 0 = custom / promo: leave blank so staff types it
-  document.getElementById('cp-price').value = (opt && +opt.dataset.price > 0) ? opt.dataset.price : '';
-  cpBalance();
+  var isLL = sel.value==='__looklab__';
+  document.getElementById('cp-ll').style.display = isLL ? '' : 'none';
+  if(isLL){ cpLLInit(); }
+  else {
+    // price 0 = custom / promo: leave blank so staff types it
+    document.getElementById('cp-price').value = (opt && +opt.dataset.price > 0) ? opt.dataset.price : '';
+    cpBalance();
+  }
+  cpHmu();
+}
 
-  // HMU prep: offer to block the next slot if the new package has HMU and the old one did not
+// HMU prep: offer to block the next slot if the new package has HMU and the old one did not
+function cpHmu(){
+  var a = (DB.acknowledgements||[]).find(function(x){ return x.id===window._cpAckId; });
   var box = document.getElementById('cp-hmu');
+  var prev = document.getElementById('cp-blocknext');
+  var wasChecked = prev ? prev.checked : true;
   box.style.display = 'none'; box.innerHTML = '';
-  if(a && sel.value && _hasHMU(sel.value) && !_hasHMU(a.service)){
+  box.dataset.next = '';
+  var chosen = cpChosen();
+  if(a && chosen && _hasHMU(chosen) && !_hasHMU(a.service)){
     var idx = ALL_TIME_SLOTS.indexOf(String(a.timeSlot||'').trim());
     var next = (idx > -1 && idx < ALL_TIME_SLOTS.length-1) ? ALL_TIME_SLOTS[idx+1] : null;
     var d = dateOnly(a.bookDate);
@@ -3840,7 +3868,7 @@ function cpPick(){
     });
     var html = '<div style="background:#fff4e6;border:1px solid #d79068;border-radius:8px;padding:10px 12px;font-size:11px;color:#5c3717;">'+
       '💄 <strong>This package includes Hair &amp; Makeup.</strong> Client should arrive 1.5 hrs early and the HMU artist must be booked.';
-    if(next && !nextTaken) html += '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12px;"><input type="checkbox" id="cp-blocknext" checked> Also block the next slot ('+next+') for HMU prep</label>';
+    if(next && !nextTaken) html += '<label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12px;"><input type="checkbox" id="cp-blocknext" '+(wasChecked?'checked':'')+'> Also block the next slot ('+next+') for HMU prep</label>';
     else if(nextTaken)     html += '<div style="margin-top:6px;">⚠ The next slot ('+next+') already has a booking, so it can\'t be blocked.</div>';
     box.innerHTML = html + '</div>';
     box.style.display = '';
@@ -3848,6 +3876,113 @@ function cpPick(){
   }
 }
 
+// ── Look Lab combinations (Change Package) ───────────────────
+// Prices come live from the Look Lab sheet (same source as the Look Lab page).
+// If it can't be reached, the built-in table below is used. Keep the two in step.
+var _llPos = null;
+var LL_POS_URL = 'https://script.google.com/macros/s/AKfycbwRIZPUmK-xm0fFsL1bnn9KAUQ9r57uDG_OXPQi7WyP5VZ0jlWaOq72pmVzUoiAesDEiA/exec';
+var LL_POS_BUILTIN = {
+  sessions: [{id:'Standard',name:'Standard',price:1200},{id:'Signature',name:'Signature',price:3000},{id:'Prestige',name:'Prestige',price:5000}],
+  moods: [{id:'styleshots',name:'Styleshots',price:0},{id:'coatcode',name:'The Coat Code',price:800},{id:'angelic',name:'Angelic Muse',price:800}],
+  double: {id:'double',name:'Twofold',price:1800},
+  keepsakes: [
+    {id:'digital',name:'Digital',price:0,notWith:'Twofold'},
+    {id:'mini',name:'Mini Keepsake',price:100,notWith:'Twofold'},
+    {id:'wall',name:'Prestige Wall',price:1000,prestigePrice:0,freeWith:'Twofold',onlyWith:'Twofold'},
+    {id:'acrylic',name:'Prestige Acrylic',price:1500,prestigePrice:1000}
+  ],
+  extras: [
+    {key:'outfit',name:'Additional Outfit Change',price:300},{key:'photos',name:'+3 Edited Photos',price:500},
+    {key:'rush',name:'Rush 24-Hour Delivery',price:500},{key:'time',name:'+15 Mins Time',price:700},
+    {key:'framed5r',name:'5R Framed Photo',price:800},{key:'framed8r',name:'8R Framed Photo',price:1000}
+  ],
+  source: 'built-in prices'
+};
+function llPosLoad(){
+  if(_llPos) return Promise.resolve(_llPos);
+  return new Promise(function(resolve){
+    var done = false, cb = '__llpos' + Date.now();
+    function fin(d, src){
+      if(done) return; done = true;
+      d = d || LL_POS_BUILTIN;
+      _llPos = {sessions:d.sessions, moods:d.moods, double:d.double||LL_POS_BUILTIN.double, keepsakes:d.keepsakes,
+                extras:(d.extras&&d.extras.length)?d.extras:LL_POS_BUILTIN.extras, source:src};
+      resolve(_llPos);
+    }
+    var t = setTimeout(function(){ fin(null,'built-in prices'); }, 4000);
+    window[cb] = function(d){
+      clearTimeout(t);
+      var ok = d && Array.isArray(d.sessions) && d.sessions.length && Array.isArray(d.moods) && d.moods.length && Array.isArray(d.keepsakes) && d.keepsakes.length;
+      fin(ok ? d : null, ok ? 'live prices' : 'built-in prices');
+      try{ delete window[cb]; }catch(e){}
+    };
+    var el = document.createElement('script');
+    el.src = LL_POS_URL + '?d=' + encodeURIComponent(btoa(JSON.stringify({action:'getLookLab'}))) + '&callback=' + cb;
+    el.onerror = function(){ clearTimeout(t); fin(null,'built-in prices'); };
+    document.head.appendChild(el);
+  });
+}
+function llPosNames(rule, mood){
+  if(!rule || !mood) return false;
+  var w = String(rule).trim().toLowerCase();
+  return !!w && (w===String(mood.id).toLowerCase() || w===String(mood.name).toLowerCase());
+}
+function llPosMood(id){ return id==='double' ? _llPos.double : _llPos.moods.find(function(m){ return m.id===id; }); }
+function llPosKeepsakes(moodId){
+  var m = llPosMood(moodId);
+  return _llPos.keepsakes.filter(function(k){
+    if(k.onlyWith) return llPosNames(k.onlyWith, m);
+    if(k.notWith && llPosNames(k.notWith, m)) return false;
+    return true;
+  });
+}
+function llPosKeepsakePrice(sessionId, k, moodId){
+  if(llPosNames(k.freeWith, llPosMood(moodId))) return 0;
+  if(String(sessionId).toLowerCase()==='prestige' && k.prestigePrice!=null) return k.prestigePrice;
+  return k.price||0;
+}
+async function cpLLInit(){
+  var info = document.getElementById('cp-ll-name');
+  info.textContent = '⏳ Loading Look Lab prices…';
+  var d = await llPosLoad();
+  if(document.getElementById('cp-service').value!=='__looklab__') return;
+  var o = function(arr){ return arr.map(function(x){ return '<option value="'+escHtml(x.id)+'">'+escHtml(x.name)+'</option>'; }).join(''); };
+  document.getElementById('cp-ll-s').innerHTML = o(d.sessions);
+  document.getElementById('cp-ll-m').innerHTML = o(d.moods.concat([d.double]));
+  document.getElementById('cp-ll-x').innerHTML = d.extras.map(function(x){
+    return '<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" class="cp-ll-xc" value="'+escHtml(x.key)+'" onchange="cpLLUpdate()"> '+escHtml(x.name)+' <span style="color:var(--muted);">+₱'+fmt(x.price)+'</span></label>';
+  }).join('');
+  document.getElementById('cp-ll-src').textContent = '· ' + d.source;
+  cpLLMood();
+}
+function cpLLMood(){
+  var d = _llPos; if(!d) return;
+  var mood = document.getElementById('cp-ll-m').value;
+  var sess = document.getElementById('cp-ll-s').value;
+  document.getElementById('cp-ll-k').innerHTML = llPosKeepsakes(mood).map(function(k){
+    return '<option value="'+escHtml(k.id)+'">'+escHtml(k.name)+'</option>';
+  }).join('');
+  cpLLUpdate();
+}
+function cpLLUpdate(){
+  var d = _llPos; if(!d) return;
+  var sId = document.getElementById('cp-ll-s').value, mId = document.getElementById('cp-ll-m').value, kId = document.getElementById('cp-ll-k').value;
+  var S = d.sessions.find(function(x){ return x.id===sId; }), M = llPosMood(mId), K = d.keepsakes.find(function(x){ return x.id===kId; });
+  if(!S || !M || !K) return;
+  var total = (S.price||0) + (M.price||0) + llPosKeepsakePrice(sId, K, mId);
+  var extras = [];
+  document.querySelectorAll('.cp-ll-xc:checked').forEach(function(cb){
+    var x = d.extras.find(function(e){ return e.key===cb.value; });
+    if(x){ total += (x.price||0); extras.push(x.name); }
+  });
+  window._cpLLName = 'The Look Lab: ' + S.name + ' + ' + M.name + ' + ' + K.name;
+  window._cpLLExtras = extras.join(', ');
+  document.getElementById('cp-ll-name').innerHTML = '<strong>'+escHtml(window._cpLLName)+'</strong>' + (extras.length ? '<br>Add-ons: '+escHtml(window._cpLLExtras) : '') +
+    '<br>Gown add-on (if any) is not included — add it to the total below.';
+  document.getElementById('cp-price').value = total;
+  cpBalance();
+  cpHmu();
+}
 function cpBalance(){
   var a = (DB.acknowledgements||[]).find(function(x){ return x.id===window._cpAckId; });
   var el = document.getElementById('cp-balance');
@@ -3861,7 +3996,7 @@ function cpBalance(){
 async function submitChangePackage(id){
   var a = (DB.acknowledgements||[]).find(function(x){ return x.id===id; });
   if(!a) return;
-  var newSvc = document.getElementById('cp-service').value;
+  var newSvc = cpChosen();
   var priceRaw = document.getElementById('cp-price').value;
   if(!newSvc){ notify('Choose the new package','error'); return; }
   if(priceRaw === '' || isNaN(+priceRaw) || +priceRaw < 0){ notify('Enter the new total price','error'); return; }
@@ -3881,6 +4016,9 @@ async function submitChangePackage(id){
   // 1) booking record (+ sheet)
   a.service = newSvc; a.totalPrice = newPrice;
   if(a.total !== undefined) a.total = newPrice;
+  if(document.getElementById('cp-service').value==='__looklab__' && window._cpLLExtras){
+    a.notes = (a.notes ? a.notes + ' | ' : '') + 'Look Lab add-ons: ' + window._cpLLExtras;
+  }
   saveLocal();
   push('saveAcknowledgement', a);
 
