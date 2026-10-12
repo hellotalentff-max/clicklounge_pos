@@ -3452,6 +3452,8 @@ function renderCalendarLists(acks, yr, mo){
       // Extract email and time from event description
       var emailMatch = (ev.description||'').match(/Email:\s*(\S+@\S+)/i);
       var evEmail = emailMatch ? emailMatch[1].trim() : '';
+      var evPhone = _calPhoneOf(ev);
+      if(evPhone) _calPhones[clientName.toLowerCase()] = evPhone;
       var timeMatch  = (ev.description||'').match(/Time:\s*(.+)/i);
       var evTime  = timeMatch ? timeMatch[1].trim() : '';
       // Fallback: extract time from ISO start (convert to PHT)
@@ -3475,6 +3477,7 @@ function renderCalendarLists(acks, yr, mo){
           '<div style="font-size:11px;color:var(--muted);">'+
             '📅 '+date+(evTime?' · 🕐 '+escHtml(evTime):'')+' · '+escHtml(service||'Booking request')+
             (evEmail?' · ✉ '+escHtml(evEmail):'')+
+            (evPhone?' · 📱 '+escHtml(evPhone):'')+
             (evTotal?' · ₱'+fmt(+evTotal)+' total':'')+
           '</div>'+
           (function(){ var pr = calProofOf(ev); return calProofHtml(pr, pr ? _refCount[(pr.method||'')+'|'+String(pr.ref).toUpperCase()] : 0); })()+
@@ -3532,6 +3535,21 @@ function calNavToday(){
 
 function _hasHMU(pkgName){
   return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama|luxe mode|coat code|luxe m0de|styleshots)/i.test(pkgName||'');
+}
+
+// ── Client phone numbers from booking requests ──
+// The booking page's mobile number is written into the calendar event ("Phone: 09…").
+// Remember it per client name, and copy it onto the client record when the booking is confirmed.
+var _calPhones = {};
+function _calPhoneOf(ev){
+  var m = String((ev && ev.description) || '').match(/Phone:\s*([+\d][\d\s\-]{6,})/i);
+  return m ? m[1].trim() : '';
+}
+function _calPhoneApply(name){
+  var ph = _calPhones[String(name||'').trim().toLowerCase()];
+  if(!ph) return;
+  var cl = (DB.clients||[]).find(function(c){ return (c.fbName||'').toLowerCase() === String(name||'').toLowerCase(); });
+  if(cl && !cl.phone){ cl.phone = ph; push('saveClient', cl); }
 }
 
 // ── Payment proof sent by the client from the booking page ──
@@ -4270,6 +4288,7 @@ async function quickConfirmBooking(btn){
         var cl={id:uid(),fbName:name,email:email,type:'booked',added:todayStr()};
         DB.clients.push(cl); push('saveClient',cl);
       }
+      _calPhoneApply(name);
       saveLocal();
       notify('Booking confirmed! Email sent to '+email,'success');
       logActivity('Quick Confirmed',(result.ackNum||'')+' — '+name,'success');
@@ -5557,6 +5576,7 @@ async function saveAck(){
           var cl = {id:uid(), fbName:fbName, email:email, type:'booked', added:todayStr()};
           DB.clients.push(cl);
         }
+        _calPhoneApply(fbName);
 
         saveLocal();
         notify('✓ Booking confirmed! Email with T&C sent to '+email,'success');
@@ -5598,6 +5618,7 @@ function saveAckLocal(fbName, email, service, bookDate, mop, dp, total){
     DB.clients.push(cl);
     push('saveClient', cl);
   }
+  _calPhoneApply(fbName);
 
   saveLocal();
   notify('Receipt saved: '+ackNum,'success');
