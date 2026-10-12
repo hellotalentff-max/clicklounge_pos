@@ -3437,6 +3437,10 @@ function renderCalendarLists(acks, yr, mo){
     // Ack receipts pending
     pending.forEach(function(a){ pendHtml += ackListRow(a,'pending'); });
     // Google Cal pending events (booking requests not yet turned into receipts)
+    // Bookings with payment details go first — they're the ones ready to verify.
+    var _refCount = {};
+    calPending.forEach(function(ev){ var pr = calProofOf(ev); if(pr){ var k = (pr.method||'')+'|'+String(pr.ref).toUpperCase(); _refCount[k] = (_refCount[k]||0)+1; } });
+    calPending.sort(function(a,b){ return (calProofOf(b)?1:0) - (calProofOf(a)?1:0); });
     calPending.forEach(function(ev){
       var name = ev.title.replace(/\[PENDING\]/gi,'').replace(/\[CONFIRMED\]/gi,'').trim();
       var nameMatch = name.match(/—\s*(.+?)\s*\(/);
@@ -3473,6 +3477,7 @@ function renderCalendarLists(acks, yr, mo){
             (evEmail?' · ✉ '+escHtml(evEmail):'')+
             (evTotal?' · ₱'+fmt(+evTotal)+' total':'')+
           '</div>'+
+          (function(){ var pr = calProofOf(ev); return calProofHtml(pr, pr ? _refCount[(pr.method||'')+'|'+String(pr.ref).toUpperCase()] : 0); })()+
         '</div>'+
         '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+
           '<button class="btn btn-sm btn-teal" data-name="'+encodeURIComponent(clientName)+'" data-date="'+date+'" data-svc="'+encodeURIComponent(service)+'" data-email="'+encodeURIComponent(evEmail)+'" data-time="'+encodeURIComponent(evTime)+'" data-evid="'+encodeURIComponent(evId)+'" data-total="'+encodeURIComponent(evTotal)+'" onclick="openNewAckFromCalEvent(this)">✉ Confirm & Email</button>'+
@@ -3527,6 +3532,31 @@ function calNavToday(){
 
 function _hasHMU(pkgName){
   return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama|luxe mode|coat code|luxe m0de|styleshots)/i.test(pkgName||'');
+}
+
+// ── Payment proof sent by the client from the booking page ──
+// The booking backend writes a line like
+//   💳 PAYMENT SUBMITTED: method=GCash | ref=1234567890123 | amount=300 | from=Juan D | at=2026-10-12 14:03
+// into the calendar event. Returns {method, ref, amount, from, at} or null.
+function calProofOf(ev){
+  var m = String((ev && ev.description) || '').match(/PAYMENT SUBMITTED:\s*(.+)/i);
+  if(!m) return null;
+  var o = {};
+  m[1].split('|').forEach(function(kv){
+    var i = kv.indexOf('=');
+    if(i > -1) o[kv.slice(0,i).trim()] = kv.slice(i+1).trim();
+  });
+  return o.ref ? o : null;
+}
+function calProofHtml(proof, dupCount){
+  if(!proof) return '<div style="margin-top:4px;font-size:10.5px;color:var(--muted);">⏳ No payment details sent yet</div>';
+  var ref = String(proof.ref||'').replace(/[^A-Za-z0-9]/g,'');
+  return '<div style="margin-top:5px;font-size:11px;background:rgba(61,140,110,.1);border:1px solid rgba(61,140,110,.3);color:#2d6a4f;border-radius:6px;padding:5px 8px;line-height:1.6;">'+
+    '💳 <b>Payment submitted</b> · '+escHtml(proof.method||'')+' · Ref <b style="letter-spacing:.3px;">'+escHtml(ref)+'</b> '+
+    '<button class="btn btn-sm btn-outline" style="font-size:9px;padding:1px 6px;" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+ref+'\');notify(\'Reference copied — search it in your '+escHtml(proof.method||'')+' history\',\'success\')">Copy</button>'+
+    '<br>Look for <b>₱'+fmt(+proof.amount||0)+'</b>'+(proof.from?' · from '+escHtml(proof.from):'')+(proof.at?' · sent '+escHtml(proof.at):'')+
+    (dupCount > 1 ? '<br><span style="color:var(--danger);font-weight:700;">⚠ This reference was entered on '+dupCount+' bookings — check before confirming</span>' : '')+
+  '</div>';
 }
 
 function calDayClick(dateStr){
