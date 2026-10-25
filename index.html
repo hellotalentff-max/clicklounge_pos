@@ -2009,6 +2009,13 @@ tr:hover td { background:var(--light); }
       <div id="fin-cash-received"></div>
     </div>
 
+    <!-- Booked but never came -->
+    <div class="card">
+      <div class="ct">🚫 No-Shows This Period</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Confirmed bookings in the period with no check-in and no invoice for that client on or near the session date. The system has no no-show status, so check each name below before treating it as final.</div>
+      <div id="fin-noshow"></div>
+    </div>
+
     <!-- Sales Table -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
@@ -2045,6 +2052,8 @@ tr:hover td { background:var(--light); }
     <div class="rep-section-grid" style="margin-top:16px;">
       <div class="rep-card-stat" id="bk-revenue"><div class="rs-label">Booking Revenue</div><div class="rs-val">—</div></div>
       <div class="rep-card-stat" id="bk-avg-dp"><div class="rs-label">Avg Downpayment</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="bk-noshow"><div class="rs-label">No-Shows</div><div class="rs-val">—</div></div>
+      <div class="rep-card-stat" id="bk-showrate"><div class="rs-label">Show Rate</div><div class="rs-val">—</div></div>
     </div>
 
     <!-- Timeslot heatmap -->
@@ -6668,6 +6677,8 @@ function executePrint(){
     body += (document.getElementById('fin-sales-table')?.innerHTML||'<p style="color:#6b8080;font-size:11px;">No sales data.</p>');
     body += sectionTitle('📆','Deposits & Payments in Other Months');
     body += (document.getElementById('fin-cross')?.innerHTML||'');
+    body += sectionTitle('🚫','No-Shows This Period');
+    body += (document.getElementById('fin-noshow')?.innerHTML||'');
   }
 
   // ── Expenses Table ──
@@ -8954,6 +8965,7 @@ function _buildReports(prefixes, label){
   acks.forEach(a=>{ ackMap[a.fbName]=a; });
 
   renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes);
+  renderNoShows(prefixes);
   renderClientsReport(regs, txnMap, ackMap, label, prefixes);
   renderPackagesReport(txns, regs, txnMap, ackMap, label);
   renderOperationsReport(txns, eods, allFT, gifts, label);
@@ -9301,6 +9313,103 @@ function renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes)
   expHtml += '<tr style="background:var(--light);font-weight:700;border-top:2px solid var(--light2);"><td colspan="2">TOTAL</td><td style="text-align:right;color:var(--danger);">₱'+fmt(totalExp)+'</td><td></td></tr>';
   expHtml += '</tbody></table></div>';
   document.getElementById('fin-exp-table').innerHTML = allExp.length ? expHtml : '<div class="tm">No expenses this period.</div>';
+}
+
+// ════════════════════════════════
+// NO-SHOWS — confirmed bookings whose client never checked in or was invoiced
+// ════════════════════════════════
+function _nsTokens(s){ var seen={}, out=[]; String(s||'').toLowerCase().replace(/[^a-z ]/g,' ').split(/\s+/).forEach(function(t){ if(t&&!seen[t]){ seen[t]=1; out.push(t); } }); return out; }
+function _nsSame(a, b){
+  var ta=_nsTokens(a), tb=_nsTokens(b);
+  if(!ta.length||!tb.length) return false;
+  var hit=ta.filter(function(t){ return tb.indexOf(t)!==-1; }).length;
+  return hit/Math.min(ta.length,tb.length) >= 0.8;
+}
+function _nsGap(d1, d2){ return Math.abs(Date.parse(d1+'T00:00:00Z')-Date.parse(d2+'T00:00:00Z'))/86400000; }
+
+// prefixes = ['2026-10', …]. Only sessions before today count, so today's clients are never flagged early.
+function computeNoShows(prefixes){
+  var today = todayStr();
+  var regs  = DB.registrations||[];
+  var txns  = (DB.transactions||[]).filter(function(t){ return !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var reqs  = DB.bookings||[];
+  var seen = {}, res = {considered:0, list:[]};
+  (DB.acknowledgements||[]).forEach(function(a){
+    var bd = dateOnly(a.bookDate);
+    if(!bd || bd >= today) return;
+    if(prefixes.indexOf(bd.slice(0,7)) === -1) return;
+    if(/cancel/i.test(a.status||'')) return;
+    if(!/^AR\d{6}/.test(String(a.ackNum||''))) return;       // old imported rows have no real check-in trail
+    var key = _nsTokens(a.fbName).sort().join(' ') + '|' + bd;
+    if(seen[key]) return; seen[key] = 1;                      // same client, same day, entered twice
+    res.considered++;
+
+    var email = String(a.email||'').toLowerCase();
+    var checkedIn = regs.some(function(r){
+      if(r.ackId && r.ackId === a.id) return true;
+      var rd = dateOnly(r.date);
+      return rd === bd && (_nsSame(r.fbName, a.fbName) || (email && String(r.email||'').toLowerCase() === email));
+    });
+    // An invoice within 10 days also counts: the client rebooked and came
+    var invoiced = !checkedIn && txns.some(function(t){
+      var td = dateOnly(t.date);
+      return td && _nsGap(td, bd) <= 10 && _nsSame(t.clientName, a.fbName);
+    });
+    if(checkedIn || invoiced) return;
+
+    var req = reqs.filter(function(b){ return dateOnly(b.date||b.Date||'') === bd && _nsSame(b.fb_name||b.fbName||b.name||'', a.fbName); })[0];
+    var dp = parseFloat(a.downpayment)||0, tp = parseFloat(a.totalPrice)||0, rp = req ? (parseFloat(req.price)||0) : 0;
+    var value = tp > dp ? tp : (rp > dp ? rp : (tp || dp));
+    var reqStatus = req ? String(req.status||'') : '';
+    res.list.push({
+      date: bd, name: a.fbName||'', service: a.service||'', timeSlot: a.timeSlot||'',
+      deposit: dp, value: value,
+      note: /resched/i.test(reqStatus) ? 'Online request says Rescheduled — check if they moved' : ''
+    });
+  });
+  res.list.sort(function(x,y){ return x.date.localeCompare(y.date); });
+  return res;
+}
+
+function renderNoShows(prefixes){
+  var r = computeNoShows(prefixes||[]);
+  var n = r.list.length;
+  var dep = r.list.reduce(function(s,x){ return s + x.deposit; }, 0);
+  var val = r.list.reduce(function(s,x){ return s + x.value; }, 0);
+  var unbilled = Math.max(0, val - dep);
+  var rate = r.considered ? Math.round((r.considered - n) / r.considered * 1000) / 10 : null;
+
+  var bn = document.getElementById('bk-noshow');
+  if(bn) bn.innerHTML = '<div class="rs-label">No-Shows</div><div class="rs-val'+(n?' rs-danger':'')+'">'+n+'</div>';
+  var br = document.getElementById('bk-showrate');
+  if(br) br.innerHTML = '<div class="rs-label">Show Rate</div><div class="rs-val">'+(rate===null?'—':rate+'%')+'</div>';
+
+  var el = document.getElementById('fin-noshow');
+  if(!el) return;
+  if(!r.considered){ el.innerHTML = '<div class="tm">No past confirmed bookings in this period.</div>'; return; }
+  // literal colours on purpose: this HTML is also copied into the print window, which has no CSS variables
+  var cell = 'padding:10px 12px;text-align:center;border:1px solid #e3ebe9;border-radius:8px;';
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px;">'+
+    '<div style="'+cell+'"><div style="font-size:10px;color:#6b8080;">Booked sessions held</div><div style="font-size:18px;font-weight:700;">'+r.considered+'</div></div>'+
+    '<div style="'+cell+'"><div style="font-size:10px;color:#6b8080;">No-shows</div><div style="font-size:18px;font-weight:700;color:'+(n?'#c0544a':'#2f7a5e')+';">'+n+'</div></div>'+
+    '<div style="'+cell+'"><div style="font-size:10px;color:#6b8080;">Show rate</div><div style="font-size:18px;font-weight:700;">'+rate+'%</div></div>'+
+    '<div style="'+cell+'"><div style="font-size:10px;color:#6b8080;">Deposits collected</div><div style="font-size:18px;font-weight:700;">₱'+fmt(dep)+'</div></div>'+
+    '<div style="'+cell+'"><div style="font-size:10px;color:#6b8080;">Balance not earned</div><div style="font-size:18px;font-weight:700;color:'+(unbilled?'#c0544a':'inherit')+';">₱'+fmt(unbilled)+'</div></div>'+
+  '</div>';
+  if(n){
+    html += '<div style="overflow-x:auto;"><table><thead><tr><th>Session</th><th>Client</th><th>Package</th><th style="text-align:right;">Deposit</th><th style="text-align:right;">Package value</th></tr></thead><tbody>';
+    r.list.forEach(function(x){
+      html += '<tr><td style="white-space:nowrap;font-size:11px;">'+escHtml(x.date)+(x.timeSlot?'<br><span style="color:#6b8080;">'+escHtml(x.timeSlot)+'</span>':'')+'</td>'+
+        '<td>'+escHtml(x.name)+(x.note?'<div style="font-size:10px;color:#8a6a0c;">'+escHtml(x.note)+'</div>':'')+'</td>'+
+        '<td style="font-size:11px;">'+escHtml(x.service)+'</td>'+
+        '<td style="text-align:right;">₱'+fmt(x.deposit)+'</td>'+
+        '<td style="text-align:right;">'+(x.value?'₱'+fmt(x.value):'—')+'</td></tr>';
+    });
+    html += '<tr style="background:#f4f7f6;font-weight:700;border-top:2px solid #e3ebe9;"><td colspan="3">TOTAL</td><td style="text-align:right;">₱'+fmt(dep)+'</td><td style="text-align:right;">₱'+fmt(val)+'</td></tr>';
+    html += '</tbody></table></div>';
+  }
+  html += '<div style="font-size:10px;color:#6b8080;margin-top:8px;">Balance not earned = package value minus the deposit. Deposits are counted as kept; if you refund or credit any of them, subtract those. Only sessions before today are checked.</div>';
+  el.innerHTML = html;
 }
 
 // ════════════════════════════════
