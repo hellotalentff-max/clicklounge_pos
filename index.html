@@ -3696,6 +3696,7 @@ function calDayClick(dateStr){
         '<button class="btn btn-sm" style="background:var(--gold);color:#fff;" data-aid="'+a.id+'" onclick="calRescheduleAck(this)">📆 Reschedule</button>'+
         '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calChangePkgAck(this)">🔄 Change Package</button>'+
         '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)">🖨 Print</button>'+
+        '<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger);" data-aid="'+a.id+'" onclick="calCancelAck(this)">🚫 Cancel</button>'+
         '<button class="btn btn-sm btn-danger" data-aid="'+a.id+'" onclick="calDeleteAck(this)">✕ Delete</button>'+
       '</div>'+
     '</div>';
@@ -4225,20 +4226,42 @@ function promptCancelReason(name, email){
   });
 }
 
+// When a client cancels, their downpayment stays usable for a shoot booked within the same month
+// as the original booking. Returns {amount, until, month} (all '' / 0 when there is no deposit or date).
+function dpCreditInfo(bookDate, downpayment){
+  var amount = parseFloat(downpayment) || 0;
+  var m = String(bookDate||'').match(/^(\d{4})-(\d{2})/);
+  if(!m || amount <= 0) return {amount:0, until:'', month:''};
+  var y = parseInt(m[1],10), mo = parseInt(m[2],10);
+  var last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  var names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  return {amount: amount, until: names[mo-1]+' '+last+', '+y, month: names[mo-1]+' '+y};
+}
+
 function calCancelAck(btn){
   var id = btn.dataset.aid;
-  if(!confirm('Cancel this booking? The client will need to rebook.')) return;
   var ack = DB.acknowledgements.find(function(a){ return a.id === id; });
+  if(!confirm('Cancel this booking? The client will need to rebook.')) return;
   promptCancelReason(ack?ack.fbName:'', ack?ack.email||'':'').then(function(reason){
+    var credit = {amount:0, until:'', month:''};
     if(ack){
       ack.status = 'Cancelled';
+      if(reason === 'clientrequest'){
+        credit = dpCreditInfo(ack.bookDate, ack.downpayment);
+        if(credit.amount){
+          var line = 'Client cancelled — ₱'+fmt(credit.amount)+' deposit can be used for a shoot scheduled within '+credit.month+' (until '+credit.until+').';
+          if(String(ack.notes||'').indexOf(line) === -1) ack.notes = (ack.notes ? ack.notes+' | ' : '') + line;
+        }
+      }
       saveLocal();
       push('saveAcknowledgement', ack);
-      if(hasUrl()) gasCall('cancelBooking', { id: id, fbName: ack.fbName, notifyClient: !!reason, cancelReason: reason||'', email: ack.email||'', package: ack.service||'', bookDate: ack.bookDate||'', timeSlot: ack.timeSlot||'' }).catch(function(){});
+      if(hasUrl()) gasCall('cancelBooking', { id: id, fbName: ack.fbName, notifyClient: !!reason, cancelReason: reason||'', email: ack.email||'', package: ack.service||'', bookDate: ack.bookDate||'', timeSlot: ack.timeSlot||'', downpayment: credit.amount, creditUntil: credit.until, creditMonth: credit.month }).catch(function(){});
     }
-    notify('Booking cancelled', 'success');
+    notify('Booking cancelled' + (credit.amount ? ' — deposit usable until '+credit.until : ''), 'success');
     logActivity('Booking Cancelled', (ack?ack.ackNum:'') + ' — ' + (ack?ack.fbName:''), 'danger');
+    closeModal();
     renderCalendar();
+    if(typeof renderAcks === 'function') renderAcks();
   });
 }
 
