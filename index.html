@@ -3374,6 +3374,7 @@ function renderCalendar(){
     dayAcks.forEach(function(a){
       var s = String(a.status||'').toLowerCase();
       var style = s.includes('cancel') ? ['#f8d7da','#c0544a']
+                : isNoShowStatus(s) ? ['#e2e3e5','#6c757d']
                 : s.includes('confirm') ? ['#d4edda','#51897d']
                 : ['#fff3cd','#ffc107'];
       var label = _isCBEPkg(a.service) ? _cbeChipLabel(a.service, a.fbName) : firstNameLast(a.fbName);
@@ -3697,6 +3698,7 @@ function calDayClick(dateStr){
         '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calChangePkgAck(this)">🔄 Change Package</button>'+
         '<button class="btn btn-sm btn-outline" data-aid="'+a.id+'" onclick="calPrintAck(this)">🖨 Print</button>'+
         '<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger);" data-aid="'+a.id+'" onclick="calCancelAck(this)">🚫 Cancel</button>'+
+        (isNoShowStatus(a.status) ? '' : '<button class="btn btn-sm btn-outline" style="color:#6c757d;border-color:#6c757d;" data-aid="'+a.id+'" onclick="calNoShowAck(this)">👻 No-show</button>')+
         '<button class="btn btn-sm btn-danger" data-aid="'+a.id+'" onclick="calDeleteAck(this)">✕ Delete</button>'+
       '</div>'+
     '</div>';
@@ -4184,6 +4186,7 @@ async function submitReschedule(id){
 
     // Update local ack
     a.bookDate = newDate; a.timeSlot = newSlot;
+    if(isNoShowStatus(a.status)) a.status = 'Confirmed';   // moved to a new date, so it is live again
     saveLocal();
     push('saveAcknowledgement', a);
     logActivity('Booking Rescheduled', (a.fbName||'')+' — '+oldDate+' '+oldSlot+' → '+newDate+' '+newSlot, 'info');
@@ -4223,6 +4226,61 @@ function promptCancelReason(name, email){
       document.getElementById('cr-client').onclick = function(){ closeModal(); resolve('clientrequest'); };
       document.getElementById('cr-skip').onclick   = function(){ closeModal(); resolve(null); };
     }, 30);
+  });
+}
+
+function isNoShowStatus(st){ return /no.?show/i.test(String(st||'')); }
+
+// Asks whether to email a client who did not come. Resolves 'email', 'skip' or null (abort).
+function promptNoShow(name, email){
+  return new Promise(function(resolve){
+    if(!email){
+      if(!confirm('Mark '+name+' as a no-show? There is no email on file, so they will not be notified.')) { resolve(null); return; }
+      resolve('skip'); return;
+    }
+    openModal(
+      '<h3 style="margin-bottom:4px;">Mark '+escHtml(name)+' as a no-show?</h3>'+
+      '<p style="font-size:12px;color:var(--muted);margin-bottom:16px;">'+escHtml(email)+'</p>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;">'+
+        '<button class="btn btn-teal" id="ns-email">📧 Mark no-show &amp; email them</button>'+
+        '<button class="btn btn-outline" id="ns-skip">Mark no-show only — don\'t email</button>'+
+        '<button class="btn btn-outline" id="ns-abort">Never mind</button>'+
+      '</div>'
+    );
+    setTimeout(function(){
+      document.getElementById('ns-email').onclick = function(){ closeModal(); resolve('email'); };
+      document.getElementById('ns-skip').onclick  = function(){ closeModal(); resolve('skip'); };
+      document.getElementById('ns-abort').onclick = function(){ closeModal(); resolve(null); };
+    }, 30);
+  });
+}
+
+function calNoShowAck(btn){
+  var id = btn.dataset.aid;
+  var ack = DB.acknowledgements.find(function(a){ return a.id === id; });
+  if(!ack) return;
+  promptNoShow(ack.fbName||'', ack.email||'').then(function(choice){
+    if(!choice) return;
+    var credit = dpCreditInfo(ack.bookDate, ack.downpayment);
+    ack.status = 'No-show';
+    if(credit.amount){
+      var line = 'No-show — ₱'+fmt(credit.amount)+' deposit can be used for a shoot scheduled within '+credit.month+' (until '+credit.until+').';
+      if(String(ack.notes||'').indexOf(line) === -1) ack.notes = (ack.notes ? ack.notes+' | ' : '') + line;
+    }
+    saveLocal();
+    push('saveAcknowledgement', ack);
+    logActivity('Booking No-Show', (ack.ackNum||'') + ' — ' + (ack.fbName||''), 'danger');
+    closeModal();
+    renderCalendar();
+    if(typeof renderAcks === 'function') renderAcks();
+    if(choice === 'email' && hasUrl()){
+      notify('Marked as no-show — sending email…', 'info');
+      gasCall('markNoShow', { id: id, fbName: ack.fbName||'', email: ack.email||'', package: ack.service||'', bookDate: ack.bookDate||'', timeSlot: ack.timeSlot||'', downpayment: credit.amount, creditUntil: credit.until, creditMonth: credit.month })
+        .then(function(r){ notify(r && r.emailSent ? 'No-show email sent to '+ack.email : 'Marked as no-show, but the email did not send', r && r.emailSent ? 'success' : 'warn'); })
+        .catch(function(){ notify('Marked as no-show, but the email did not send', 'warn'); });
+    } else {
+      notify('Marked as no-show', 'success');
+    }
   });
 }
 
@@ -5702,6 +5760,7 @@ function renderAcks(){
     const s = String(a.status||'').toLowerCase();
     if(s.includes('confirm')) return 'confirmed';
     if(s.includes('cancel'))  return 'cancelled';
+    if(isNoShowStatus(s))     return 'noshow';
     return 'pending'; // default — no status means pending
   };
 
@@ -5753,8 +5812,10 @@ function renderAcks(){
         ? 'background:rgba(61,140,110,0.12);color:var(--success);border:1px solid rgba(61,140,110,0.25);'
         : status==='cancelled'
         ? 'background:rgba(192,84,74,0.08);color:var(--danger);border:1px solid rgba(192,84,74,0.2);'
+        : status==='noshow'
+        ? 'background:rgba(108,117,125,0.12);color:#6c757d;border:1px solid rgba(108,117,125,0.3);'
         : 'background:rgba(215,144,104,0.12);color:var(--gold);border:1px solid rgba(215,144,104,0.3);';
-      const badgeLabel = status==='confirmed' ? '✓ Confirmed' : status==='cancelled' ? '✕ Cancelled' : '⏳ Pending';
+      const badgeLabel = status==='confirmed' ? '✓ Confirmed' : status==='cancelled' ? '✕ Cancelled' : status==='noshow' ? '👻 No-show' : '⏳ Pending';
 
       // Balance due
       const total    = +a.totalPrice||+a.total||0;
@@ -8018,8 +8079,9 @@ function openClientProfile(nameJson){
         .slice(0,5).forEach(function(a){
       var isConf = String(a.status||'').toLowerCase().includes('confirm');
       var isCanc = String(a.status||'').toLowerCase().includes('cancel');
-      var stColor = isConf?'var(--success)':isCanc?'var(--danger)':'var(--gold)';
-      var stLabel = isConf?'Confirmed':isCanc?'Cancelled':'Pending';
+      var isNs = isNoShowStatus(a.status);
+      var stColor = isConf?'var(--success)':isCanc?'var(--danger)':isNs?'#6c757d':'var(--gold)';
+      var stLabel = isConf?'Confirmed':isCanc?'Cancelled':isNs?'No-show':'Pending';
       html += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--light2);">'+
         '<span class="badge b-gold" style="font-size:9px;flex-shrink:0;">'+escHtml(a.ackNum||'—')+'</span>'+
         '<div style="flex:1;min-width:0;">'+
@@ -9359,22 +9421,23 @@ function computeNoShows(prefixes){
   var seen = {}, res = {considered:0, list:[]};
   (DB.acknowledgements||[]).forEach(function(a){
     var bd = dateOnly(a.bookDate);
-    if(!bd || bd >= today) return;
+    var marked = isNoShowStatus(a.status);                    // staff tagged it with the No-show button
+    if(!bd || (bd >= today && !marked)) return;
     if(prefixes.indexOf(bd.slice(0,7)) === -1) return;
     if(/cancel/i.test(a.status||'')) return;
-    if(!/^AR\d{6}/.test(String(a.ackNum||''))) return;       // old imported rows have no real check-in trail
+    if(!marked && !/^AR\d{6}/.test(String(a.ackNum||''))) return;       // old imported rows have no real check-in trail
     var key = _nsTokens(a.fbName).sort().join(' ') + '|' + bd;
     if(seen[key]) return; seen[key] = 1;                      // same client, same day, entered twice
     res.considered++;
 
     var email = String(a.email||'').toLowerCase();
-    var checkedIn = regs.some(function(r){
+    var checkedIn = !marked && regs.some(function(r){
       if(r.ackId && r.ackId === a.id) return true;
       var rd = dateOnly(r.date);
       return rd === bd && (_nsSame(r.fbName, a.fbName) || (email && String(r.email||'').toLowerCase() === email));
     });
     // An invoice within 10 days also counts: the client rebooked and came
-    var invoiced = !checkedIn && txns.some(function(t){
+    var invoiced = !marked && !checkedIn && txns.some(function(t){
       var td = dateOnly(t.date);
       return td && _nsGap(td, bd) <= 10 && _nsSame(t.clientName, a.fbName);
     });
@@ -9387,7 +9450,7 @@ function computeNoShows(prefixes){
     res.list.push({
       date: bd, name: a.fbName||'', service: a.service||'', timeSlot: a.timeSlot||'',
       deposit: dp, value: value,
-      note: /resched/i.test(reqStatus) ? 'Online request says Rescheduled — check if they moved' : ''
+      note: marked ? 'Tagged as no-show by staff' : (/resched/i.test(reqStatus) ? 'Online request says Rescheduled — check if they moved' : '')
     });
   });
   res.list.sort(function(x,y){ return x.date.localeCompare(y.date); });
