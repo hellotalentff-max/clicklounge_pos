@@ -4286,6 +4286,13 @@ function calNoShowAck(btn){
 
 // When a client cancels, their downpayment stays usable for a shoot booked within the same month
 // as the original booking. Returns {amount, until, month} (all '' / 0 when there is no deposit or date).
+// Whole days from today (Manila) to the session date; negative once the date has passed.
+function daysUntilShoot(bookDate){
+  var bd = dateOnly(bookDate);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(bd)) return 0;
+  return Math.round((Date.parse(bd+'T00:00:00Z') - Date.parse(todayStr()+'T00:00:00Z')) / 86400000);
+}
+
 function dpCreditInfo(bookDate, downpayment){
   var amount = parseFloat(downpayment) || 0;
   var m = String(bookDate||'').match(/^(\d{4})-(\d{2})/);
@@ -4301,21 +4308,27 @@ function calCancelAck(btn){
   var ack = DB.acknowledgements.find(function(a){ return a.id === id; });
   if(!confirm('Cancel this booking? The client will need to rebook.')) return;
   promptCancelReason(ack?ack.fbName:'', ack?ack.email||'':'').then(function(reason){
-    var credit = {amount:0, until:'', month:''};
+    var credit = {amount:0, until:'', month:''}, forfeit = 0;
     if(ack){
       ack.status = 'Cancelled';
       if(reason === 'clientrequest'){
-        credit = dpCreditInfo(ack.bookDate, ack.downpayment);
-        if(credit.amount){
-          var line = 'Client cancelled — ₱'+fmt(credit.amount)+' deposit can be used for a shoot scheduled within '+credit.month+' (until '+credit.until+').';
-          if(String(ack.notes||'').indexOf(line) === -1) ack.notes = (ack.notes ? ack.notes+' | ' : '') + line;
+        // Studio rule: cancel at least 5 days before the shoot and the deposit stays usable within the
+        // same month; any later and it is forfeited.
+        var line = '';
+        if(daysUntilShoot(ack.bookDate) >= 5){
+          credit = dpCreditInfo(ack.bookDate, ack.downpayment);
+          if(credit.amount) line = 'Client cancelled 5+ days before — ₱'+fmt(credit.amount)+' deposit can be used for another package scheduled within '+credit.month+' (until '+credit.until+').';
+        } else {
+          forfeit = parseFloat(ack.downpayment) || 0;
+          if(forfeit) line = 'Client cancelled less than 5 days before the shoot — ₱'+fmt(forfeit)+' deposit forfeited.';
         }
+        if(line && String(ack.notes||'').indexOf(line) === -1) ack.notes = (ack.notes ? ack.notes+' | ' : '') + line;
       }
       saveLocal();
       push('saveAcknowledgement', ack);
-      if(hasUrl()) gasCall('cancelBooking', { id: id, fbName: ack.fbName, notifyClient: !!reason, cancelReason: reason||'', email: ack.email||'', package: ack.service||'', bookDate: ack.bookDate||'', timeSlot: ack.timeSlot||'', downpayment: credit.amount, creditUntil: credit.until, creditMonth: credit.month }).catch(function(){});
+      if(hasUrl()) gasCall('cancelBooking', { id: id, fbName: ack.fbName, notifyClient: !!reason, cancelReason: reason||'', email: ack.email||'', package: ack.service||'', bookDate: ack.bookDate||'', timeSlot: ack.timeSlot||'', downpayment: credit.amount, creditUntil: credit.until, creditMonth: credit.month, forfeitAmount: forfeit }).catch(function(){});
     }
-    notify('Booking cancelled' + (credit.amount ? ' — deposit usable until '+credit.until : ''), 'success');
+    notify('Booking cancelled' + (credit.amount ? ' — deposit usable until '+credit.until : forfeit ? ' — deposit forfeited (less than 5 days before the shoot)' : ''), 'success');
     logActivity('Booking Cancelled', (ack?ack.ackNum:'') + ' — ' + (ack?ack.fbName:''), 'danger');
     closeModal();
     renderCalendar();
