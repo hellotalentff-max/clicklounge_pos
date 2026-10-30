@@ -2608,13 +2608,22 @@ let _knownBookingIds = new Set();
 const SVC_DEFAULTS = {
   ss:[{n:'Snapshot Selfie',p:500},{n:'Tribe Time',p:800},{n:'Crowd Cam',p:1000},{n:'Crew Captures',p:1200},{n:'Frenzy Snaps',p:700},{n:'Party Clicks',p:1000},{n:'Click Captures',p:1500}],
   ph:[{n:'Styleshots S',p:1500},{n:'Styleshots L',p:2000},{n:'Fambam',p:1700},{n:'Famvibes',p:2200},{n:'Onederful',p:1500},{n:'Twogether',p:2000},{n:'Big Kid',p:2000},{n:'All Star',p:2500},{n:'Cap & Gown',p:700},{n:'Grad-u-click',p:1200},{n:'VIP Grad Glam',p:2500}],
-  ot:[{n:'ID Pic',p:250},{n:'Frame',p:1500},{n:'Disc Frame',p:800},{n:'4R Print',p:50},{n:'8R/A4',p:200},{n:'Styleshots Promo',p:3000},{n:'Couple Styleshots',p:4000},{n:'PopReveal',p:2500},{n:'MamaLove',p:2000},{n:'Glowing Mom',p:5500},{n:'Moments Fam',p:3000},{n:'Generations',p:4000}],
-  as:[{n:'5 mins',p:100},{n:'4R Print',p:50},{n:'Pax',p:100},{n:'Frame',p:1500},{n:'HMU',p:2000},{n:'Digital Copy',p:200},{n:'Pet',p:100},{n:'Set Design',p:700},{n:'Balloon',p:75},{n:'Theme Set Up',p:2000}],
-  ap:[{n:'5 mins',p:200},{n:'Pax',p:200},{n:'Photo Edit',p:300},{n:'Rush Edit',p:300}]
+  ot:[{n:'ID Pic',p:250},{n:'Frame',p:1500},{n:'Disc Frame',p:900},{n:'4R Print',p:50},{n:'8R/A4',p:200},{n:'Styleshots Promo',p:3000},{n:'Couple Styleshots',p:4000},{n:'PopReveal',p:2500},{n:'MamaLove',p:2000},{n:'Glowing Mom',p:5500},{n:'Moments Fam',p:3000},{n:'Generations',p:4000}],
+  as:[{n:'5 mins',p:100},{n:'4R Print',p:50},{n:'Pax',p:100},{n:'Frame',p:1500},{n:'HMU',p:2000},{n:'Digital Copy',p:200},{n:'Pet',p:100},{n:'Set Design',p:700},{n:'Balloon',p:75},{n:'Theme Set Up',p:2000},{n:'Photographer',p:850},{n:'8x24 Print',p:350},{n:'Prestige Backdrop',p:300},{n:'Photo Edit (5)',p:1000}],
+  ap:[{n:'5 mins',p:200},{n:'Pax',p:200},{n:'Photo Edit',p:300},{n:'Rush Edit',p:300},{n:'Photo Edit (5)',p:1000},{n:'8x24 Print',p:350},{n:'Prestige Backdrop',p:300}]
 };
 function loadSVC(){ try{ const s=localStorage.getItem('cl_svc'); return s?JSON.parse(s):JSON.parse(JSON.stringify(SVC_DEFAULTS)); }catch(e){ return JSON.parse(JSON.stringify(SVC_DEFAULTS)); } }
 function saveSVC(svc){ try{ localStorage.setItem('cl_svc',JSON.stringify(svc)); }catch(e){} }
 let SVC = loadSVC();
+// One-time price update (Oct 2026) for devices that already saved a service list
+(function(){
+  try{ if(localStorage.getItem('cl_svc_v')==='2026-10') return; }catch(e){ return; }
+  const set=(cat,n,p)=>{ if(!SVC[cat]) return; const it=SVC[cat].find(i=>i.n===n); if(it) it.p=p; else SVC[cat].push({n,p}); };
+  set('ot','Disc Frame',900);
+  set('as','Photographer',850); set('as','8x24 Print',350); set('as','Prestige Backdrop',300); set('as','Photo Edit (5)',1000);
+  set('ap','Photo Edit (5)',1000); set('ap','8x24 Print',350); set('ap','Prestige Backdrop',300);
+  saveSVC(SVC); try{ localStorage.setItem('cl_svc_v','2026-10'); }catch(e){}
+})();
 const SVC_LABELS = { ss:'Self Shoot', ph:'Photographer', ot:'Others', as:'Add-ons — Self Shoot', ap:'Add-ons — Photographer' };
 
 // ================================================================
