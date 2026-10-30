@@ -1194,10 +1194,20 @@ tr:hover td { background:var(--light); }
         <!-- Balance MOP -->
         <div class="field" style="margin-bottom:10px;">
           <label>Balance Mode of Payment</label>
-          <select id="bal-mop" class="sinput">
+          <select id="bal-mop" class="sinput" onchange="toggleMopSplit()">
             <option value="">— Select —</option>
             <option>Cash</option><option>GCash</option><option>Maya</option><option>BPI</option><option>Mixed</option>
           </select>
+          <div id="mop-split" style="display:none;margin-top:8px;padding:10px;border:1px dashed var(--light2);border-radius:8px;">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">How much was paid with each? Must add up to the balance due.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+              <label style="font-size:10px;">Cash<input type="number" min="0" step="0.01" class="sinput mop-part" data-m="Cash" oninput="updMopSplit()" style="padding:5px 8px;"></label>
+              <label style="font-size:10px;">GCash<input type="number" min="0" step="0.01" class="sinput mop-part" data-m="GCash" oninput="updMopSplit()" style="padding:5px 8px;"></label>
+              <label style="font-size:10px;">Maya<input type="number" min="0" step="0.01" class="sinput mop-part" data-m="Maya" oninput="updMopSplit()" style="padding:5px 8px;"></label>
+              <label style="font-size:10px;">BPI<input type="number" min="0" step="0.01" class="sinput mop-part" data-m="BPI" oninput="updMopSplit()" style="padding:5px 8px;"></label>
+            </div>
+            <div id="mop-split-sum" style="font-size:11px;margin-top:6px;"></div>
+          </div>
         </div>
 
         <button class="btn btn-gold" style="width:100%;padding:12px;font-size:14px;" onclick="submitInvoice()">
@@ -2524,6 +2534,21 @@ function evDateMNL(utcStr) {
   } catch(e) { return String(utcStr).slice(0,10); }
 }
 
+// Balance payment method. A split payment is saved as e.g. "Mixed (Cash 500 + GCash 1500)"
+// so the breakdown travels with the invoice; plain "Mixed" is an older, unitemised one.
+function mopParts(t){
+  const m=String(t.balanceMOP||'').trim(), bal=+t.balance||0;
+  const mm=m.match(/^Mixed\s*\((.+)\)$/);
+  if(mm){
+    const out={};
+    mm[1].split('+').forEach(p=>{ const x=p.trim().match(/^(.+?)\s+([\d.,]+)$/); if(x) out[x[1]]=(out[x[1]]||0)+(parseFloat(x[2].replace(/,/g,''))||0); });
+    return out;
+  }
+  return m ? {[m]:bal} : {};
+}
+// Amount of this invoice's balance paid by method m
+function mopAmt(t,m){ return mopParts(t)[m]||0; }
+function isSplitMOP(t){ return /^Mixed\s*\(/.test(String(t.balanceMOP||'')); }
 function dateOnly(val) {
   if (!val) return '';
   return String(val).slice(0, 10);
@@ -3019,8 +3044,8 @@ function genEODlive(){
 
   var totalSales  = txns.reduce(function(s,t){ return s+(+t.total||0); },0);
   var totalDisc   = txns.reduce(function(s,t){ return s+(+t.discount||0); },0);
-  var cashRev     = txns.filter(function(t){ return t.balanceMOP==='Cash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
-  var gcashRev    = txns.filter(function(t){ return t.balanceMOP==='GCash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  var cashRev     = txns.reduce(function(s,t){ return s+mopAmt(t,'Cash'); },0);
+  var gcashRev    = txns.reduce(function(s,t){ return s+mopAmt(t,'GCash'); },0);
   var ackCashDP   = todayAcks.filter(function(a){ return a.mop==='Cash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
   var ackGcashDP  = todayAcks.filter(function(a){ return a.mop==='GCash'; }).reduce(function(s,a){ return s+(+a.downpayment||0); },0);
   var totalDPs    = todayAcks.reduce(function(s,a){ return s+(+a.downpayment||0); },0);
@@ -3123,8 +3148,8 @@ async function genEOD(){
   // Sales
   var totalRev   = txns.reduce(function(s,t){ return s+(+t.total||0); },0);
   var totalDisc  = txns.reduce(function(s,t){ return s+(+t.discount||0); },0);
-  var cashRev    = txns.filter(function(t){ return t.balanceMOP==='Cash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
-  var gcashRev   = txns.filter(function(t){ return t.balanceMOP==='GCash'; }).reduce(function(s,t){ return s+(+t.balance||0); },0);
+  var cashRev    = txns.reduce(function(s,t){ return s+mopAmt(t,'Cash'); },0);
+  var gcashRev   = txns.reduce(function(s,t){ return s+mopAmt(t,'GCash'); },0);
 
   // Fund transfers
   var cashToBank = fts.filter(function(f){ return String(f.type||'').includes('Cash to Bank'); }).reduce(function(s,f){ return s+(+f.amt||0); },0);
@@ -4699,8 +4724,8 @@ function printCashflowReport(){
   const totalRefunds  = refunds.reduce((s,f)=>s+(+f.amt||0),0);
   const totalGCashTx  = gcashToBk.reduce((s,f)=>s+(+f.amt||0),0);
   const totalCashDep  = cashToBk.reduce((s,f)=>s+(+f.amt||0),0);
-  const gcashCollected= txns.filter(t=>t.balanceMOP==='GCash'||t.mop==='GCash').reduce((s,t)=>s+(+t.total||0),0);
-  const cashCollected = txns.filter(t=>t.balanceMOP==='Cash'||t.mop==='Cash').reduce((s,t)=>s+(+t.total||0),0);
+  const gcashCollected= txns.reduce((s,t)=>s+(isSplitMOP(t)?mopAmt(t,'GCash'):((t.balanceMOP==='GCash'||t.mop==='GCash')?(+t.total||0):0)),0);
+  const cashCollected = txns.reduce((s,t)=>s+(isSplitMOP(t)?mopAmt(t,'Cash'):((t.balanceMOP==='Cash'||t.mop==='Cash')?(+t.total||0):0)),0);
   const cashExpenses  = expenses.filter(e=>!e.mop||e.mop==='Cash').reduce((s,e)=>s+(+e.amt||0),0);
   const totalOpeningCash = 0; // Not available in print data — use 0
   const cashInBox     = Math.max(0, totalOpeningCash + cashCollected - cashExpenses - totalCashDep);
@@ -6177,6 +6202,17 @@ function addCustom(){
   document.getElementById('custom-name').value=''; document.getElementById('custom-price').value='';
 }
 function rmItem(idx){ INV.splice(idx,1); recalc(); }
+// Staff incentives (TimeCommand → Incentives) read "Sold by" / "Done by" off these lines.
+// Their commission is shared between the seller and the person who does the work;
+// every other add-on's commission goes to the team's incentive fund, so it needs neither.
+function isSplitLine(i){ return /^(photographer|photo edit \(5\))$/i.test(String(i.name).trim()); }
+function setInvField(idx,field,val){ if(INV[idx]) INV[idx][field]=val; }
+function staffPick_(idx,field,label,cur){
+  return '<select class="sinput" style="font-size:11px;padding:3px 6px;width:auto;" onchange="setInvField('+idx+',\''+field+'\',this.value)">'+
+    '<option value="">'+label+'…</option>'+
+    (DB.staff||[]).map(s=>'<option value="'+escHtml(s)+'"'+(s===cur?' selected':'')+'>'+escHtml(s)+'</option>').join('')+
+  '</select>';
+}
 function chgQty(idx,d){ INV[idx].qty+=d; if(INV[idx].qty<=0) INV.splice(idx,1); recalc(); }
 function populateInvClient(){
   // Update shared datalist used by all name inputs across the app
@@ -6318,7 +6354,11 @@ function recalc(){
         '<span style="min-width:58px;text-align:right;font-weight:500;">&#8369;'+fmt(item.price*item.qty)+'</span>'+
         '<button class="btn btn-sm btn-outline" style="padding:2px 6px;color:var(--danger);" onclick="rmItem('+idx+')">✕</button>'+
       '</div>'+
-    '</div>';
+    '</div>'+
+    (isSplitLine(item)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 6px;">'+
+      staffPick_(idx,'soldBy','Sold by',item.soldBy)+
+      staffPick_(idx,'doneBy','Done by',item.doneBy)+
+    '</div>':'');
   });
   lEl.innerHTML=itemHtml;
   const svcs=INV.filter(i=>!i.isAddon), adds=INV.filter(i=>i.isAddon);
@@ -6346,12 +6386,29 @@ function recalc(){
   totHtml+='<div class="inv-total"><span>Total Amount</span><span>&#8369;'+fmt(total)+'</span></div>'+
     '<div class="inv-bal"><span>Balance Due</span><span>&#8369;'+fmt(balance)+'</span></div>';
   tEl.innerHTML=totHtml;
+  if(document.getElementById('bal-mop')?.value==='Mixed') updMopSplit();
+}
+// Balance due as currently shown on the invoice form
+function invBalanceDue(){ const el=document.querySelector('#inv-totals .inv-bal span:last-child'); return el?(parseFloat(el.textContent.replace(/[^\d.]/g,''))||0):0; }
+function toggleMopSplit(){
+  const on=document.getElementById('bal-mop').value==='Mixed';
+  document.getElementById('mop-split').style.display=on?'':'none';
+  if(on) updMopSplit();
+}
+function mopSplitVals(){
+  const out=[]; document.querySelectorAll('#mop-split .mop-part').forEach(i=>{ const v=parseFloat(i.value)||0; if(v>0) out.push([i.dataset.m,Math.round(v*100)/100]); });
+  return out;
+}
+function updMopSplit(){
+  const parts=mopSplitVals(), sum=parts.reduce((s,p)=>s+p[1],0), due=invBalanceDue(), left=Math.round((due-sum)*100)/100;
+  const el=document.getElementById('mop-split-sum'); if(!el) return;
+  el.innerHTML='Entered ₱'+fmt(sum)+' of ₱'+fmt(due)+' — '+(left===0?'<span style="color:var(--teal);font-weight:600;">✓ matches</span>':'<span style="color:var(--danger);font-weight:600;">'+(left>0?'₱'+fmt(left)+' left':'₱'+fmt(-left)+' too much')+'</span>');
 }
 async function submitInvoice(){
   const invNum=document.getElementById('inv-num').value.trim();
   const staff=document.getElementById('inv-staff').value.trim()||CURR_USER;
   const clientName=document.getElementById('inv-client').value.trim();
-  const mop=document.getElementById('bal-mop').value;
+  let mop=document.getElementById('bal-mop').value;
   if(!invNum){ notify('Invoice number required','error'); return; }
   // Prevent duplicate invoice number on same day
   const dupInv = DB.transactions.find(t => String(t.invoiceNum).trim().toLowerCase() === invNum.toLowerCase() && dateOnly(t.date) === todayStr());
@@ -6359,6 +6416,14 @@ async function submitInvoice(){
   if(!clientName){ notify('Enter client name','error'); return; }
   if(!INV.length){ notify('Add at least one service','error'); return; }
   if(!mop){ notify('Select balance mode of payment','error'); return; }
+  if(mop==='Mixed'){
+    const parts=mopSplitVals(), sum=Math.round(parts.reduce((s,p)=>s+p[1],0)*100)/100, due=invBalanceDue();
+    if(parts.length<2){ notify('Mixed payment: enter the amount for at least two methods','error'); return; }
+    if(Math.abs(sum-due)>0.009){ notify('Mixed payment adds up to ₱'+fmt(sum)+' but the balance is ₱'+fmt(due),'error'); return; }
+    mop='Mixed ('+parts.map(p=>p[0]+' '+p[1]).join(' + ')+')';
+  }
+  const noSeller=INV.filter(i=>isSplitLine(i)&&(!i.soldBy||!i.doneBy));
+  if(noSeller.length && !confirm(noSeller.map(i=>i.name).join(', ')+' — "Sold by" / "Done by" not picked. That staff share will go to the incentive fund instead. Save anyway?')) return;
   const svcs=INV.filter(i=>!i.isAddon), adds=INV.filter(i=>i.isAddon);
   const svcsT=svcs.reduce((s,i)=>s+i.price*i.qty,0), addsT=adds.reduce((s,i)=>s+i.price*i.qty,0), sub=svcsT+addsT;
   const dEn=document.getElementById('d-en').checked;
@@ -6376,6 +6441,7 @@ async function submitInvoice(){
   await push('saveTransaction',txn);
   INV=[];
   ['inv-num','dp-amt','v-amt','bal-mop'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.querySelectorAll('#mop-split .mop-part').forEach(i=>i.value=''); toggleMopSplit();
   document.getElementById('inv-client').value='';
   document.getElementById('d-en').checked=false; document.getElementById('d-pax').value=1; document.getElementById('d-sc').value=0;
   document.getElementById('inv-ack').style.display='none';
@@ -9308,7 +9374,7 @@ function renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes)
   const mops = ['Cash','GCash','Maya','BPI','Mixed'];
   const mopData = mops.map(m=>({
     label:m,
-    val:txns.filter(t=>t.balanceMOP===m).reduce((s,t)=>s+(+t.balance||0),0)
+    val:txns.reduce((s,t)=>s+mopAmt(t,m),0)
   })).filter(m=>m.val>0).sort((a,b)=>b.val-a.val);
   const mopMax = mopData[0]?.val||1;
   const colors = {'Cash':'var(--teal)','GCash':'var(--gold)','Maya':'#5b63d9','BPI':'#c0544a','Mixed':'var(--muted)'};
@@ -9326,7 +9392,7 @@ function renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes)
   let mopDetail = '<div style="overflow-x:auto;"><table><thead><tr><th>Method</th><th style="text-align:right;">Amount Collected</th><th style="text-align:center;">Transactions</th><th style="text-align:right;">Share</th></tr></thead><tbody>';
   const totalMOP = mopData.reduce((s,m)=>s+m.val,0);
   mopData.forEach(m=>{
-    const cnt   = txns.filter(t=>t.balanceMOP===m.label).length;
+    const cnt   = txns.filter(t=>mopAmt(t,m.label)>0).length;
     const share = totalMOP ? Math.round(m.val/totalMOP*100) : 0;
     mopDetail += '<tr><td style="font-weight:500;">'+m.label+'</td><td style="text-align:right;color:var(--teal);font-weight:600;">₱'+fmt(m.val)+'</td><td style="text-align:center;">'+cnt+'</td><td style="text-align:right;color:var(--muted);">'+share+'%</td></tr>';
   });
@@ -9396,7 +9462,7 @@ function renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes)
     // by payment method: balances by the method used on the invoice, deposits by the method on the booking receipt
     const meth = {};
     const addM = (m, k, v)=>{ m=m||'Other'; (meth[m]=meth[m]||{bal:0,dep:0})[k]+=v; };
-    txns.forEach(t=>{ if(+t.balance>0) addM(t.balanceMOP,'bal',+t.balance); });
+    txns.forEach(t=>{ if(+t.balance>0) Object.entries(mopParts(t)).forEach(([m,v])=>addM(m,'bal',v)); });
     depAcks.forEach(a=>addM(a.mop,'dep',+a.downpayment||0));
     const mNames = Object.keys(meth).sort((a,b)=>(meth[b].bal+meth[b].dep)-(meth[a].bal+meth[a].dep));
     if(mNames.length){
@@ -9731,8 +9797,8 @@ function renderOperationsReport(txns, eods, allFT, gifts, label){
   document.getElementById('ops-gifts').innerHTML        = '<div class="rs-label">Gifts Redeemed</div><div class="rs-val">'+giftsRed+'</div>';
 
   // Cash management
-  const totalCash    = txns.filter(t=>t.balanceMOP==='Cash').reduce((s,t)=>s+(+t.balance||0),0);
-  const totalGcash   = txns.filter(t=>t.balanceMOP==='GCash').reduce((s,t)=>s+(+t.balance||0),0);
+  const totalCash    = txns.reduce((s,t)=>s+mopAmt(t,'Cash'),0);
+  const totalGcash   = txns.reduce((s,t)=>s+mopAmt(t,'GCash'),0);
   const cashDeposited= allFT.filter(f=>f.type&&f.type.toLowerCase().includes('cash to bank')).reduce((s,f)=>s+(+f.amt||0),0);
   const gcashToBank  = allFT.filter(f=>f.type&&f.type.toLowerCase().includes('gcash to bank')).reduce((s,f)=>s+(+f.amt||0),0);
   const refunds      = allFT.filter(f=>f.type&&f.type.toLowerCase().includes('refund')).reduce((s,f)=>s+(+f.amt||0),0);
@@ -9850,11 +9916,11 @@ function _generateMonthlyReport(){
   const totalSales = txns.reduce((s,t)=>s+(+t.total||0),0);
   const totalDisc  = txns.reduce((s,t)=>s+(+t.discount||0),0);
   const totalDP    = txns.reduce((s,t)=>s+(+t.downpayment||0),0);
-  const totalCash  = txns.filter(t=>t.balanceMOP==='Cash').reduce((s,t)=>s+(+t.balance||0),0);
-  const totalGcash = txns.filter(t=>t.balanceMOP==='GCash').reduce((s,t)=>s+(+t.balance||0),0);
-  const totalBPI   = txns.filter(t=>t.balanceMOP==='BPI').reduce((s,t)=>s+(+t.balance||0),0);
-  const totalMaya  = txns.filter(t=>t.balanceMOP==='Maya').reduce((s,t)=>s+(+t.balance||0),0);
-  const totalMixed = txns.filter(t=>t.balanceMOP==='Mixed').reduce((s,t)=>s+(+t.balance||0),0);
+  const totalCash  = txns.reduce((s,t)=>s+mopAmt(t,'Cash'),0);
+  const totalGcash = txns.reduce((s,t)=>s+mopAmt(t,'GCash'),0);
+  const totalBPI   = txns.reduce((s,t)=>s+mopAmt(t,'BPI'),0);
+  const totalMaya  = txns.reduce((s,t)=>s+mopAmt(t,'Maya'),0);
+  const totalMixed = txns.reduce((s,t)=>s+mopAmt(t,'Mixed'),0);
 
   // All expenses — use direct Expenses sheet first, fallback to EOD embedded
   const directExp = (DB.expenses||[]).filter(e => {
@@ -9895,7 +9961,7 @@ function _generateMonthlyReport(){
 
   // Cashflow breakdown
   // GCash collections = all GCash payments received
-  const gcashCollected = txns.filter(t=>t.balanceMOP==='GCash').reduce((s,t)=>s+(+t.balance||0),0);
+  const gcashCollected = txns.reduce((s,t)=>s+mopAmt(t,'GCash'),0);
   // Cash on hand at end of month = sum of all EOD cash on hand entries
   // Cash fund in box = Opening Cash + Cash Sales - Cash Expenses - Cash deposited to bank
   const totalOpeningCash = eods.reduce((s,r)=>s+(+r.openingCash||0),0);
@@ -9975,7 +10041,7 @@ function _generateMonthlyReport(){
     <div class="card">
       <div class="ct">Payment Breakdown</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
-        ${[['Cash',totalCash],['GCash',totalGcash],['BPI',totalBPI],['Maya',totalMaya],['Mixed',totalMixed]]
+        ${[['Cash',totalCash],['GCash',totalGcash],['BPI',totalBPI],['Maya',totalMaya],['Mixed (not itemised)',totalMixed]]
           .map(function(pair){return '<div class="il"><span class="tm">'+pair[0]+'</span><span style="font-weight:500;">&#8369;'+fmt(pair[1])+'</span></div>';}).join('')}
       </div>
     </div>
