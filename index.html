@@ -4077,6 +4077,71 @@ function cpLLUpdate(){
   cpBalance();
   cpHmu();
 }
+// ── Look Lab combinations on the invoice (Photographer tab) ──
+// Same prices and naming as Change Package, so invoices read "The Look Lab: Prestige + The Coat Code + Digital".
+async function invLLInit(){
+  var box = document.getElementById('inv-ll');
+  if(!box) return;
+  box.innerHTML = '<div class="tm" style="font-size:11px;margin-top:10px;">⏳ Loading Look Lab prices…</div>';
+  var d = await llPosLoad();
+  box = document.getElementById('inv-ll'); if(!box) return;
+  var o = function(arr){ return arr.map(function(x){ return '<option value="'+escHtml(x.id)+'">'+escHtml(x.name)+(x.price?' (₱'+fmt(x.price)+')':'')+'</option>'; }).join(''); };
+  box.innerHTML =
+    '<div style="margin-top:12px;padding:12px;border:1px solid var(--light2);border-radius:10px;background:var(--light);">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--slate);margin-bottom:8px;">🎨 The Look Lab <span style="font-weight:400;color:var(--muted);font-size:10px;">· '+escHtml(d.source)+'</span></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">'+
+        '<div class="field" style="margin:0;"><label>Session</label><select id="inv-ll-s" class="sinput" style="width:100%;" onchange="invLLMood()">'+o(d.sessions)+'</select></div>'+
+        '<div class="field" style="margin:0;"><label>Mood</label><select id="inv-ll-m" class="sinput" style="width:100%;" onchange="invLLMood()">'+o(d.moods.concat([d.double]))+'</select></div>'+
+        '<div class="field" style="margin:0;"><label>Keepsake</label><select id="inv-ll-k" class="sinput" style="width:100%;" onchange="invLLUpdate()"></select></div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:11px;margin-top:8px;">'+
+        d.extras.map(function(x){
+          return '<label style="display:flex;gap:6px;align-items:center;"><input type="checkbox" class="inv-ll-xc" value="'+escHtml(x.key)+'" onchange="invLLUpdate()"> '+escHtml(x.name)+' <span style="color:var(--muted);">+₱'+fmt(x.price)+'</span></label>';
+        }).join('')+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;">'+
+        '<div id="inv-ll-name" style="font-size:11px;color:var(--muted);flex:1;min-width:160px;"></div>'+
+        '<button class="btn btn-gold btn-sm" onclick="invLLAdd()">+ Add to invoice</button>'+
+      '</div>'+
+    '</div>';
+  invLLMood();
+}
+function invLLMood(){
+  var d = _llPos; if(!d) return;
+  var k = document.getElementById('inv-ll-k'); if(!k) return;
+  var mood = document.getElementById('inv-ll-m').value, sess = document.getElementById('inv-ll-s').value;
+  k.innerHTML = llPosKeepsakes(mood).map(function(x){
+    var p = llPosKeepsakePrice(sess, x, mood);
+    return '<option value="'+escHtml(x.id)+'">'+escHtml(x.name)+(p?' (₱'+fmt(p)+')':'')+'</option>';
+  }).join('');
+  invLLUpdate();
+}
+function invLLPick(){
+  var d = _llPos; if(!d) return null;
+  var sId = document.getElementById('inv-ll-s').value, mId = document.getElementById('inv-ll-m').value, kId = document.getElementById('inv-ll-k').value;
+  var S = d.sessions.find(function(x){ return x.id===sId; }), M = llPosMood(mId), K = d.keepsakes.find(function(x){ return x.id===kId; });
+  if(!S || !M || !K) return null;
+  var extras = [];
+  document.querySelectorAll('.inv-ll-xc:checked').forEach(function(cb){
+    var x = d.extras.find(function(e){ return e.key===cb.value; }); if(x) extras.push(x);
+  });
+  return { name: 'The Look Lab: ' + S.name + ' + ' + M.name + ' + ' + K.name,
+           price: (S.price||0) + (M.price||0) + llPosKeepsakePrice(sId, K, mId), extras: extras };
+}
+function invLLUpdate(){
+  var p = invLLPick(), el = document.getElementById('inv-ll-name'); if(!p || !el) return;
+  var tot = p.price + p.extras.reduce(function(t,x){ return t+(x.price||0); },0);
+  el.innerHTML = '<strong style="color:var(--slate);">'+escHtml(p.name)+'</strong> · ₱'+fmt(p.price)+
+    (p.extras.length ? '<br>+ '+escHtml(p.extras.map(function(x){ return x.name; }).join(', '))+' · total ₱'+fmt(tot) : '');
+}
+function invLLAdd(){
+  var p = invLLPick(); if(!p) return;
+  addItem(p.name, p.price, false);
+  p.extras.forEach(function(x){ addItem(x.name, x.price||0, true); });
+  document.querySelectorAll('.inv-ll-xc:checked').forEach(function(cb){ cb.checked = false; });
+  invLLUpdate();
+  notify('Added '+p.name);
+}
 function cpBalance(){
   var a = (DB.acknowledgements||[]).find(function(x){ return x.id===window._cpAckId; });
   var el = document.getElementById('cp-balance');
@@ -6133,7 +6198,8 @@ function renderInvoicePage(){
   var gridHtml = '';
   categories.forEach(function(cat, idx){
     tabHtml += '<button class="stab'+(idx===0?' active':'')+'" id="stab-'+cat.key+'" onclick="showSvcTab(\''+cat.key+'\')">'+cat.label+'</button>';
-    gridHtml += '<div class="stab-panel" id="stab-panel-'+cat.key+'" style="'+(idx===0?'':'display:none;')+'"><div id="sg-'+cat.key+'"></div></div>';
+    gridHtml += '<div class="stab-panel" id="stab-panel-'+cat.key+'" style="'+(idx===0?'':'display:none;')+'"><div id="sg-'+cat.key+'"></div>'+
+      (cat.key==='ph' ? '<div id="inv-ll"></div>' : '')+'</div>';
   });
   tabsEl.innerHTML = tabHtml;
   gridEl.innerHTML = gridHtml;
@@ -6142,6 +6208,7 @@ function renderInvoicePage(){
   renderSvcGrid('sg-ss',SVC.ss,false); renderSvcGrid('sg-ph',SVC.ph,false);
   renderSvcGrid('sg-ot',SVC.ot,false); renderSvcGrid('sg-as',SVC.as,true);
   renderSvcGrid('sg-ap',SVC.ap,true);
+  invLLInit();
 
   // Populate staff dropdown
   var staffSel = document.getElementById('inv-staff');
