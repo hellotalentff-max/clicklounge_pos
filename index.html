@@ -6277,14 +6277,18 @@ function addCustom(){
   document.getElementById('custom-name').value=''; document.getElementById('custom-price').value='';
 }
 function rmItem(idx){ INV.splice(idx,1); recalc(); }
-// Staff incentives (TimeCommand → Incentives) read "Sold by" / "Done by" off these lines.
-// Their commission is shared between the seller and the person who does the work;
-// every other add-on's commission goes to the team's incentive fund, so it needs neither.
-function isSplitLine(i){ return /^(photographer|photo edit \(5\))$/i.test(String(i.name).trim()); }
+// Staff incentives (TimeCommand → Incentives) read "Sold by" / "Done by" off add-on lines.
+// Add-ons (and frames/prints) earn a 10% commission when a staff member offered them;
+// "Client asked" means the client requested it, so no commission. Digital copies don't count.
+function isCommissionLine(i){ return !/digital/i.test(i.name) && (i.isAddon || /frame|print|8R|A4/i.test(i.name)); }
+// These are shared: 25% the seller, 50% the one who does the work, 25% the team fund.
+function isSplitLine(i){ return /^(photographer|photo edit \(5\)|acrylic frame w\/ gold studs \(8x24\))$/i.test(String(i.name).trim()); }
+var CLIENT_ASKED = '__client__';
 function setInvField(idx,field,val){ if(INV[idx]) INV[idx][field]=val; }
 function staffPick_(idx,field,label,cur){
   return '<select class="sinput" style="font-size:11px;padding:3px 6px;width:auto;" onchange="setInvField('+idx+',\''+field+'\',this.value)">'+
     '<option value="">'+label+'…</option>'+
+    (field==='soldBy' ? '<option value="'+CLIENT_ASKED+'"'+(cur===CLIENT_ASKED?' selected':'')+'>Client asked</option>' : '')+
     (DB.staff||[]).map(s=>'<option value="'+escHtml(s)+'"'+(s===cur?' selected':'')+'>'+escHtml(s)+'</option>').join('')+
   '</select>';
 }
@@ -6430,9 +6434,9 @@ function recalc(){
         '<button class="btn btn-sm btn-outline" style="padding:2px 6px;color:var(--danger);" onclick="rmItem('+idx+')">✕</button>'+
       '</div>'+
     '</div>'+
-    (isSplitLine(item)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 6px;">'+
+    (isCommissionLine(item)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 6px;">'+
       staffPick_(idx,'soldBy','Sold by',item.soldBy)+
-      staffPick_(idx,'doneBy','Done by',item.doneBy)+
+      (isSplitLine(item)?staffPick_(idx,'doneBy','Done by',item.doneBy):'')+
     '</div>':'');
   });
   lEl.innerHTML=itemHtml;
@@ -6497,8 +6501,8 @@ async function submitInvoice(){
     if(Math.abs(sum-due)>0.009){ notify('Mixed payment adds up to ₱'+fmt(sum)+' but the balance is ₱'+fmt(due),'error'); return; }
     mop='Mixed ('+parts.map(p=>p[0]+' '+p[1]).join(' + ')+')';
   }
-  const noSeller=INV.filter(i=>isSplitLine(i)&&(!i.soldBy||!i.doneBy));
-  if(noSeller.length && !confirm(noSeller.map(i=>i.name).join(', ')+' — "Sold by" / "Done by" not picked. That staff share will go to the incentive fund instead. Save anyway?')) return;
+  const noSeller=INV.filter(i=>isCommissionLine(i)&&(!i.soldBy||(isSplitLine(i)&&!i.doneBy)));
+  if(noSeller.length && !confirm(noSeller.map(i=>i.name).join(', ')+' — "Sold by"'+(noSeller.some(isSplitLine)?' / "Done by"':'')+' not picked (choose "Client asked" if the client requested it). Unpicked lines count as client-asked: no commission for the seller. Save anyway?')) return;
   const svcs=INV.filter(i=>!i.isAddon), adds=INV.filter(i=>i.isAddon);
   const svcsT=svcs.reduce((s,i)=>s+i.price*i.qty,0), addsT=adds.reduce((s,i)=>s+i.price*i.qty,0), sub=svcsT+addsT;
   const dEn=document.getElementById('d-en').checked;
