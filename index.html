@@ -6624,10 +6624,8 @@ async function sendEmailNow(txnId) {
   const btn = document.querySelector('#modal-box .btn-teal');
   if (btn) { btn.disabled=true; btn.textContent='Sending…'; }
   try {
-    const feedbackBase = DB.studioInfo.feedbackUrl || '';
-    const feedbackLink = feedbackBase
-      ? feedbackBase + '?name=' + encodeURIComponent(t.clientName) + '&email=' + encodeURIComponent(email)
-      : '';
+    // The feedback form goes out only with the drive link (Tasks app), so the invoice email no longer carries it
+    const feedbackLink = '';
     const r = await gasCall('sendInvoiceEmail', {
       toEmail:     email,
       clientName:  t.clientName,
