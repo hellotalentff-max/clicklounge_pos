@@ -2743,7 +2743,7 @@ function gasCall(action, payload={}, _retryCount=0) {
       done = true;
       cleanup();
       if (data && data.error) { setSS('error'); reject(new Error(data.error)); }
-      else { setSS('synced'); resolve(data); }
+      else { setSS('synced'); _markOnline(); resolve(data); }
     };
 
     function cleanup() {
@@ -11270,6 +11270,24 @@ window.addEventListener('online', async ()=>{
   if(hasUrl()&&CURR_USER){
     await syncAll();
     notify('All data synced ✓','success');
+  }
+});
+
+// Phones and tablets often skip the 'online' event (page in the background, a Wi-Fi blip),
+// which left the Offline notice up for good. Any answer from Sheets proves we're online.
+function _markOnline(){
+  _isOnline = true;
+  const pill = document.getElementById('offline-banner');
+  if(pill && pill.style.display !== 'none'){
+    hideOfflineBanner();
+    loadOfflineQueue();
+    if(_offlineQueue.length) flushOfflineQueue();
+  }
+}
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && navigator.onLine){
+    const pill = document.getElementById('offline-banner');
+    if(pill && pill.style.display !== 'none'){ _markOnline(); if(hasUrl()&&CURR_USER) syncAll(); }
   }
 });
 
