@@ -6279,8 +6279,8 @@ function addCustom(){
 function rmItem(idx){ INV.splice(idx,1); recalc(); }
 // Staff incentives (TimeCommand → Incentives) read "Sold by" / "Done by" off add-on lines.
 // Add-ons (and frames/prints) earn a 10% commission when a staff member offered them;
-// "Client asked" means the client requested it, so no commission. Digital copies don't count.
-function isCommissionLine(i){ return !/digital/i.test(i.name) && (i.isAddon || /frame|print|8R|A4/i.test(i.name)); }
+// "Client asked" means the client requested it, so no commission. Digital copies count like any add-on.
+function isCommissionLine(i){ return i.isAddon || /frame|print|8R|A4/i.test(i.name); }
 // These are shared: 25% the seller, 50% the one who does the work, 25% the team fund.
 function isSplitLine(i){ return /^(photographer|photo edit \(5\)|acrylic frame w\/ gold studs \(8x24\))$/i.test(String(i.name).trim()); }
 var CLIENT_ASKED = '__client__';
