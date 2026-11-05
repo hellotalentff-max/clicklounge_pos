@@ -1123,6 +1123,7 @@ tr:hover td { background:var(--light); }
           <input type="text" id="inv-client" class="sinput" placeholder="Start typing client name..." autocomplete="off" list="client-names-list" oninput="onClientChange(this.value)">
         </div>
         <div id="inv-client-info" style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:8px;"></div>
+        <div id="inv-late-note" style="display:none;background:rgba(192,84,74,0.06);border:1px solid rgba(192,84,74,0.25);color:var(--text);border-radius:8px;padding:8px 12px;font-size:11.5px;line-height:1.5;margin-bottom:8px;"></div>
         <!-- Linked ack receipt auto-detected -->
         <div id="inv-ack" style="display:none;background:rgba(81,137,125,0.06);border:1px solid rgba(81,137,125,0.15);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
           <div style="font-size:11px;font-weight:600;color:var(--teal);margin-bottom:6px;">📋 Downpayment Found</div>
@@ -2024,6 +2025,13 @@ tr:hover td { background:var(--light); }
       <div class="ct">🚫 No-Shows This Period</div>
       <div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Confirmed bookings in the period with no check-in and no invoice for that client on or near the session date. The system has no no-show status, so check each name below before treating it as final.</div>
       <div id="fin-noshow"></div>
+    </div>
+
+    <!-- Clients who checked in late -->
+    <div class="card">
+      <div class="ct">⏰ Late Client Arrivals</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Booked clients who checked in more than 15 minutes after their time slot. Each one owes a ₱200 Late Fee; a fee that wasn't invoiced comes off the team incentive fund.</div>
+      <div id="fin-late"></div>
     </div>
 
     <!-- Sales Table -->
@@ -5623,6 +5631,8 @@ async function submitReg(){
   notify('Registered: '+fbName+' — Social media: '+(socialConsent==='yes'?'✅ Allowed':'🚫 Private'),'success');
   logActivity('Client Registered', fbName+' ('+CUR_ARR+') | Social: '+socialConsent, 'success');
   await push('saveRegistration',reg);
+  var _late = regLate_(reg);
+  if(_late){ logActivity('Late Arrival', fbName+' — '+fmtLateMin(_late.mins)+' after '+_late.slot+' slot · ₱'+LATE_FEE+' Late Fee', 'warn'); lateFeeAlert(fbName, _late); }
 
   // Reset form
   document.getElementById('reg-fb').value='';
@@ -5653,7 +5663,7 @@ function renderReg(){
       : '<span style="color:var(--muted);font-size:11px;">—</span>';
     regRows+='<tr><td style="white-space:nowrap;font-family:monospace;font-size:12px;">'+fmtTimePHT(r.time)+'</td>'+
       '<td>'+escHtml(r.fbName)+'</td><td>'+(r.email||'—')+'</td>'+
-      '<td><span class="badge '+(r.arrType==='booked'?'b-gold':'b-teal')+'">'+r.arrType+'</span></td>'+
+      '<td><span class="badge '+(r.arrType==='booked'?'b-gold':'b-teal')+'">'+r.arrType+'</span>'+(function(L){ return L?' <span class="badge" style="background:rgba(192,84,74,0.1);color:var(--danger);" title="Slot '+escHtml(L.slot)+'">⏰ '+fmtLateMin(L.mins)+' late · Late Fee</span>':''; })(regLate_(r))+'</td>'+
       '<td>'+sm+'</td></tr>';
   });
   el.innerHTML='<table><thead><tr><th>Time</th><th>FB Name</th><th>Email</th><th>Type</th><th>📸 SM Consent</th></tr></thead><tbody>'+regRows+'</tbody></table>';
@@ -6276,14 +6286,57 @@ function addCustom(){
   addItem(name,price,true);
   document.getElementById('custom-name').value=''; document.getElementById('custom-price').value='';
 }
-function rmItem(idx){ INV.splice(idx,1); recalc(); }
+function rmItem(idx){
+  if(INV[idx] && isLateFeeLine(INV[idx]) && !confirm('Remove the Late Fee?\n\nIf it is not invoiced, ₱'+fmt(LATE_FEE)+' comes off the team incentive fund.')) return;
+  if(INV[idx] && isLateFeeLine(INV[idx])) _lateFeeRemoved[String(document.getElementById('inv-client')?.value||'').trim().toLowerCase()] = 1;
+  INV.splice(idx,1); recalc();
+}
+var _lateFeeRemoved = {};
 // Staff incentives (TimeCommand → Incentives) read "Sold by" / "Done by" off add-on lines.
 // Add-ons (and frames/prints) earn a 10% commission when a staff member offered them;
 // "Client asked" means the client requested it, so no commission. Digital copies count like any add-on.
-function isCommissionLine(i){ return i.isAddon || /frame|print|8R|A4/i.test(i.name); }
+function isCommissionLine(i){ return !isLateFeeLine(i) && (i.isAddon || /frame|print|8R|A4/i.test(i.name)); }
 // These are shared: 25% the seller, 50% the one who does the work, 25% the team fund.
 function isSplitLine(i){ return /^(photographer|photo edit \(5\)|acrylic frame w\/ gold studs \(8x24\))$/i.test(String(i.name).trim()); }
 var CLIENT_ASKED = '__client__';
+
+// ── Late arrivals ──
+// A booked client who checks in more than LATE_GRACE_MIN minutes after their time slot owes a
+// Late Fee. It is added to their invoice automatically. If it is removed (not invoiced),
+// TimeCommand takes LATE_FEE off the team incentive fund for that day.
+var LATE_FEE = 200, LATE_GRACE_MIN = 15, LATE_FEE_NAME = 'Late Fee', LATE_FEE_START = '2026-11-06';   // fund deduction applies from this date
+function isLateFeeLine(i){ return /^late ?fee\b/i.test(String((i&&i.name)||'').trim()); }
+function clockMin_(t){
+  var m = String(t||'').match(/(?:^|\D)(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)/i);
+  if(!m) return null;
+  var h = parseInt(m[1],10), mi = parseInt(m[2],10);
+  if(/PM/i.test(m[3]) && h < 12) h += 12;
+  if(/AM/i.test(m[3]) && h === 12) h = 0;
+  return h*60 + mi;
+}
+function fmtLateMin(m){ return m >= 60 ? Math.floor(m/60)+'h '+(m%60)+'m' : m+' min'; }
+// Returns {ack, slot, checkIn, mins} when this check-in was late for its booking, else null
+function regLate_(r){
+  if(!r || r.arrType !== 'booked' || !r.ackId) return null;
+  var a = (DB.acknowledgements||[]).find(function(x){ return x.id === r.ackId; });
+  if(!a || dateOnly(a.bookDate) !== dateOnly(r.date)) return null;
+  var checkIn = String(fmtTimePHT(r.time)||'').replace(/(\d:\d{2}):\d{2}/,'$1');
+  var s = clockMin_(a.timeSlot), t = clockMin_(checkIn) != null ? clockMin_(checkIn) : clockMin_(r.time);
+  if(s == null || t == null) return null;
+  var mins = t - s;
+  return mins > LATE_GRACE_MIN ? { ack: a, slot: a.timeSlot, checkIn: checkIn, mins: mins } : null;
+}
+function lateFeeAlert(name, L){
+  openModal(
+    '<h3 style="margin-bottom:6px;color:var(--danger);">⏰ Late Fee — ₱'+fmt(LATE_FEE)+'</h3>'+
+    '<p style="font-size:13px;line-height:1.6;margin-bottom:12px;"><strong>'+escHtml(name)+'</strong> checked in at <strong>'+escHtml(L.checkIn)+'</strong>, '+
+      '<strong>'+fmtLateMin(L.mins)+'</strong> after their <strong>'+escHtml(L.slot)+'</strong> slot (grace period '+LATE_GRACE_MIN+' min).</p>'+
+    '<div style="background:rgba(192,84,74,.06);border:1px solid rgba(192,84,74,.25);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;margin-bottom:14px;">'+
+      'A ₱'+fmt(LATE_FEE)+' <strong>Late Fee</strong> will be added to their invoice automatically. Let the client know before the session.<br>'+
+      '<span style="color:var(--muted);">If the Late Fee is not invoiced, ₱'+fmt(LATE_FEE)+' comes off the team incentive fund.</span></div>'+
+    '<div class="fe"><button class="btn btn-gold" onclick="closeModal()">OK, client informed</button></div>'
+  );
+}
 function setInvField(idx,field,val){ if(INV[idx]) INV[idx][field]=val; }
 function staffPick_(idx,field,label,cur){
   return '<select class="sinput" style="font-size:11px;padding:3px 6px;width:auto;" onchange="setInvField('+idx+',\''+field+'\',this.value)">'+
@@ -6292,7 +6345,7 @@ function staffPick_(idx,field,label,cur){
     (DB.staff||[]).map(s=>'<option value="'+escHtml(s)+'"'+(s===cur?' selected':'')+'>'+escHtml(s)+'</option>').join('')+
   '</select>';
 }
-function chgQty(idx,d){ INV[idx].qty+=d; if(INV[idx].qty<=0) INV.splice(idx,1); recalc(); }
+function chgQty(idx,d){ if(INV[idx].qty+d<=0){ rmItem(idx); return; } INV[idx].qty+=d; recalc(); }
 function populateInvClient(){
   // Update shared datalist used by all name inputs across the app
   updateClientDatalist();
@@ -6347,6 +6400,7 @@ function onClientChange(name){
   var reg = (DB.registrations||[]).find(function(r){
     return (r.fbName||'').toLowerCase()===nameLower && dateOnly(r.date)===todayStr();
   });
+  invLateCheck(reg, nameLower);
   if(reg && reg.ackId){
     var a = (DB.acknowledgements||[]).find(function(x){ return x.id===reg.ackId; });
     if(a && +a.downpayment > 0){
@@ -6373,6 +6427,23 @@ function onClientChange(name){
   recalc();
 }
 
+// Late check-in today → add the Late Fee once (unless staff already removed it for this client)
+function invLateCheck(reg, nameLower){
+  var note = document.getElementById('inv-late-note');
+  var L = regLate_(reg);
+  if(!L){ if(note) note.style.display='none'; return; }
+  var has = INV.some(isLateFeeLine);
+  if(!has && !_lateFeeRemoved[nameLower]){
+    INV.push({ name: LATE_FEE_NAME, price: LATE_FEE, qty: 1, isAddon: true });
+    has = true;
+    notify('⏰ Late arrival — ₱'+fmt(LATE_FEE)+' Late Fee added to the invoice','warn');
+  }
+  if(note){
+    note.innerHTML = '⏰ <strong>Late arrival:</strong> checked in '+escHtml(L.checkIn)+' for the '+escHtml(L.slot)+' slot ('+fmtLateMin(L.mins)+' late). '+
+      (has ? '₱'+fmt(LATE_FEE)+' Late Fee is on the invoice.' : '<strong>Late Fee removed</strong> — ₱'+fmt(LATE_FEE)+' will come off the team incentive fund.');
+    note.style.display = '';
+  }
+}
 function showAckDP(a, dpEl, box){
   var iaName = document.getElementById('ia-name');
   var iaMop  = document.getElementById('ia-mop');
@@ -6403,7 +6474,7 @@ function showAckDP(a, dpEl, box){
   var dpPaid   = +a.downpayment || 0;
   var usable   = !!(a.service) && total > 0 && (isCBE || total > dpPaid);
   if(usable){
-    if(!INV.length) addItem(a.service, total, false);
+    if(!INV.some(function(i){ return !isLateFeeLine(i); })) { addItem(a.service, total, false); INV.sort(function(x,y){ return isLateFeeLine(x)-isLateFeeLine(y); }); }
     var when = dateOnly(a.bookDate||'');
     if(pkgTotal) pkgTotal.textContent = (a.service||'package') + ' — ₱' + fmt(total);
     if(pkgIcon)  pkgIcon.textContent  = isCBE ? '🎂' : '📦';
@@ -6524,6 +6595,7 @@ async function submitInvoice(){
   document.getElementById('inv-client').value='';
   document.getElementById('d-en').checked=false; document.getElementById('d-pax').value=1; document.getElementById('d-sc').value=0;
   document.getElementById('inv-ack').style.display='none';
+  const lateNote=document.getElementById('inv-late-note'); if(lateNote) lateNote.style.display='none';
   recalc();
   // Show email prompt then print
   promptEmail(txn.id);
@@ -6928,6 +7000,8 @@ function executePrint(){
     body += (document.getElementById('fin-cross')?.innerHTML||'');
     body += sectionTitle('🚫','No-Shows This Period');
     body += (document.getElementById('fin-noshow')?.innerHTML||'');
+    body += sectionTitle('⏰','Late Client Arrivals');
+    body += (document.getElementById('fin-late')?.innerHTML||'');
   }
 
   // ── Expenses Table ──
@@ -9216,6 +9290,7 @@ function _buildReports(prefixes, label){
 
   renderFinancialReport(txns, allExp, allFT, eods, label, acks, prefixes);
   renderNoShows(prefixes);
+  renderLateArrivals(prefixes);
   renderClientsReport(regs, txnMap, ackMap, label, prefixes);
   renderPackagesReport(txns, regs, txnMap, ackMap, label);
   renderOperationsReport(txns, eods, allFT, gifts, label);
@@ -9660,6 +9735,62 @@ function renderNoShows(prefixes){
     html += '</tbody></table></div>';
   }
   html += '<div style="font-size:10px;color:#6b8080;margin-top:8px;">Balance not earned = package value minus the deposit. Deposits are counted as kept; if you refund or credit any of them, subtract those. Only sessions before today are checked.</div>';
+  el.innerHTML = html;
+}
+
+// Booked check-ins in the period, and which came in late. A Late Fee counts as invoiced when an
+// invoice for that client, dated the check-in day or up to 3 days after, has a Late Fee line.
+function computeLateArrivals(prefixes){
+  var txns = (DB.transactions||[]).filter(function(t){ return !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var res = { booked: 0, list: [] };
+  (DB.registrations||[]).forEach(function(r){
+    var rd = dateOnly(r.date);
+    if(!rd || prefixes.indexOf(rd.slice(0,7)) === -1 || r.arrType !== 'booked' || !r.ackId) return;
+    res.booked++;
+    var L = regLate_(r);
+    if(!L) return;
+    var inv = txns.find(function(t){
+      var td = dateOnly(t.date); if(!td || td < rd || _nsGap(td, rd) > 3 || !_nsSame(t.clientName, r.fbName)) return false;
+      var items = t.items; if(typeof items === 'string'){ try{ items = JSON.parse(items); }catch(e){ items = []; } }
+      return (Array.isArray(items)?items:[]).some(isLateFeeLine);
+    });
+    res.list.push({ date: rd, name: r.fbName||'', service: L.ack.service||'', slot: L.slot, checkIn: L.checkIn, mins: L.mins, invoiced: !!inv, invoiceNum: inv ? inv.invoiceNum : '' });
+  });
+  res.list.sort(function(x,y){ return (x.date+x.slot).localeCompare(y.date+y.slot); });
+  return res;
+}
+function renderLateArrivals(prefixes){
+  var el = document.getElementById('fin-late');
+  if(!el) return;
+  var r = computeLateArrivals(prefixes||[]);
+  if(!r.booked){ el.innerHTML = '<div class="tm">No booked check-ins in this period.</div>'; return; }
+  var n = r.list.length, paid = r.list.filter(function(x){ return x.invoiced; }).length;
+  var unpaid = r.list.filter(function(x){ return !x.invoiced && x.date >= LATE_FEE_START; }).length;
+  var avg = n ? Math.round(r.list.reduce(function(s,x){ return s + x.mins; },0) / n) : 0;
+  var rate = Math.round(n / r.booked * 1000) / 10;
+  // literal colours on purpose: this HTML is also copied into the print window, which has no CSS variables
+  var cell = 'padding:10px 12px;text-align:center;border:1px solid #e3ebe9;border-radius:8px;';
+  var box = function(lbl, val, col){ return '<div style="'+cell+'"><div style="font-size:10px;color:#6b8080;">'+lbl+'</div><div style="font-size:18px;font-weight:700;'+(col?'color:'+col+';':'')+'">'+val+'</div></div>'; };
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px;">'+
+    box('Booked check-ins', r.booked)+
+    box('Late (over '+LATE_GRACE_MIN+' min)', n, n?'#c0544a':'#2f7a5e')+
+    box('Late rate', rate+'%')+
+    box('Average lateness', n ? fmtLateMin(avg) : '—')+
+    box('Late Fees invoiced', paid+' · ₱'+fmt(paid*LATE_FEE), '#2f7a5e')+
+    box('Not invoiced (off the fund)', unpaid ? unpaid+' · −₱'+fmt(unpaid*LATE_FEE) : '0', unpaid?'#c0544a':'inherit')+
+  '</div>';
+  if(n){
+    html += '<div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Client</th><th>Slot</th><th>Checked in</th><th style="text-align:right;">Late by</th><th>Late Fee</th></tr></thead><tbody>';
+    r.list.forEach(function(x){
+      html += '<tr><td style="white-space:nowrap;font-size:11px;">'+escHtml(x.date)+'</td>'+
+        '<td>'+escHtml(x.name)+'<div style="font-size:10px;color:#6b8080;">'+escHtml(x.service)+'</div></td>'+
+        '<td style="white-space:nowrap;">'+escHtml(x.slot)+'</td><td style="white-space:nowrap;">'+escHtml(x.checkIn)+'</td>'+
+        '<td style="text-align:right;white-space:nowrap;">'+fmtLateMin(x.mins)+'</td>'+
+        '<td style="white-space:nowrap;">'+(x.invoiced ? '<span style="color:#2f7a5e;">✓ '+escHtml(x.invoiceNum)+'</span>' : (x.date >= LATE_FEE_START ? '<span style="color:#c0544a;font-weight:600;">✗ not invoiced · −₱'+fmt(LATE_FEE)+' fund</span>' : '<span style="color:#6b8080;">not invoiced (before the rule)</span>'))+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '<div style="font-size:10px;color:#6b8080;margin-top:8px;">Late = checked in more than '+LATE_GRACE_MIN+' minutes after the booked time slot (check-in time at the kiosk or Registration page). Walk-ins are not counted. The ₱'+fmt(LATE_FEE)+' fund deduction applies from '+LATE_FEE_START+'.</div>';
   el.innerHTML = html;
 }
 
@@ -10434,6 +10565,8 @@ async function pollKiosk(){
       if(document.getElementById('page-registration').classList.contains('active')) renderReg();
       _newNames=newOnes.map(r=>r.fbName);
       showKioskAlert(_newNames);
+      var _lateOnes=newOnes.map(r=>({r:r,L:regLate_(r)})).filter(x=>x.L);
+      if(_lateOnes.length) lateFeeAlert(_lateOnes[0].r.fbName, _lateOnes[0].L);
     }
     todayR.forEach(r=>_knownRegIds.add(String(r.id)));
   }catch(e){ /* silent */ }
@@ -10444,7 +10577,9 @@ function showKioskAlert(names){
   const list=names.length<=3
     ? names.map(function(n){return '<strong>'+escHtml(n)+'</strong>';}).join(', ')
     : '<strong>'+escHtml(names[0])+'</strong> and '+(names.length-1)+' others';
-  document.getElementById('ka-msg').innerHTML=`${list} ${plural?'have':'has'} checked in at the kiosk and ${plural?'are':'is'} ready to invoice.`;
+  var lateNames=(DB.registrations||[]).filter(r=>dateOnly(r.date)===todayStr()&&names.indexOf(r.fbName)!==-1&&regLate_(r)).map(r=>r.fbName);
+  document.getElementById('ka-msg').innerHTML=`${list} ${plural?'have':'has'} checked in at the kiosk and ${plural?'are':'is'} ready to invoice.`+
+    (lateNames.length?'<div style="color:var(--danger);font-weight:600;margin-top:4px;">⏰ Late — ₱'+fmt(LATE_FEE)+' Late Fee: '+lateNames.map(escHtml).join(', ')+'</div>':'');
   document.getElementById('kiosk-alert').classList.add('show');
   const btn=document.getElementById('sidebar-sync-btn');
   btn.style.background='rgba(215,144,104,0.3)'; btn.style.color='#d79068';
