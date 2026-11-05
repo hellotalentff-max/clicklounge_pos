@@ -2030,7 +2030,7 @@ tr:hover td { background:var(--light); }
     <!-- Clients who checked in late -->
     <div class="card">
       <div class="ct">⏰ Late Client Arrivals</div>
-      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Booked clients who checked in more than 15 minutes after their time slot. Each one owes a ₱200 Late Fee; a fee that wasn't invoiced comes off the team incentive fund.</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:12px;">Booked clients who checked in more than 15 minutes after their time slot (hair &amp; makeup packages: after their call time, 1.5 hours before the slot). Each one owes a ₱200 Late Fee; a fee that wasn't invoiced comes off the team incentive fund.</div>
       <div id="fin-late"></div>
     </div>
 
@@ -3594,7 +3594,11 @@ function calNavToday(){
 }
 
 function _hasHMU(pkgName){
-  return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama|luxe mode|coat code|luxe m0de|styleshots)/i.test(pkgName||'');
+  var p = String(pkgName||'');
+  // Look Lab / Birthday Experience builds: "<Tier> + <Look> + Digital". Styleshots, The Coat Code and
+  // Angelic Muse include HMU at Signature and Prestige; the Standard tier has no HMU.
+  if(/^(the look lab|clicklounge birthday experience)\b/i.test(p)) return /\b(signature|prestige)\b/i.test(p) && /(styleshots|coat code|angelic muse)/i.test(p);
+  return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama)/i.test(p);
 }
 
 // ── Client phone numbers from booking requests ──
@@ -5632,7 +5636,7 @@ async function submitReg(){
   logActivity('Client Registered', fbName+' ('+CUR_ARR+') | Social: '+socialConsent, 'success');
   await push('saveRegistration',reg);
   var _late = regLate_(reg);
-  if(_late){ logActivity('Late Arrival', fbName+' — '+fmtLateMin(_late.mins)+' after '+_late.slot+' slot · ₱'+LATE_FEE+' Late Fee', 'warn'); lateFeeAlert(fbName, _late); }
+  if(_late){ logActivity('Late Arrival', fbName+' — '+fmtLateMin(_late.mins)+' after '+(_late.hmu?_late.due+' HMU call time':_late.slot+' slot')+' · ₱'+LATE_FEE+' Late Fee', 'warn'); lateFeeAlert(fbName, _late); }
 
   // Reset form
   document.getElementById('reg-fb').value='';
@@ -5663,7 +5667,7 @@ function renderReg(){
       : '<span style="color:var(--muted);font-size:11px;">—</span>';
     regRows+='<tr><td style="white-space:nowrap;font-family:monospace;font-size:12px;">'+fmtTimePHT(r.time)+'</td>'+
       '<td>'+escHtml(r.fbName)+'</td><td>'+(r.email||'—')+'</td>'+
-      '<td><span class="badge '+(r.arrType==='booked'?'b-gold':'b-teal')+'">'+r.arrType+'</span>'+(function(L){ return L?' <span class="badge" style="background:rgba(192,84,74,0.1);color:var(--danger);" title="Slot '+escHtml(L.slot)+'">⏰ '+fmtLateMin(L.mins)+' late · Late Fee</span>':''; })(regLate_(r))+'</td>'+
+      '<td><span class="badge '+(r.arrType==='booked'?'b-gold':'b-teal')+'">'+r.arrType+'</span>'+(function(L){ return L?' <span class="badge" style="background:rgba(192,84,74,0.1);color:var(--danger);" title="'+(L.hmu?'HMU call '+escHtml(L.due)+' · ':'')+'Slot '+escHtml(L.slot)+'">⏰ '+fmtLateMin(L.mins)+' late · Late Fee</span>':''; })(regLate_(r))+'</td>'+
       '<td>'+sm+'</td></tr>';
   });
   el.innerHTML='<table><thead><tr><th>Time</th><th>FB Name</th><th>Email</th><th>Type</th><th>📸 SM Consent</th></tr></thead><tbody>'+regRows+'</tbody></table>';
@@ -6304,6 +6308,7 @@ var CLIENT_ASKED = '__client__';
 // A booked client who checks in more than LATE_GRACE_MIN minutes after their time slot owes a
 // Late Fee. It is added to their invoice automatically. If it is removed (not invoiced),
 // TimeCommand takes LATE_FEE off the team incentive fund for that day.
+var LATE_HMU_EARLY_MIN = 90;   // hair & makeup packages: the client is due 1.5 hours before the slot
 var LATE_FEE = 200, LATE_GRACE_MIN = 15, LATE_FEE_NAME = 'Late Fee', LATE_FEE_START = '2026-11-06';   // fund deduction applies from this date
 function isLateFeeLine(i){ return /^late ?fee\b/i.test(String((i&&i.name)||'').trim()); }
 function clockMin_(t){
@@ -6315,7 +6320,9 @@ function clockMin_(t){
   return h*60 + mi;
 }
 function fmtLateMin(m){ return m >= 60 ? Math.floor(m/60)+'h '+(m%60)+'m' : m+' min'; }
-// Returns {ack, slot, checkIn, mins} when this check-in was late for its booking, else null
+function minToClock_(m){ var h = Math.floor(m/60), mi = m%60, ap = h >= 12 ? 'PM' : 'AM'; h = h%12 || 12; return h+':'+String(mi).padStart(2,'0')+' '+ap; }
+// Returns {ack, slot, due, hmu, checkIn, mins} when this check-in was late for its booking, else null.
+// HMU packages are due 1.5 hours before the slot (hair & makeup call time).
 function regLate_(r){
   if(!r || r.arrType !== 'booked' || !r.ackId) return null;
   var a = (DB.acknowledgements||[]).find(function(x){ return x.id === r.ackId; });
@@ -6323,14 +6330,15 @@ function regLate_(r){
   var checkIn = String(fmtTimePHT(r.time)||'').replace(/(\d:\d{2}):\d{2}/,'$1');
   var s = clockMin_(a.timeSlot), t = clockMin_(checkIn) != null ? clockMin_(checkIn) : clockMin_(r.time);
   if(s == null || t == null) return null;
-  var mins = t - s;
-  return mins > LATE_GRACE_MIN ? { ack: a, slot: a.timeSlot, checkIn: checkIn, mins: mins } : null;
+  var hmu = _hasHMU(a.service), dueMin = s - (hmu ? LATE_HMU_EARLY_MIN : 0);
+  var mins = t - dueMin;
+  return mins > LATE_GRACE_MIN ? { ack: a, slot: a.timeSlot, hmu: hmu, due: hmu ? minToClock_(dueMin) : a.timeSlot, checkIn: checkIn, mins: mins } : null;
 }
 function lateFeeAlert(name, L){
   openModal(
     '<h3 style="margin-bottom:6px;color:var(--danger);">⏰ Late Fee — ₱'+fmt(LATE_FEE)+'</h3>'+
     '<p style="font-size:13px;line-height:1.6;margin-bottom:12px;"><strong>'+escHtml(name)+'</strong> checked in at <strong>'+escHtml(L.checkIn)+'</strong>, '+
-      '<strong>'+fmtLateMin(L.mins)+'</strong> after their <strong>'+escHtml(L.slot)+'</strong> slot (grace period '+LATE_GRACE_MIN+' min).</p>'+
+      '<strong>'+fmtLateMin(L.mins)+'</strong> after '+(L.hmu ? 'their <strong>'+escHtml(L.due)+'</strong> hair &amp; makeup call time (1.5 hours before the '+escHtml(L.slot)+' slot)' : 'their <strong>'+escHtml(L.slot)+'</strong> slot')+' (grace period '+LATE_GRACE_MIN+' min).</p>'+
     '<div style="background:rgba(192,84,74,.06);border:1px solid rgba(192,84,74,.25);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.6;margin-bottom:14px;">'+
       'A ₱'+fmt(LATE_FEE)+' <strong>Late Fee</strong> will be added to their invoice automatically. Let the client know before the session.<br>'+
       '<span style="color:var(--muted);">If the Late Fee is not invoiced, ₱'+fmt(LATE_FEE)+' comes off the team incentive fund.</span></div>'+
@@ -6439,7 +6447,7 @@ function invLateCheck(reg, nameLower){
     notify('⏰ Late arrival — ₱'+fmt(LATE_FEE)+' Late Fee added to the invoice','warn');
   }
   if(note){
-    note.innerHTML = '⏰ <strong>Late arrival:</strong> checked in '+escHtml(L.checkIn)+' for the '+escHtml(L.slot)+' slot ('+fmtLateMin(L.mins)+' late). '+
+    note.innerHTML = '⏰ <strong>Late arrival:</strong> checked in '+escHtml(L.checkIn)+' for '+(L.hmu ? 'a '+escHtml(L.due)+' HMU call time ('+escHtml(L.slot)+' slot)' : 'the '+escHtml(L.slot)+' slot')+' ('+fmtLateMin(L.mins)+' late). '+
       (has ? '₱'+fmt(LATE_FEE)+' Late Fee is on the invoice.' : '<strong>Late Fee removed</strong> — ₱'+fmt(LATE_FEE)+' will come off the team incentive fund.');
     note.style.display = '';
   }
@@ -9754,7 +9762,7 @@ function computeLateArrivals(prefixes){
       var items = t.items; if(typeof items === 'string'){ try{ items = JSON.parse(items); }catch(e){ items = []; } }
       return (Array.isArray(items)?items:[]).some(isLateFeeLine);
     });
-    res.list.push({ date: rd, name: r.fbName||'', service: L.ack.service||'', slot: L.slot, checkIn: L.checkIn, mins: L.mins, invoiced: !!inv, invoiceNum: inv ? inv.invoiceNum : '' });
+    res.list.push({ date: rd, name: r.fbName||'', service: L.ack.service||'', slot: L.slot, due: L.due, hmu: L.hmu, checkIn: L.checkIn, mins: L.mins, invoiced: !!inv, invoiceNum: inv ? inv.invoiceNum : '' });
   });
   res.list.sort(function(x,y){ return (x.date+x.slot).localeCompare(y.date+y.slot); });
   return res;
@@ -9780,17 +9788,17 @@ function renderLateArrivals(prefixes){
     box('Not invoiced (off the fund)', unpaid ? unpaid+' · −₱'+fmt(unpaid*LATE_FEE) : '0', unpaid?'#c0544a':'inherit')+
   '</div>';
   if(n){
-    html += '<div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Client</th><th>Slot</th><th>Checked in</th><th style="text-align:right;">Late by</th><th>Late Fee</th></tr></thead><tbody>';
+    html += '<div style="overflow-x:auto;"><table><thead><tr><th>Date</th><th>Client</th><th>Slot</th><th>Due by</th><th>Checked in</th><th style="text-align:right;">Late by</th><th>Late Fee</th></tr></thead><tbody>';
     r.list.forEach(function(x){
       html += '<tr><td style="white-space:nowrap;font-size:11px;">'+escHtml(x.date)+'</td>'+
         '<td>'+escHtml(x.name)+'<div style="font-size:10px;color:#6b8080;">'+escHtml(x.service)+'</div></td>'+
-        '<td style="white-space:nowrap;">'+escHtml(x.slot)+'</td><td style="white-space:nowrap;">'+escHtml(x.checkIn)+'</td>'+
+        '<td style="white-space:nowrap;">'+escHtml(x.slot)+'</td><td style="white-space:nowrap;">'+escHtml(x.due)+(x.hmu?' <span style="font-size:10px;color:#6b8080;">HMU</span>':'')+'</td><td style="white-space:nowrap;">'+escHtml(x.checkIn)+'</td>'+
         '<td style="text-align:right;white-space:nowrap;">'+fmtLateMin(x.mins)+'</td>'+
         '<td style="white-space:nowrap;">'+(x.invoiced ? '<span style="color:#2f7a5e;">✓ '+escHtml(x.invoiceNum)+'</span>' : (x.date >= LATE_FEE_START ? '<span style="color:#c0544a;font-weight:600;">✗ not invoiced · −₱'+fmt(LATE_FEE)+' fund</span>' : '<span style="color:#6b8080;">not invoiced (before the rule)</span>'))+'</td></tr>';
     });
     html += '</tbody></table></div>';
   }
-  html += '<div style="font-size:10px;color:#6b8080;margin-top:8px;">Late = checked in more than '+LATE_GRACE_MIN+' minutes after the booked time slot (check-in time at the kiosk or Registration page). Walk-ins are not counted. The ₱'+fmt(LATE_FEE)+' fund deduction applies from '+LATE_FEE_START+'.</div>';
+  html += '<div style="font-size:10px;color:#6b8080;margin-top:8px;">Late = checked in more than '+LATE_GRACE_MIN+' minutes after the booked time slot, or after the call time 1.5 hours before the slot for hair &amp; makeup packages (check-in time at the kiosk or Registration page). Walk-ins are not counted. The ₱'+fmt(LATE_FEE)+' fund deduction applies from '+LATE_FEE_START+'.</div>';
   el.innerHTML = html;
 }
 
