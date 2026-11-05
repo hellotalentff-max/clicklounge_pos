@@ -3598,7 +3598,7 @@ function _hasHMU(pkgName){
   // Look Lab / Birthday Experience builds: "<Tier> + <Look> + Digital". Styleshots, The Coat Code and
   // Angelic Muse include HMU at Signature and Prestige; the Standard tier has no HMU.
   if(/^(the look lab|clicklounge birthday experience)\b/i.test(p)) return /\b(signature|prestige)\b/i.test(p) && /(styleshots|coat code|angelic muse)/i.test(p);
-  return /(promo styleshots|couple styleshots promo|glowing mom|vip grad glam|radiant mama)/i.test(p);
+  return /(couple styleshots promo|glowing mom|vip grad glam|radiant mama)/i.test(p);   // Promo Styleshots has no HMU
 }
 
 // ── Client phone numbers from booking requests ──
