@@ -2728,6 +2728,17 @@ function setSS(s){
 // JSONP call — works on ALL browsers including Safari on iPad/iPhone.
 // Apps Script redirects break fetch() on Safari; JSONP uses a <script>
 // tag instead which follows redirects transparently on all platforms.
+// Meta Conversions API relay (a separate Apps Script). Empty = off. Tells Meta an online booking was
+// confirmed. The relay ignores anything that didn't start on the booking page. Never holds up the POS.
+var CAPI_URL = 'https://script.google.com/macros/s/AKfycby-ezFqIwM7MNBQ4qda3r5MxeFkiC32ZCpBBUPJ6Ph27EDgdOSQu7vIXORkU5p8bV1Wbw/exec';
+function capiConfirmed(email, id, value) {
+  if (!CAPI_URL || !email) return;
+  try {
+    fetch(CAPI_URL, { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ event: 'Purchase', id: 'dep-' + id, email: email, value: Number(value) || 0 }) }).catch(function(){});
+  } catch (e) {}
+}
+
 function gasCall(action, payload={}, _retryCount=0) {
   return new Promise((resolve, reject) => {
     if (!hasUrl()) { reject(new Error('No URL set')); return; }
@@ -4520,6 +4531,7 @@ async function quickConfirmBooking(btn){
       saveLocal();
       notify('Booking confirmed! Email sent to '+email,'success');
       logActivity('Quick Confirmed',(result.ackNum||'')+' — '+name,'success');
+      capiConfirmed(email, evId, total);
       createHmuPrepTask(ack);
       createEditingTask(ack);
       renderCalendar();
@@ -4571,6 +4583,7 @@ async function confirmAck(id){
   await push('saveAcknowledgement', a);
   notify('Booking confirmed ✓','success');
   logActivity('Booking Confirmed', a.fbName+' — '+a.bookDate, 'success');
+  capiConfirmed(a.email, a.id, a.totalPrice);
   createHmuPrepTask(a);
   createEditingTask(a);
 
@@ -5810,6 +5823,7 @@ async function saveAck(){
 
         saveLocal();
         notify('✓ Booking confirmed! Email with T&C sent to '+email,'success');
+        capiConfirmed(email, evId, total);
         createHmuPrepTask(ack);
         createEditingTask(ack);
         closeModal();
