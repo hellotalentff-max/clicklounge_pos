@@ -131,6 +131,17 @@ function saveSettings(){
 }
 
 // JSONP gasCall
+// Staff key for the Apps Script gate. Typed once per device (Settings, or when asked)
+// and shared by every ClickLounge staff app on this site. Never put it in this file.
+function gateKey(){ try{ return localStorage.getItem('cl_gate_key')||''; }catch(e){ return ''; } }
+var _gateAsked = false;
+function gateAskKey(){
+  if(_gateAsked) return false; _gateAsked = true;
+  var k = window.prompt('This needs the ClickLounge staff key.\nType it in once on this device (ask the owner if you don\'t have it).');
+  k = (k||'').trim(); if(!k) return false;
+  try{ localStorage.setItem('cl_gate_key', k); }catch(e){}
+  return true;
+}
 function gasCall(action, payload, retryCount){
   if(!retryCount) retryCount = 0;
   return new Promise(function(resolve, reject){
@@ -141,8 +152,10 @@ function gasCall(action, payload, retryCount){
       if(retryCount < 2){ resolve(gasCall(action, payload, retryCount+1)); }
       else{ reject(new Error('Timeout')); }
     }, 45000);
-    window[cbName] = function(data){ clearTimeout(timeout); delete window[cbName]; resolve(data); };
-    var dataObj = JSON.stringify({action: action, payload: payload||{}});
+    window[cbName] = function(data){ clearTimeout(timeout); delete window[cbName];
+      if(data && data.code === 'NOT_ALLOWED' && gateAskKey()){ resolve(gasCall(action, payload, retryCount)); return; }
+      resolve(data); };
+    var dataObj = JSON.stringify({action: action, payload: payload||{}, key: gateKey()});
     var encoded = btoa(unescape(encodeURIComponent(dataObj)));
     var s = document.createElement('script');
     s.src = getUrl()+'?d='+encodeURIComponent(encoded)+'&callback='+cbName;

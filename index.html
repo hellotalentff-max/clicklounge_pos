@@ -2182,6 +2182,13 @@ tr:hover td { background:var(--light); }
           <label for="set-url">Apps Script Web App URL</label>
           <input type="text" id="set-url" placeholder="https://script.google.com/macros/s/YOUR_ID/exec">
         </div>
+        <div class="field mb16">
+          <label for="set-gate-key">Staff key <span style="font-weight:400;color:var(--muted);">(this device only, shared with Tasks and ClickCard)</span></label>
+          <div style="display:flex;gap:8px;">
+            <input type="password" id="set-gate-key" placeholder="cls-…" autocomplete="off" style="flex:1;">
+            <button class="btn btn-teal btn-sm" onclick="saveGateKey()">Save key</button>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-teal btn-sm" onclick="saveUrl()">Save URL</button>
           <button class="btn btn-outline btn-sm" onclick="initRemote()">Init Sheets (first time)</button>
@@ -2703,12 +2710,23 @@ function capiConfirmed(email, id, value) {
   } catch (e) {}
 }
 
+// Staff key for the Apps Script gate. Typed once per device (Settings, or when asked)
+// and shared by every ClickLounge staff app on this site. Never put it in this file.
+function gateKey(){ try{ return localStorage.getItem('cl_gate_key')||''; }catch(e){ return ''; } }
+var _gateAsked = false;
+function gateAskKey(){
+  if(_gateAsked) return false; _gateAsked = true;
+  var k = window.prompt('This needs the ClickLounge staff key.\nType it in once on this device (ask the owner if you don\'t have it).');
+  k = (k||'').trim(); if(!k) return false;
+  try{ localStorage.setItem('cl_gate_key', k); }catch(e){}
+  return true;
+}
 function gasCall(action, payload={}, _retryCount=0) {
   return new Promise((resolve, reject) => {
     if (!hasUrl()) { reject(new Error('No URL set')); return; }
     setSS('syncing');
     const cbName = '_gcb_' + Math.random().toString(36).slice(2);
-    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify({action, payload}))));
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify({action, payload, key: gateKey()}))));
     const url  = getUrl() + '?d=' + encodeURIComponent(b64) + '&callback=' + cbName;
     let done = false;
 
@@ -2731,6 +2749,7 @@ function gasCall(action, payload={}, _retryCount=0) {
       if (done) return;
       done = true;
       cleanup();
+      if (data && data.code === 'NOT_ALLOWED' && gateAskKey()) { gasCall(action, payload, _retryCount).then(resolve).catch(reject); return; }
       if (data && data.error) { setSS('error'); reject(new Error(data.error)); }
       else { setSS('synced'); _markOnline(); resolve(data); }
     };
@@ -2858,6 +2877,13 @@ function saveUrl(){
   if(!url){ notify('Enter a URL first','error'); return; }
   localStorage.setItem('cl_url', url);
   notify('URL saved ✓','success');
+}
+
+function saveGateKey(){
+  const k = (document.getElementById('set-gate-key')?.value||'').trim();
+  if(!k){ notify('Enter the staff key','error'); return; }
+  try{ localStorage.setItem('cl_gate_key', k); }catch(e){}
+  notify('Staff key saved on this device ✓','success');
 }
 
 function saveAdminPw(){
@@ -7586,6 +7612,7 @@ function renderSettings(){
   setVal('set-addr',         si.address);
   setVal('set-address',      si.address);
   setVal('set-url',          getUrl());
+  setVal('set-gate-key',     gateKey());
   setVal('set-admin-pw',     '');
   setVal('set-feedback-url', si.feedbackUrl||'');
   setVal('set-eod-email',    si.eodEmail||'');
