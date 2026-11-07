@@ -993,46 +993,10 @@ tr:hover td { background:var(--light); }
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
     <div class="card">
-      <div class="ct">New Registration</div>
-      <div class="field"><label>Arrival Type</label>
-        <div style="display:flex;gap:8px;margin-bottom:12px;">
-          <div class="arr-opt sel" id="arr-walkin" onclick="setArr('walkin')">Walk-in</div>
-          <div class="arr-opt" id="arr-booked" onclick="setArr('booked')">Booked</div>
-        </div>
-      </div>
-      <div id="bk-sel" style="display:none;margin-bottom:12px;">
-        <div class="field"><label>Select Booked Client</label>
-          <select id="booked-sel" class="sinput" onchange="prefillBooked(this.value)">
-            <option value="">— Choose —</option>
-          </select>
-        </div>
-      </div>
-      <div class="field"><label>Facebook Name *</label>
-        <input type="text" id="reg-fb" class="sinput" placeholder="Client's Facebook name" autocomplete="off" list="client-names-list"></div>
-      <div class="field"><label>Email</label>
-        <input type="email" id="reg-email" class="sinput" placeholder="client@email.com"></div>
-      <div id="reg-optional" style="display:none;">
-        <div class="field"><label>Mobile</label>
-          <input type="tel" id="reg-phone" class="sinput" placeholder="09xx xxx xxxx"></div>
-        <div class="field"><label>Birthday</label>
-          <input type="date" id="reg-bday" class="sinput"></div>
-      </div>
-      <button type="button" onclick="toggleRegOptional()" id="reg-opt-btn" style="background:none;border:1.5px dashed rgba(81,137,125,0.4);color:var(--teal);border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;width:100%;margin-bottom:12px;font-family:inherit;">
-        ➕ Add phone & birthday
-      </button>
-      <div style="margin-bottom:12px;">
-        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;">📸 Social Media Consent</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <label id="reg-smc-yes-lbl" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--light2);border-radius:8px;cursor:pointer;transition:all .15s;">
-            <input type="radio" name="reg-smc" id="reg-smc-yes" value="yes" style="accent-color:var(--teal);"> <span style="font-size:12px;">✅ Yes, may post</span>
-          </label>
-          <label id="reg-smc-no-lbl" style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:2px solid var(--light2);border-radius:8px;cursor:pointer;transition:all .15s;">
-            <input type="radio" name="reg-smc" id="reg-smc-no" value="no" style="accent-color:var(--danger);"> <span style="font-size:12px;">🚫 Keep private</span>
-          </label>
-        </div>
-        <div id="smc-warn" style="font-size:11px;color:var(--danger);margin-top:6px;display:none;">Please select a social media consent option.</div>
-      </div>
-      <div class="fe"><button class="btn btn-gold" onclick="submitReg()">Register ✓</button></div>
+      <div class="ct">Check-in happens at the kiosk</div>
+      <p style="font-size:13px;line-height:1.6;margin-bottom:10px;">All clients, walk-in and booked, check in on the kiosk. It collects the T&amp;C agreement, social media consent and contact details, and tells late booked clients about the ₱200 Late Fee.</p>
+      <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14px;">Check-ins show up in Today's Registrations within a minute, and the POS alerts you when a client is ready to invoice or came in late.</p>
+      <div class="fe"><a class="btn btn-gold" href="https://hellotalentff-max.github.io/clicklounge_kiosk/" target="_blank" rel="noopener" style="text-decoration:none;">Open the kiosk ↗</a></div>
     </div>
     <div>
       <div class="card">
@@ -2625,7 +2589,7 @@ let _isOnline = navigator.onLine;
 function loadOfflineQueue(){ try{ _offlineQueue = JSON.parse(localStorage.getItem('cl_offline_q')||'[]'); }catch(e){ _offlineQueue = []; } }
 function saveOfflineQueue(){ localStorage.setItem('cl_offline_q', JSON.stringify(_offlineQueue)); }
 loadOfflineQueue(); // load any queued items from previous session // tracks recently deleted tasks so sync won't restore them
-let INV = [], CUR_ARR='walkin', EOD_EXP=[], EOD_FT=[], CURR_USER='', IS_ADMIN=false;
+let INV = [], EOD_EXP=[], EOD_FT=[], CURR_USER='', IS_ADMIN=false;
 // Always initialise calendar month/year in Manila time
 function mnlYear()  { return parseInt(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'}).split('-')[0]); }
 function mnlMonth() { return parseInt(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Manila'}).split('-')[1]) - 1; }
@@ -2849,7 +2813,7 @@ async function syncAll(){
     saveLocal(); notify('Sync complete ✓','success');
     if(typeof loadTasks==='function'){ loadTasks(); renderTasks(); updateDashTaskAlert(); }
     const pg=document.querySelector('.page.active'); if(pg) showPage(pg.id.replace('page-',''));
-    populateInvClient(); populateBookedSel(); updateClientDatalist();
+    populateInvClient(); updateClientDatalist();
   }catch(e){ setSS('error'); notify('Sync failed: '+e.message,'error'); }
 }
 async function initRemote(){ try{ const r=await gasCall('initSheets'); notify(r.message||'Sheets initialised ✓','success'); }catch(e){ notify('Init failed: '+e.message,'error'); } }
@@ -5566,115 +5530,7 @@ function renderDashPendingList(){
 // ================================================================
 //  REGISTRATION
 // ================================================================
-function toggleRegOptional(){
-  const box   = document.getElementById('reg-optional');
-  const label = document.getElementById('reg-optional-label');
-  if(!box) return;
-  const isOpen = box.style.display !== 'none';
-  box.style.display  = isOpen ? 'none' : '';
-  label.textContent  = isOpen ? 'Add more details' : 'Hide extra fields';
-}
-
-function setArr(t){
-  CUR_ARR=t;
-  document.getElementById('arr-walkin').classList.toggle('sel',t==='walkin');
-  document.getElementById('arr-booked').classList.toggle('sel',t==='booked');
-  document.getElementById('reg-wi').style.display=t==='walkin'?'':'none';
-  document.getElementById('reg-bk').style.display=t==='booked'?'':'none';
-  if(t==='booked') populateBookedSel();
-}
-function populateBookedSel(){
-  var sel=document.getElementById('booked-sel');
-  if(!sel) return;
-  sel.innerHTML='<option value="">— choose —</option>'+DB.acknowledgements.map(function(a){return '<option value="'+a.id+'">'+escHtml(a.fbName)+'</option>';}).join('');
-}
-function prefillBooked(id){
-  const a=DB.acknowledgements.find(x=>x.id===id);
-  const box=document.getElementById('bk-pull');
-  if(!a){box.style.display='none';return;}
-  box.style.display='';
-  document.getElementById('bkp-name').textContent=a.fbName;
-  document.getElementById('bkp-svc').textContent=a.service||'—';
-  document.getElementById('bkp-dp').textContent=fmt(+a.downpayment);
-  document.getElementById('bkp-mop').textContent=a.mop;
-}
-async function submitReg(){
-  if(!document.getElementById('reg-agree').checked){ notify('Client must agree to T&C','error'); return; }
-
-  // Validate social media consent
-  const smcYes = document.getElementById('smc-yes');
-  const smcNo  = document.getElementById('smc-no');
-  const smcWarn= document.getElementById('smc-warn');
-  if(!smcYes?.checked && !smcNo?.checked){
-    if(smcWarn) smcWarn.style.display='';
-    notify('Please select a social media consent option','error'); return;
-  }
-  if(smcWarn) smcWarn.style.display='none';
-  const socialConsent = smcYes?.checked ? 'yes' : 'no';
-
-  let fbName,email,ackId='';
-  if(CUR_ARR==='walkin'){
-    fbName=document.getElementById('reg-fb').value.trim();
-    email=document.getElementById('reg-email').value.trim();
-    if(!fbName){ notify('FB Name is required','error'); return; }
-    if(!email){ notify('Email address is required','error'); document.getElementById('reg-email').focus(); return; }
-    if(!/^[^@]+@[^@]+\.[^@]+$/.test(email)){ notify('Please enter a valid email address','error'); document.getElementById('reg-email').focus(); return; }
-  } else {
-    ackId=document.getElementById('reg-bk-sel').value;
-    if(!ackId){ notify('Select a booked client','error'); return; }
-    const a=DB.acknowledgements.find(x=>x.id===ackId);
-    fbName=a.fbName; email=a.email||'';
-  }
-  if(DB.registrations.find(r=>r.fbName===fbName&&dateOnly(r.date) === todayStr())){ notify('Already registered today','error'); return; }
-
-  const regEmail  = (document.getElementById('reg-email-pos')?.value||email||'').trim();
-  const regPhone  = (document.getElementById('reg-phone')?.value||'').trim();
-  const regBday   = (document.getElementById('reg-bday')?.value||'').trim();
-  const regNotes  = (document.getElementById('reg-notes-pos')?.value||'').trim();
-
-  const reg={id:uid(),date:todayStr(),fbName,email:regEmail||email,arrType:CUR_ARR,ackId,time:timeStrPH(),socialConsent};
-  DB.registrations.push(reg);
-
-  // Create or update client record with optional fields
-  let existingClient = DB.clients.find(c=>c.fbName===fbName);
-  if(CUR_ARR==='walkin' && !existingClient){
-    const cl={id:uid(),fbName,email:regEmail||email,socialConsent,type:'walkin',added:todayStr(),
-              phone:regPhone,birthday:regBday,notes:regNotes};
-    DB.clients.push(cl); await push('saveClient',cl);
-  } else if(existingClient){
-    // Update with any newly provided info
-    if(regEmail && !existingClient.email)  existingClient.email    = regEmail;
-    if(regPhone && !existingClient.phone)  existingClient.phone    = regPhone;
-    if(regBday  && !existingClient.birthday) existingClient.birthday = regBday;
-    if(regNotes && !existingClient.notes)  existingClient.notes    = regNotes;
-    if(socialConsent) existingClient.socialConsent = socialConsent;
-    await push('saveClient', existingClient);
-  }
-  saveLocal();
-  notify('Registered: '+fbName+' — Social media: '+(socialConsent==='yes'?'✅ Allowed':'🚫 Private'),'success');
-  logActivity('Client Registered', fbName+' ('+CUR_ARR+') | Social: '+socialConsent, 'success');
-  await push('saveRegistration',reg);
-  var _late = regLate_(reg);
-  if(_late){ logActivity('Late Arrival', fbName+' — '+fmtLateMin(_late.mins)+' after '+(_late.hmu?_late.due+' HMU call time':_late.slot+' slot')+' · ₱'+LATE_FEE+' Late Fee', 'warn'); lateFeeAlert(fbName, _late); }
-
-  // Reset form
-  document.getElementById('reg-fb').value='';
-  document.getElementById('reg-agree').checked=false;
-  if(smcYes) smcYes.checked=false;
-  if(smcNo)  smcNo.checked=false;
-  const epEl = document.getElementById('reg-email-pos'); if(epEl) epEl.value='';
-  const phEl = document.getElementById('reg-phone');     if(phEl) phEl.value='';
-  const bdEl = document.getElementById('reg-bday');      if(bdEl) bdEl.value='';
-  const ntEl = document.getElementById('reg-notes-pos'); if(ntEl) ntEl.value='';
-  const optBox = document.getElementById('reg-optional');
-  if(optBox) optBox.style.display='none';
-  const optLbl = document.getElementById('reg-optional-label');
-  if(optLbl) optLbl.textContent='Add more details';
-  document.getElementById('bk-pull').style.display='none';
-  populateInvClient(); renderReg(); renderRegReport();
-}
 function renderReg(){
-  populateBookedSel();
   var regs=DB.registrations.filter(function(r){ return dateOnly(r.date) === todayStr(); });
   var el=document.getElementById('reg-table');
   if(!el) return;
@@ -9818,7 +9674,7 @@ function renderLateArrivals(prefixes){
     });
     html += '</tbody></table></div>';
   }
-  html += '<div style="font-size:10px;color:#6b8080;margin-top:8px;">Late = checked in more than '+LATE_GRACE_MIN+' minutes after the booked time slot, or after the call time 1.5 hours before the slot for hair &amp; makeup packages (check-in time at the kiosk or Registration page). Walk-ins are not counted. The ₱'+fmt(LATE_FEE)+' fund deduction applies from '+LATE_FEE_START+'.</div>';
+  html += '<div style="font-size:10px;color:#6b8080;margin-top:8px;">Late = checked in more than '+LATE_GRACE_MIN+' minutes after the booked time slot, or after the call time 1.5 hours before the slot for hair &amp; makeup packages (check-in time at the kiosk). Walk-ins are not counted. The ₱'+fmt(LATE_FEE)+' fund deduction applies from '+LATE_FEE_START+'.</div>';
   el.innerHTML = html;
 }
 
@@ -10589,7 +10445,7 @@ async function pollKiosk(){
     }
     if(newOnes.length){
       saveLocal();
-      populateInvClient(); populateBookedSel();
+      populateInvClient();
       if(document.getElementById('page-registration').classList.contains('active')) renderReg();
       _newNames=newOnes.map(r=>r.fbName);
       showKioskAlert(_newNames);
