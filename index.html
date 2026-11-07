@@ -7181,6 +7181,16 @@ function showTxTab(tab){
   if(tab==='log') renderActivityLog();
 }
 
+// One-line help under the Type picker on the Fund Transfers page, keyed by the option value.
+var FT_TYPE_HINTS = {
+  'Cash to Bank':  'Cash from the drawer deposited into the bank. Put the deposit slip number in Reference.',
+  'GCash to Bank': 'GCash balance moved to the bank account. Put the GCash reference number in Reference.',
+  'Bank to Cash':  'Cash withdrawn from the bank for the drawer (change fund, petty cash).',
+  'Bank to GCash': 'Bank money loaded to GCash. Put the transfer reference in Reference.',
+  'Refund Cash':   'Money returned to a client in cash. Put the client name in Reference and the reason in Notes.',
+  'Refund GCash':  'Money returned to a client by GCash. Put the client name in Reference and the GCash ref in Notes.',
+  'Refund Bank':   'Money returned to a client by bank transfer. Put the client name in Reference and the bank ref in Notes.'
+};
 function renderFTTypeHint(){
   var type = document.getElementById('ft-page-type')?.value||'';
   var hint = document.getElementById('ft-page-hint');
