@@ -890,6 +890,7 @@ tr:hover td { background:var(--light); }
     <button onclick="showPage('acknowledgement')" data-page="acknowledgement"><span class="ni">◈</span>Acknowledgement</button>
     <button onclick="showPage('invoice')" data-page="invoice"><span class="ni">◧</span>Invoice / POS</button>
     <button onclick="showPage('clients')" data-page="clients"><span class="ni">♟</span>Clients</button>
+    <button onclick="showPage('pipeline')" data-page="pipeline"><span class="ni">▤</span>Pipeline</button>
     <button onclick="showPage('transactions')" data-page="transactions"><span class="ni">≡</span>Transactions</button>
     <button onclick="showPage('tasks')" data-page="tasks"><span class="ni">✓</span>Tasks</button>
     <button onclick="showPage('expenses')" data-page="expenses"><span class="ni">💸</span>Expenses</button>
@@ -1205,6 +1206,49 @@ tr:hover td { background:var(--light); }
 </div>
 
 <!-- CLIENTS -->
+<div id="page-pipeline" class="page">
+  <style>
+    .pl-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+    .pl-bar .sinput{width:auto;min-width:130px;}
+    .pl-board{display:flex;gap:10px;overflow-x:auto;padding-bottom:10px;align-items:flex-start;}
+    .pl-col{flex:0 0 218px;background:var(--light);border-radius:10px;padding:8px;}
+    .pl-col-h{display:flex;justify-content:space-between;align-items:baseline;gap:6px;padding:2px 4px 8px;}
+    .pl-col-t{font-size:12px;font-weight:700;color:var(--slate);}
+    .pl-col-n{font-size:11px;color:var(--muted);white-space:nowrap;}
+    .pl-card{background:var(--white);border:1px solid var(--light2);border-radius:8px;padding:9px 10px;margin-bottom:7px;cursor:pointer;width:100%;text-align:left;font-family:inherit;color:var(--text);display:block;}
+    .pl-card:hover{border-color:var(--teal);}
+    .pl-name{font-size:12.5px;font-weight:600;color:var(--slate);overflow-wrap:anywhere;}
+    .pl-sub{font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.4;overflow-wrap:anywhere;}
+    .pl-row{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:6px;}
+    .pl-src{font-size:9.5px;padding:2px 7px;border-radius:9px;background:rgba(81,137,125,.12);color:var(--teal);font-weight:600;}
+    .pl-src.none{background:rgba(215,144,104,.16);color:#a8622f;}
+    .pl-val{font-size:11.5px;font-weight:700;color:var(--slate);}
+    .pl-warn{font-size:10px;color:var(--danger);font-weight:600;margin-top:5px;line-height:1.35;}
+    .pl-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px;margin-bottom:12px;}
+    .pl-stat{background:var(--white);border:1px solid var(--light2);border-radius:8px;padding:8px 10px;}
+    .pl-stat b{display:block;font-size:17px;color:var(--slate);}
+    .pl-stat span{font-size:10px;color:var(--muted);}
+    .pl-tl{border-left:2px solid var(--light2);margin:4px 0 14px 4px;padding-left:12px;}
+    .pl-tl div{font-size:12px;margin-bottom:7px;line-height:1.4;}
+    .pl-tl small{color:var(--muted);display:block;font-size:10.5px;}
+  </style>
+  <div class="ph">
+    <div><h2>Pipeline</h2><p>Every booking from first request to rebooking. Cards move on their own as bookings are confirmed, checked in, invoiced and delivered.</p></div>
+    <button class="btn btn-gold btn-sm" onclick="plAddLead()">+ Add Lead</button>
+  </div>
+  <div class="pl-bar">
+    <select id="pl-view" class="sinput" onchange="renderPipeline()" aria-label="Which bookings to show"></select>
+    <select id="pl-src" class="sinput" onchange="renderPipeline()" aria-label="Lead source"></select>
+    <input id="pl-q" class="sinput" type="search" placeholder="Search client…" oninput="renderPipeline()" aria-label="Search client">
+  </div>
+  <div id="pl-stats" class="pl-stats"></div>
+  <div id="pl-board" class="pl-board"></div>
+  <div class="card" style="margin-top:6px;">
+    <div class="ct">Lead Sources</div>
+    <div id="pl-sources" style="overflow-x:auto;"></div>
+  </div>
+</div>
+
 <div id="page-clients" class="page">
   <style>
     /* ── Scoped Clients page styles ── */
@@ -2805,6 +2849,7 @@ async function syncAll(){
     if(Array.isArray(d.registrations))    DB.registrations    =d.registrations;
     if(Array.isArray(d.acknowledgements)) DB.acknowledgements =d.acknowledgements;
     if(Array.isArray(d.bookings))         DB.bookings         =d.bookings;
+    if(Array.isArray(d.pipeline))         DB.pipeline         =d.pipeline;
     if(Array.isArray(d.transactions))     DB.transactions     =d.transactions;
     if(Array.isArray(d.eodReports))       DB.eodReports       =d.eodReports;
     if(Array.isArray(d.expenses))         DB.expenses         =d.expenses;
@@ -4717,6 +4762,7 @@ function showPage(pg){
     acknowledgement: renderAcks,
     invoice:      renderInvoicePage,
     clients:      renderClientsHub,
+    pipeline:     renderPipeline,
     transactions: ()=>{ if(hasUrl()&&(!DB.transactions||!DB.transactions.length)){ syncAll().then(()=>{ renderTxns(); showTxTab('inv'); }); } else { renderTxns(); showTxTab('inv'); } },
     expenses:     renderExpensesPage,
     gifts:        ()=>{ syncAll().then(renderGiftsPage); },
@@ -9713,6 +9759,327 @@ function renderLateArrivals(prefixes){
   }
   html += '<div style="font-size:10px;color:#6b8080;margin-top:8px;">Late = checked in more than '+LATE_GRACE_MIN+' minutes after the booked time slot, or after the call time 1.5 hours before the slot for hair &amp; makeup packages (check-in time at the kiosk). Walk-ins are not counted. The ₱'+fmt(LATE_FEE)+' fund deduction applies from '+LATE_FEE_START+'.</div>';
   el.innerHTML = html;
+}
+
+// ════════════════════════════════
+// PIPELINE — one card per booking, from request to rebooking.
+// Stages are worked out from what already happened (booking request, receipt,
+// check-in, invoice, photo link, feedback), so nobody has to move cards by hand.
+// Only leads, lost reasons, notes and hand-picked sources are saved (Pipeline sheet).
+// ════════════════════════════════
+var PL_START = '2026-09-01';         // older sessions stay out of the board
+var PL_STAGES = [
+  { id:'inquiry',   label:'Inquiry' },
+  { id:'requested', label:'Requested' },
+  { id:'payment',   label:'Payment Sent' },
+  { id:'confirmed', label:'Confirmed' },
+  { id:'shot',      label:'Shot' },
+  { id:'photos',    label:'Photos Sent' },
+  { id:'feedback',  label:'Feedback' },
+  { id:'rebooked',  label:'Rebooked' },
+  { id:'lost',      label:'Lost' }
+];
+var PL_SOURCES = ['Facebook/IG Ad','Facebook/IG Organic','Messenger','Google','Website','Referral','Repeat Client','Walk-in','Other'];
+var PL_ORGANIC = ['Facebook/IG Organic','Messenger','Google','Website','Walk-in'];   // not paid, not referral/repeat
+var PL_LOST = ['No deposit','Cancelled','No-show','Too expensive','Chose another studio','Schedule conflict','No reply','Other'];
+var _plDeals = [];
+
+function plRank(st){ return PL_STAGES.findIndex(function(x){ return x.id === st; }); }
+function plDay(v){ return dateOnly(v) || ''; }
+function plDaysSince(d){ return d ? Math.floor((Date.parse(todayStr()+'T00:00:00Z') - Date.parse(d+'T00:00:00Z'))/86400000) : 0; }
+function plItems(t){ var i = t.items; if(typeof i === 'string'){ try{ i = JSON.parse(i); }catch(e){ i = []; } } return Array.isArray(i) ? i : []; }
+
+// What the booking page sent, e.g. "Online Booking · facebook / nov_coatcode"
+function plRawSource(raw){
+  var m = String(raw||'').toLowerCase().replace(/^online booking\s*·\s*/,'').trim();
+  if(!m) return '';
+  var parts = m.split(' / '), src = parts[0].trim(), camp = (parts[1]||'').trim();
+  if(/chat|messenger/.test(camp) || /messenger/.test(src)) return 'Messenger';
+  if(/^(fb|facebook|ig|instagram|meta)/.test(src)) return camp ? 'Facebook/IG Ad' : 'Facebook/IG Organic';
+  if(/google/.test(src)) return 'Google';
+  if(src === 'direct') return 'Website';
+  return 'Other';
+}
+
+function plBuildDeals(){
+  var today = todayStr();
+  var rows = {}; (DB.pipeline||[]).forEach(function(r){ rows[String(r.id)] = r; });
+  var regs = DB.registrations||[];
+  var txns = (DB.transactions||[]).filter(function(t){ return !String(t.invoiceNum||'').startsWith('[VOID]'); });
+  var tasks = DB.tasks||[];
+  // Rows from the drive-link form are one column off: date in id, name in date, email in name
+  var fbs = (DB.feedback||[]).filter(function(f){ return /^\d{4}-\d{2}-\d{2}/.test(String(f.id||'')); })
+    .map(function(f){ return { date:String(f.id).slice(0,10), name:f.date, email:String(f.name||'').toLowerCase().trim(), rating:f.rating }; });
+  var deals = [], byKey = {};
+  function sameClient(d, name, email){
+    email = String(email||'').toLowerCase().trim();
+    return _nsSame(d.name, name) || !!(email && d.email && email === d.email);
+  }
+  function addDeal(o){ o.keys = o.keys || []; o.email = String(o.email||'').toLowerCase().trim(); deals.push(o); return o; }
+
+  // 1. Receipts: confirmed bookings
+  (DB.acknowledgements||[]).forEach(function(a){
+    var bd = plDay(a.bookDate);
+    if(!bd || bd < PL_START) return;
+    var twin = deals.find(function(d){ return d.session === bd && sameClient(d, a.fbName, a.email); });
+    if(twin){ twin.keys.push(String(a.id)); return; }
+    addDeal({ keys:[String(a.id)], name:a.fbName||'', email:a.email, phone:'', pkg:a.service||'', session:bd, slot:a.timeSlot||'', ack:a });
+  });
+  // 2. Online requests: join the receipt for the same client and day, else stand alone
+  (DB.bookings||[]).forEach(function(b){
+    var bd = plDay(b.date), name = b.fb_name||b.fbName||b.name||'', st = String(b.status||'');
+    if(!bd || bd < PL_START) return;
+    var hit = deals.find(function(d){ return d.session === bd && sameClient(d, name, b.email); });
+    if(hit){ hit.bk = hit.bk || b; hit.keys.push(String(b.id)); return; }
+    if(/resched/i.test(st)) return;                           // the moved booking has its own card
+    addDeal({ keys:[String(b.id)], name:name, email:b.email, phone:b.phone||'', pkg:b.package||'', session:bd, slot:b.time_slot||'', bk:b });
+  });
+  // 3. Walk-ins
+  regs.forEach(function(r){
+    var rd = plDay(r.date);
+    if(!rd || rd < PL_START) return;
+    var hit = deals.find(function(d){ return d.session === rd && sameClient(d, r.fbName, r.email); });
+    if(hit){ if(hit.keys.indexOf(String(r.id)) < 0) hit.keys.push(String(r.id)); return; }
+    if(r.arrType === 'walkin') addDeal({ keys:[String(r.id)], name:r.fbName||'', email:r.email, phone:'', pkg:'', session:rd, slot:'', walkin:r });
+  });
+  // 4. Leads added by hand: fold into the booking once that client books
+  (DB.pipeline||[]).forEach(function(r){
+    if(r.type !== 'lead') return;
+    var made = plDay(r.updatedAt) || today;
+    var hit = deals.find(function(d){ return d.session >= made && sameClient(d, r.name, r.email); });
+    if(hit){ hit.keys.push(String(r.id)); return; }
+    addDeal({ keys:[String(r.id)], name:r.name||'', email:r.email, phone:r.phone||'', pkg:r['package']||'', session:'', slot:'', lead:r, made:made });
+  });
+
+  deals.forEach(function(d){
+    var row = {}; d.keys.forEach(function(k){ var r = rows[k]; if(r) ['source','note','lostReason'].forEach(function(f){ if(r[f]) row[f] = r[f]; }); });
+    d.row = row;
+    var rec = d.lead ? null : d.session;
+    d.reg = rec ? regs.find(function(r){ return (d.ack && r.ackId && r.ackId === d.ack.id) || (plDay(r.date) === rec && sameClient(d, r.fbName, r.email)); }) : null;
+    d.txn = rec ? txns.find(function(t){ var td = plDay(t.date); return td && td >= rec && _nsGap(td, rec) <= 10 && _nsSame(t.clientName, d.name); }) : null;
+    if(d.txn && !d.pkg) d.pkg = (plItems(d.txn)[0]||{}).name || '';
+    var dp = d.ack ? +d.ack.downpayment||0 : 0, tp = d.ack ? +d.ack.totalPrice||0 : 0, bp = d.bk ? +d.bk.price||0 : 0;
+    d.value = d.txn ? (+d.txn.total||0) : (tp > dp ? tp : (bp || tp || dp || (d.lead ? +d.lead.value||0 : 0)));
+    d.paid = !!d.txn;
+    if(rec){
+      var job = tasks.find(function(t){
+        if(!_nsSame(t.client, d.name)) return false;
+        var sent = plDay(t.editedSentDate) || plDay(t.driveLinkSentDate);
+        return (sent && sent >= rec) || (t.stage === 'delivered' && plDay(t.completedAt) >= rec);
+      });
+      d.sent = job ? (plDay(job.editedSentDate) || plDay(job.driveLinkSentDate) || plDay(job.completedAt)) : '';
+      d.fb = fbs.find(function(f){ return f.date >= rec && ((d.email && f.email === d.email) || _nsSame(f.name, d.name)); }) || null;
+    }
+    d.prior = rec ? (txns.some(function(t){ var td = plDay(t.date); return td && td < rec && _nsGap(td, rec) > 1 && _nsSame(t.clientName, d.name); })
+                  || regs.some(function(r){ var rd = plDay(r.date); return rd && rd < rec && _nsGap(rd, rec) > 1 && _nsSame(r.fbName, d.name); })) : false;
+
+    var ackSt = d.ack ? String(d.ack.status||'') : '', bkSt = d.bk ? String(d.bk.status||'') : '';
+    var came = !!(d.reg || d.txn), past = rec && rec < today;
+    if(row.lostReason){ d.stage = 'lost'; d.lost = row.lostReason; }
+    else if(/cancel/i.test(ackSt) || (!d.ack && /cancel/i.test(bkSt))){ d.stage = 'lost'; d.lost = 'Cancelled'; }
+    else if(isNoShowStatus(ackSt)){ d.stage = 'lost'; d.lost = 'No-show'; }
+    else if(d.lead) d.stage = 'inquiry';
+    else if(came) d.stage = 'shot';
+    else if(d.ack){
+      if(past && plDaysSince(rec) > 10){ d.stage = 'lost'; d.lost = 'No-show'; } else d.stage = 'confirmed';
+    }
+    else if(past){ d.stage = 'lost'; d.lost = 'No deposit'; }
+    else d.stage = /payment submitted/i.test(bkSt) ? 'payment' : 'requested';
+    if(d.stage === 'shot'){ if(d.fb) d.stage = 'feedback'; else if(d.sent) d.stage = 'photos'; }
+  });
+
+  // Rebooked: a finished session with a later live booking for the same client
+  deals.forEach(function(d){
+    if(plRank(d.stage) < plRank('shot') || d.stage === 'lost') return;
+    var next = deals.find(function(x){ return x !== d && x.session > d.session && x.stage !== 'lost' && !x.lead && sameClient(d, x.name, x.email); });
+    if(next){ d.stage = 'rebooked'; d.next = next; }
+  });
+
+  deals.forEach(function(d){
+    var referral = d.bk ? String(d.bk['']||d.bk.referred_by||'').trim() : '';
+    d.referral = referral;
+    d.source = d.row.source || (referral ? 'Referral' : '') || (d.prior ? 'Repeat Client' : '')
+      || plRawSource(d.bk && d.bk.source) || (d.walkin ? 'Walk-in' : '') || '';
+    var when = d.bk ? plDay(d.bk.submitted) : (d.ack ? plDay(d.ack.date) : (d.lead ? d.made : d.session));
+    d.since = when;
+    d.warn = '';
+    var age = plDaysSince(when), overdue = plDaysSince(d.session);
+    if(d.stage === 'requested' && age >= 1) d.warn = 'No deposit for '+age+' day'+(age!==1?'s':'');
+    else if(d.stage === 'payment') d.warn = 'Check payment and confirm';
+    else if(d.stage === 'confirmed' && d.session < today) d.warn = 'Session passed, no check-in';
+    else if(d.stage === 'shot' && overdue > 10) d.warn = 'Photos not sent, '+overdue+' days';
+  });
+  return deals;
+}
+
+function plFillFilters(){
+  var v = document.getElementById('pl-view'), s = document.getElementById('pl-src');
+  if(v && !v.options.length){
+    var html = '<option value="open">Open now</option>', y = +PL_START.slice(0,4), m = +PL_START.slice(5,7);
+    var end = todayStr().slice(0,7), list = [];
+    while(true){ var ym = y+'-'+String(m).padStart(2,'0'); list.push(ym); if(ym >= end) break; m++; if(m > 12){ m = 1; y++; } }
+    list.reverse().forEach(function(ym){
+      html += '<option value="'+ym+'">'+new Date(ym+'-01T00:00:00').toLocaleDateString('en-PH',{month:'long',year:'numeric'})+' sessions</option>';
+    });
+    v.innerHTML = html;
+  }
+  if(s && !s.options.length){
+    s.innerHTML = '<option value="">All sources</option>'+PL_SOURCES.map(function(x){ return '<option>'+escHtml(x)+'</option>'; }).join('')+'<option value="__none">Not set</option>';
+  }
+}
+
+function plInView(d, view){
+  if(view !== 'open') return !!d.session && d.session.slice(0,7) === view;
+  var age = d.session ? plDaysSince(d.session) : 0;
+  if(['feedback','rebooked','lost'].indexOf(d.stage) !== -1) return age <= 30;
+  if(d.stage === 'shot' || d.stage === 'photos') return age <= 60;
+  return true;
+}
+
+function plCard(d){
+  var i = _plDeals.indexOf(d);
+  return '<button type="button" class="pl-card" onclick="plOpen('+i+')">'+
+    '<div class="pl-name">'+escHtml(d.name||'—')+'</div>'+
+    (d.pkg ? '<div class="pl-sub">'+escHtml(d.pkg)+'</div>' : '')+
+    '<div class="pl-sub">'+(d.session ? escHtml(d.session)+(d.slot?' · '+escHtml(d.slot):'') : 'Lead added '+escHtml(d.since||''))+(d.lost?' · '+escHtml(d.lost):'')+'</div>'+
+    '<div class="pl-row"><span class="pl-src'+(d.source?'':' none')+'">'+escHtml(d.source||'Set source')+'</span>'+(d.value?'<span class="pl-val">₱'+fmt(d.value)+'</span>':'')+'</div>'+
+    (d.warn ? '<div class="pl-warn">'+escHtml(d.warn)+'</div>' : '')+
+  '</button>';
+}
+
+function renderPipeline(){
+  var board = document.getElementById('pl-board');
+  if(!board) return;
+  plFillFilters();
+  _plDeals = plBuildDeals();
+  var view = document.getElementById('pl-view').value || 'open';
+  var src  = document.getElementById('pl-src').value;
+  var q    = (document.getElementById('pl-q').value||'').trim().toLowerCase();
+  var shown = _plDeals.filter(function(d){
+    if(q) { if(String(d.name).toLowerCase().indexOf(q) === -1) return false; }
+    else if(!plInView(d, view)) return false;
+    if(src === '__none') return !d.source;
+    return !src || d.source === src;
+  });
+  board.innerHTML = PL_STAGES.map(function(st){
+    var list = shown.filter(function(d){ return d.stage === st.id; })
+      .sort(function(a,b){ return String(a.session).localeCompare(String(b.session)); });
+    var sum = list.reduce(function(t,d){ return t + (d.value||0); }, 0);
+    return '<div class="pl-col"><div class="pl-col-h"><span class="pl-col-t">'+st.label+' · '+list.length+'</span><span class="pl-col-n">'+(sum?'₱'+fmt(sum):'')+'</span></div>'+
+      list.map(plCard).join('')+'</div>';
+  }).join('');
+
+  var live = shown.filter(function(d){ return ['inquiry','requested','payment','confirmed'].indexOf(d.stage) !== -1; });
+  var booked = shown.filter(function(d){ return d.ack || d.walkin; });
+  var noCancel = booked.filter(function(d){ return d.stage !== 'lost'; });
+  var came = shown.filter(function(d){ return d.reg || d.txn; });
+  var sent = shown.filter(function(d){ return plRank(d.stage) >= plRank('photos') && d.stage !== 'lost'; });
+  var fb = shown.filter(function(d){ return !!d.fb; });
+  var lost = shown.filter(function(d){ return d.stage === 'lost'; });
+  var pct = function(a,b){ return b ? Math.round(a/b*100)+'%' : '—'; };
+  var box = function(v,l){ return '<div class="pl-stat"><b>'+v+'</b><span>'+l+'</span></div>'; };
+  document.getElementById('pl-stats').innerHTML =
+    box(live.length, 'Open · ₱'+fmt(live.reduce(function(t,d){ return t+(d.value||0); },0)))+
+    box(noCancel.length, 'Confirmed bookings')+
+    box(pct(came.length, noCancel.length), 'Showed up')+
+    box(pct(sent.length, came.length), 'Photos sent')+
+    box(pct(fb.length, sent.length), 'Gave feedback')+
+    box(lost.length, 'Lost');
+
+  var table = PL_SOURCES.concat(['']).map(function(s){
+    var l = shown.filter(function(d){ return (d.source||'') === s; });
+    if(!l.length) return '';
+    var won = l.filter(function(d){ return (d.ack || d.walkin) && d.stage !== 'lost'; });
+    var rev = l.reduce(function(t,d){ return t + (d.paid ? +d.txn.total||0 : 0); }, 0);
+    return '<tr><td>'+(s ? escHtml(s) : '<span style="color:var(--muted);">Not set</span>')+'</td><td style="text-align:right;">'+l.length+'</td><td style="text-align:right;">'+won.length+'</td><td style="text-align:right;">'+pct(won.length,l.length)+'</td><td style="text-align:right;">₱'+fmt(rev)+'</td></tr>';
+  }).join('');
+  var organic = shown.filter(function(d){ return PL_ORGANIC.indexOf(d.source) !== -1 && (d.ack || d.walkin) && d.stage !== 'lost'; }).length;
+  document.getElementById('pl-sources').innerHTML = table
+    ? '<table><thead><tr><th>Source</th><th style="text-align:right;">Bookings</th><th style="text-align:right;">Confirmed</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Invoiced</th></tr></thead><tbody>'+table+'</tbody></table>'+
+      '<div class="tm" style="margin-top:8px;">Organic confirmed bookings here: <strong>'+organic+'</strong> (everything except ads, referrals, repeat clients and Not set).</div>'
+    : '<div class="tm">No bookings to show.</div>';
+}
+
+function plOpen(i){
+  var d = _plDeals[i];
+  if(!d) return;
+  var ev = [];
+  var add = function(when, what, sub){ if(when) ev.push({ when:when, what:what, sub:sub||'' }); };
+  if(d.lead) add(d.made, 'Lead added', d.lead.phone||'');
+  if(d.bk) add(plDay(d.bk.submitted), 'Booking requested', 'Status: '+(d.bk.status||'—'));
+  if(d.ack) add(plDay(d.ack.date), 'Deposit recorded, receipt '+(d.ack.ackNum||''), '₱'+fmt(+d.ack.downpayment||0)+' via '+(d.ack.mop||'—'));
+  if(d.reg) add(plDay(d.reg.date), 'Checked in', fmtTimePHT(d.reg.time));
+  if(d.txn) add(plDay(d.txn.date), 'Invoiced '+(d.txn.invoiceNum||''), '₱'+fmt(+d.txn.total||0));
+  if(d.sent) add(d.sent, 'Photos sent');
+  if(d.fb) add(d.fb.date, 'Feedback received', d.fb.rating ? d.fb.rating+' stars' : '');
+  if(d.next) add(d.next.session, 'Booked again', d.next.pkg);
+  ev.sort(function(a,b){ return a.when.localeCompare(b.when); });
+  var opts = function(list, cur, blank){ return '<option value="">'+blank+'</option>'+list.map(function(x){ return '<option'+(x===cur?' selected':'')+'>'+escHtml(x)+'</option>'; }).join(''); };
+  var stage = (PL_STAGES.find(function(s){ return s.id === d.stage; })||{}).label;
+  openModal(
+    '<h3 style="margin-bottom:4px;">'+escHtml(d.name||'Client')+'</h3>'+
+    '<p class="tm" style="margin-bottom:12px;">'+escHtml(stage)+(d.lost?' · '+escHtml(d.lost):'')+(d.pkg?' · '+escHtml(d.pkg):'')+(d.session?' · '+escHtml(d.session)+(d.slot?' '+escHtml(d.slot):''):'')+(d.value?' · ₱'+fmt(d.value):'')+'</p>'+
+    (ev.length ? '<div class="pl-tl">'+ev.map(function(e){ return '<div>'+escHtml(e.what)+'<small>'+escHtml(e.when)+(e.sub?' · '+escHtml(e.sub):'')+'</small></div>'; }).join('')+'</div>' : '')+
+    (d.referral ? '<p class="tm" style="margin-bottom:10px;">Referred by: <strong>'+escHtml(d.referral)+'</strong></p>' : '')+
+    '<div class="field mb12"><label for="pl-m-src">Lead source</label><select id="pl-m-src" class="sinput" style="width:100%;">'+opts(PL_SOURCES, d.source, 'Not set')+'</select></div>'+
+    '<div class="field mb12"><label for="pl-m-note">Note</label><textarea id="pl-m-note" class="sinput" rows="2" style="width:100%;">'+escHtml(d.row.note||'')+'</textarea></div>'+
+    '<div class="field mb12"><label for="pl-m-lost">Lost reason</label><select id="pl-m-lost" class="sinput" style="width:100%;">'+opts(PL_LOST, d.row.lostReason||'', 'Not lost')+'</select></div>'+
+    '<div class="fe" style="gap:8px;flex-wrap:wrap;">'+
+      (d.lead ? '' : '<button class="btn btn-outline" onclick="plProfile('+i+')">Client Profile</button>')+
+      '<button class="btn btn-outline" onclick="closeModal()">Close</button>'+
+      '<button class="btn btn-gold" onclick="plSaveDeal('+i+')">Save</button>'+
+    '</div>'
+  );
+}
+function plProfile(i){ var d = _plDeals[i]; if(!d) return; closeModal(); openClientProfile(JSON.stringify(d.name)); }
+
+function plPushRow(row){
+  row.updatedAt = todayStr();
+  row.updatedBy = CURR_USER || '';
+  DB.pipeline = DB.pipeline || [];
+  var ex = DB.pipeline.find(function(r){ return String(r.id) === String(row.id); });
+  if(ex) Object.assign(ex, row); else DB.pipeline.push(row);
+  saveLocal();
+  return push('savePipeline', row);
+}
+async function plSaveDeal(i){
+  var d = _plDeals[i];
+  if(!d) return;
+  var src  = document.getElementById('pl-m-src').value;
+  var note = document.getElementById('pl-m-note').value.trim();
+  var lost = document.getElementById('pl-m-lost').value;
+  var key  = d.keys.find(function(k){ return (DB.pipeline||[]).some(function(r){ return String(r.id) === k; }); }) || d.keys[0];
+  // Keep an automatic source automatic: only save it when staff changed it
+  var keep = src === d.source && !d.row.source ? '' : src;
+  closeModal();
+  var job = plPushRow({ id:key, type:d.lead?'lead':'deal', name:d.name, source:keep, note:note, lostReason:lost, lostAt:lost?todayStr():'' });
+  renderPipeline();
+  notify('Saved','success');
+  await job;
+}
+function plAddLead(){
+  openModal(
+    '<h3 style="margin-bottom:12px;">Add Lead</h3>'+
+    '<p class="tm" style="margin-bottom:12px;">For someone who asked but has not booked yet. The card joins their booking once they book.</p>'+
+    '<div class="field mb12"><label for="pl-l-name">Name *</label><input id="pl-l-name" class="sinput" style="width:100%;" list="client-names-list" autocomplete="off"></div>'+
+    '<div class="field mb12"><label for="pl-l-phone">Phone</label><input id="pl-l-phone" class="sinput" type="tel" style="width:100%;"></div>'+
+    '<div class="field mb12"><label for="pl-l-pkg">Interested in</label><input id="pl-l-pkg" class="sinput" style="width:100%;"></div>'+
+    '<div class="field mb12"><label for="pl-l-src">Lead source</label><select id="pl-l-src" class="sinput" style="width:100%;"><option value="">Not set</option>'+PL_SOURCES.map(function(x){ return '<option>'+escHtml(x)+'</option>'; }).join('')+'</select></div>'+
+    '<div class="field mb12"><label for="pl-l-note">Note</label><textarea id="pl-l-note" class="sinput" rows="2" style="width:100%;"></textarea></div>'+
+    '<div class="fe" style="gap:8px;"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-gold" onclick="plSaveLead()">Add Lead</button></div>'
+  );
+}
+async function plSaveLead(){
+  var name = document.getElementById('pl-l-name').value.trim();
+  if(!name){ notify('Enter a name','error'); return; }
+  var row = { id:'ld'+uid(), type:'lead', name:name, phone:document.getElementById('pl-l-phone').value.trim(),
+    'package':document.getElementById('pl-l-pkg').value.trim(), source:document.getElementById('pl-l-src').value,
+    note:document.getElementById('pl-l-note').value.trim() };
+  closeModal();
+  var job = plPushRow(row);
+  renderPipeline();
+  notify('Lead added','success');
+  await job;
 }
 
 // ════════════════════════════════
